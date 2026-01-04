@@ -12,6 +12,8 @@ Group=nano
 Environment="ISAAC_DEV_DIR=/home/nano/src/jetson-orin-nano"
 Environment="ISAAC_INSTALL_DIR=/opt/isaac-robot"
 Environment="PYTHONPATH=/home/nano/src/jetson-orin-nano:/opt/isaac-robot"
+# Graph selection: minimal, full, or robot (can be overridden via systemd edit)
+# Environment="ROBOT_GRAPH=minimal"
 
 # Find Isaac root (dev takes precedence) and start robot
 ExecStart=/bin/bash -c 'ISAAC_ROOT=$(python3 /home/nano/src/jetson-orin-nano/scripts/utils/find_isaac_root.py 2>/dev/null || python3 /opt/isaac-robot/scripts/utils/find_isaac_root.py 2>/dev/null || echo "/opt/isaac-robot"); cd "$ISAAC_ROOT"; exec "$ISAAC_ROOT/scripts/system/start_robot.sh"'
