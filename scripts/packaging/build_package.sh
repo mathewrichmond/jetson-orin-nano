@@ -40,8 +40,8 @@ cp -r control "${PACKAGE_DIR}/" 2>/dev/null || true
 # Root files
 cp setup.sh "${PACKAGE_DIR}/"
 cp Makefile "${PACKAGE_DIR}/"
-cp WORKFLOW.md "${PACKAGE_DIR}/"
 cp README.md "${PACKAGE_DIR}/"
+cp CONTRIBUTING.md "${PACKAGE_DIR}/"
 cp LICENSE "${PACKAGE_DIR}/"
 cp requirements-dev.txt "${PACKAGE_DIR}/" 2>/dev/null || true
 cp .editorconfig "${PACKAGE_DIR}/"

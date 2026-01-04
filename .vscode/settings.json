@@ -107,5 +107,8 @@
     "**/build/**": true,
     "**/install/**": true,
     "**/log/**": true
-  }
+  },
+  "cursorpyright.analysis.autoImportCompletions": true,
+  "cursorpyright.analysis.diagnosticMode": "workspace",
+  "cursorpyright.analysis.typeCheckingMode": "basic"
 }

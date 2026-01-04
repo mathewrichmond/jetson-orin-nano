@@ -34,4 +34,4 @@ cd ~/src/jetson-orin-nano
 ./setup.sh
 ```
 
-See [WORKFLOW.md](../../WORKFLOW.md) for complete workflow documentation.
+See [Development Workflow](../../docs/development/WORKFLOW.md) for complete workflow documentation.

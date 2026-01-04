@@ -25,7 +25,9 @@ robot:
         - /system/disk/usage
         - /system/power
         - /system/alerts
-      subscribe: []
+        - /system/camera/health
+      subscribe:
+        - /realsense/status
 
   # VLA Controller (placeholder for future)
   vla_controller:
@@ -44,6 +46,36 @@ robot:
         - /camera/image
         - /system/status
 
+  # RealSense Cameras
+  realsense_camera:
+    enabled: true
+    package: realsense_camera
+    node: realsense_camera_node
+    namespace: /hardware
+    parameters:
+      enable_color: true
+      enable_depth: true
+      enable_pointcloud: false
+      color_width: 640
+      color_height: 480
+      color_fps: 30
+      depth_width: 640
+      depth_height: 480
+      depth_fps: 30
+      publish_rate: 30.0
+    topics:
+      publish:
+        - /camera_front/color/image_raw
+        - /camera_front/color/camera_info
+        - /camera_front/depth/image_rect_raw
+        - /camera_front/depth/camera_info
+        - /camera_rear/color/image_raw
+        - /camera_rear/color/camera_info
+        - /camera_rear/depth/image_rect_raw
+        - /camera_rear/depth/camera_info
+        - /realsense/status
+      subscribe: []
+
   # Hardware Drivers (placeholder for future)
   hardware_drivers:
     enabled: false
@@ -51,12 +83,9 @@ robot:
     node: hardware_drivers_node
     namespace: /hardware
     parameters:
-      realsense_enabled: true
       motor_controllers_enabled: true
     topics:
       publish:
-        - /camera/image
-        - /camera/depth
         - /hardware/motor/status
       subscribe:
         - /control/commands
@@ -87,9 +116,11 @@ groups:
     - vla_controller
 
   hardware:
+    - realsense_camera
     - hardware_drivers
 
   all:
     - system_monitor
     - vla_controller
+    - realsense_camera
     - hardware_drivers

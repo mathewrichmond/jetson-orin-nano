@@ -93,7 +93,7 @@ The setup script works identically on:
 - **Docker containers**
 - **Ubuntu development machines**
 
-See [WORKFLOW.md](WORKFLOW.md) for detailed workflow documentation.
+See [Development Workflow](docs/development/WORKFLOW.md) for detailed workflow documentation.
 
 ### First-Time Jetson Setup
 
@@ -134,9 +134,12 @@ ros2 --help
 
 ## 📚 Documentation
 
+- **[Quick Start](docs/QUICK_START.md)** - Quick reference for common tasks
 - **[Setup Guide](docs/setup/SETUP.md)** - Comprehensive system setup instructions
+- **[Development Workflow](docs/development/WORKFLOW.md)** - Development workflow and practices
 - **[Architecture](docs/architecture/ARCHITECTURE.md)** - System architecture and design
 - **[Hardware Setup](docs/hardware/HARDWARE.md)** - Hardware integration guides
+- **[Deployment](docs/deployment/DEPLOYMENT.md)** - Deployment and CI/CD guides
 - **[API Documentation](docs/api/API.md)** - Code API reference
 
 ## 🔌 Hardware Support

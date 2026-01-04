@@ -45,10 +45,45 @@ This is a **robot system**. All changes must consider:
 
 ## Documentation
 
+### Documentation Policies
+
+**IMPORTANT**: Follow these rules to prevent documentation sprawl:
+
+1. **Location Rules**:
+   - **README.md**: Only in package roots (`src/<package>/README.md`) and repository root
+   - **All other docs**: Must be in `docs/` folder, organized by topic
+   - **No root-level docs**: Except `README.md` and `CONTRIBUTING.md`
+
+2. **Consolidation Rules**:
+   - **Prefer updating existing docs** over creating new ones
+   - **Merge redundant content** into single authoritative docs
+   - **Remove deprecated docs** - don't document deprecated features
+   - **One doc per topic** - consolidate related quick starts into main docs
+
+3. **Documentation Structure**:
+   - `docs/setup/` - Setup and installation guides
+   - `docs/development/` - Development workflow and tools
+   - `docs/deployment/` - Deployment and CI/CD
+   - `docs/hardware/` - Hardware setup and configuration
+   - `docs/system/` - System configuration (WiFi, Bluetooth, etc.)
+   - `docs/robot/` - Robot-specific documentation
+   - `docs/monitoring/` - Monitoring and diagnostics
+   - `docs/architecture/` - System architecture and design
+
+4. **Before Creating New Docs**:
+   - Check if similar doc exists in `docs/`
+   - Update existing doc instead of creating new one
+   - If creating new doc, ensure it's in correct `docs/` subfolder
+   - Never create test/summary/temporary markdown files
+
+### Documentation Guidelines
+
 - Keep documentation up to date
 - Add examples for complex features
 - Document assumptions and requirements
 - Include troubleshooting tips
+- Use `docs/QUICK_START.md` for quick reference
+- Link to detailed docs from quick start
 
 ## Testing
 
@@ -64,4 +99,3 @@ By contributing to this project, you agree that your contributions will be licen
 ## Questions
 
 For questions or clarifications, contact the maintainer.
-
