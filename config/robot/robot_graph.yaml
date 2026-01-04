@@ -1,0 +1,95 @@
+# Robot Graph Configuration
+# Defines the complete robot system topology and node connections
+
+robot:
+  # System components
+  system_monitor:
+    enabled: true
+    package: system_monitor
+    node: system_monitor_node
+    namespace: /system
+    parameters:
+      update_rate: 1.0
+      temp_warning_threshold: 70.0
+      temp_critical_threshold: 85.0
+      cpu_warning_threshold: 80.0
+      memory_warning_threshold: 85.0
+      disk_warning_threshold: 85.0
+    topics:
+      publish:
+        - /system/status
+        - /system/temperature/cpu
+        - /system/temperature/gpu
+        - /system/cpu/usage
+        - /system/memory/usage
+        - /system/disk/usage
+        - /system/power
+        - /system/alerts
+      subscribe: []
+
+  # VLA Controller (placeholder for future)
+  vla_controller:
+    enabled: false
+    package: vla_controller
+    node: vla_controller_node
+    namespace: /control
+    parameters:
+      model_path: ""
+      update_rate: 10.0
+    topics:
+      publish:
+        - /control/commands
+        - /control/status
+      subscribe:
+        - /camera/image
+        - /system/status
+
+  # Hardware Drivers (placeholder for future)
+  hardware_drivers:
+    enabled: false
+    package: hardware_drivers
+    node: hardware_drivers_node
+    namespace: /hardware
+    parameters:
+      realsense_enabled: true
+      motor_controllers_enabled: true
+    topics:
+      publish:
+        - /camera/image
+        - /camera/depth
+        - /hardware/motor/status
+      subscribe:
+        - /control/commands
+
+  # Communication with sub-modules (placeholder)
+  submodules:
+    raspberry_pi:
+      enabled: false
+      namespace: /submodules/rpi
+      topics:
+        publish:
+          - /submodules/rpi/status
+        subscribe:
+          - /submodules/rpi/commands
+
+# Topic remappings
+remappings:
+  # Example remappings for different robot configurations
+  # - from: /camera/image
+  #   to: /front_camera/image
+
+# Node groups
+groups:
+  core:
+    - system_monitor
+
+  control:
+    - vla_controller
+
+  hardware:
+    - hardware_drivers
+
+  all:
+    - system_monitor
+    - vla_controller
+    - hardware_drivers

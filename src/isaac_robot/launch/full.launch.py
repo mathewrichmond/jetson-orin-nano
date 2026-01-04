@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""
+Full Robot Launch
+Launches complete robot system with all components
+"""
+
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.actions import ExecuteProcess
+import os
+
+
+def generate_launch_description():
+    # System Monitor
+    script_path = os.path.expanduser('~/ros2_ws/install/system_monitor/local/lib/python3.10/dist-packages/system_monitor/system_monitor_node.py')
+    system_monitor_node = ExecuteProcess(
+        cmd=[
+            '/bin/bash', '-c',
+            f'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && python3 {script_path}'
+        ],
+        name='system_monitor',
+        output='screen',
+        env={
+            'HOME': os.path.expanduser('~'),
+            'ROS_DOMAIN_ID': os.environ.get('ROS_DOMAIN_ID', '0'),
+            **os.environ,
+        }
+    )
+
+    # VLA Controller (placeholder - will be enabled when package exists)
+    # vla_controller_node = Node(
+    #     package='vla_controller',
+    #     executable='vla_controller_node',
+    #     name='vla_controller',
+    #     namespace='control',
+    #     output='screen',
+    # )
+
+    # Hardware Drivers (placeholder - will be enabled when package exists)
+    # hardware_drivers_node = Node(
+    #     package='hardware_drivers',
+    #     executable='hardware_drivers_node',
+    #     name='hardware_drivers',
+    #     namespace='hardware',
+    #     output='screen',
+    # )
+
+    return LaunchDescription([
+        system_monitor_node,
+        # vla_controller_node,
+        # hardware_drivers_node,
+    ])

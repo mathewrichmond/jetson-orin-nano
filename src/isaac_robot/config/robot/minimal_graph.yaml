@@ -1,0 +1,18 @@
+# Minimal Robot Graph Configuration
+# Only essential nodes for basic operation
+
+robot:
+  system_monitor:
+    enabled: true
+    package: system_monitor
+    node: system_monitor_node
+    namespace: /system
+    parameters:
+      update_rate: 1.0
+      temp_warning_threshold: 70.0
+      temp_critical_threshold: 85.0
+
+groups:
+  minimal:
+    - system_monitor
+

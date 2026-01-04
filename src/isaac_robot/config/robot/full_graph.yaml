@@ -1,0 +1,43 @@
+# Full Robot Graph Configuration
+# Complete robot system with all components enabled
+
+robot:
+  system_monitor:
+    enabled: true
+    package: system_monitor
+    node: system_monitor_node
+    namespace: /system
+    parameters:
+      update_rate: 2.0
+      temp_warning_threshold: 75.0
+      temp_critical_threshold: 90.0
+      cpu_warning_threshold: 85.0
+      memory_warning_threshold: 90.0
+      disk_warning_threshold: 90.0
+
+  vla_controller:
+    enabled: true
+    package: vla_controller
+    node: vla_controller_node
+    namespace: /control
+    parameters:
+      model_path: ""
+      update_rate: 10.0
+      max_speed: 1.0
+
+  hardware_drivers:
+    enabled: true
+    package: hardware_drivers
+    node: hardware_drivers_node
+    namespace: /hardware
+    parameters:
+      realsense_enabled: true
+      motor_controllers_enabled: true
+      camera_fps: 30
+
+groups:
+  full:
+    - system_monitor
+    - vla_controller
+    - hardware_drivers
+
