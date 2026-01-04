@@ -81,7 +81,7 @@ step_update_system() {
         return 0
     fi
 
-    log_step "1" "6" "Updating system packages"
+    log_step "1" "10" "Updating system packages"
 
     if ! check_root; then
         sudo apt-get update
@@ -101,7 +101,7 @@ step_install_system_packages() {
         return 0
     fi
 
-    log_step "2" "6" "Installing system packages"
+    log_step "2" "10" "Installing system packages"
 
     # Check if package manager exists
     if [ ! -f "$SCRIPT_DIR/scripts/utils/package_manager.py" ]; then
@@ -137,7 +137,7 @@ step_install_python_packages() {
         return 0
     fi
 
-    log_step "3" "6" "Installing Python packages"
+    log_step "3" "10" "Installing Python packages"
 
     # Upgrade pip
     pip3 install --upgrade pip setuptools wheel --user || sudo pip3 install --upgrade pip setuptools wheel
@@ -170,7 +170,7 @@ step_setup_ros2_workspace() {
         return 0
     fi
 
-    log_step "4" "6" "Setting up ROS 2 workspace"
+    log_step "4" "10" "Setting up ROS 2 workspace"
 
     # Check if ROS 2 is installed
     if [ ! -f "/opt/ros/humble/setup.bash" ]; then
@@ -224,7 +224,7 @@ step_setup_venv() {
         return 0
     fi
 
-    log_step "5" "7" "Setting up Python virtual environment"
+    log_step "5" "10" "Setting up Python virtual environment"
 
     if [ ! -d "$SCRIPT_DIR/.venv" ]; then
         python3 -m venv "$SCRIPT_DIR/.venv"
@@ -249,7 +249,7 @@ step_install_precommit() {
         return 0
     fi
 
-    log_step "6" "7" "Installing pre-commit hooks"
+    log_step "6" "10" "Installing pre-commit hooks"
 
     if [ -d "$SCRIPT_DIR/.git" ] && [ -f "$SCRIPT_DIR/.pre-commit-config.yaml" ]; then
         if command -v pre-commit &> /dev/null; then
@@ -265,7 +265,95 @@ step_install_precommit() {
     mark_step_complete "install_precommit"
 }
 
-# Step 7: Install systemd services (optional, only on Jetson)
+# Step 7: Setup Bluetooth (optional, only on Jetson)
+step_setup_bluetooth() {
+    if [ "$ENV_TYPE" != "jetson" ]; then
+        return 0
+    fi
+
+    if check_step "setup_bluetooth"; then
+        log "Skipping: Bluetooth setup already completed"
+        return 0
+    fi
+
+    log_step "7" "10" "Setting up Bluetooth (optional)"
+    echo ""
+    echo "Setup Bluetooth support? (y/N)"
+    echo "This will install Bluetooth packages and enable the Bluetooth service."
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        if [ -f "$SCRIPT_DIR/scripts/system/setup_bluetooth.sh" ]; then
+            "$SCRIPT_DIR/scripts/system/setup_bluetooth.sh"
+            mark_step_complete "setup_bluetooth"
+        else
+            log "WARNING: Bluetooth setup script not found"
+        fi
+    else
+        log "Skipping Bluetooth setup. Run manually: ./scripts/system/setup_bluetooth.sh"
+    fi
+}
+
+# Step 8: Setup WiFi with Ethernet priority (optional, only on Jetson)
+step_setup_wifi() {
+    if [ "$ENV_TYPE" != "jetson" ]; then
+        return 0
+    fi
+
+    if check_step "setup_wifi"; then
+        log "Skipping: WiFi setup already completed"
+        return 0
+    fi
+
+    log_step "8" "10" "Setting up WiFi with Ethernet priority (optional)"
+    echo ""
+    echo "Setup WiFi as fallback when Ethernet is disconnected? (y/N)"
+    echo "Ethernet will be preferred, WiFi will connect automatically when Ethernet is unavailable."
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        if [ -f "$SCRIPT_DIR/scripts/system/setup_wifi.sh" ]; then
+            if [ "$EUID" -eq 0 ]; then
+                "$SCRIPT_DIR/scripts/system/setup_wifi.sh"
+            else
+                sudo "$SCRIPT_DIR/scripts/system/setup_wifi.sh"
+            fi
+            mark_step_complete "setup_wifi"
+        else
+            log "WARNING: WiFi setup script not found"
+        fi
+    else
+        log "Skipping WiFi setup. Run manually: sudo ./scripts/system/setup_wifi.sh"
+    fi
+}
+
+# Step 9: Setup USB-C display and dock (optional, only on Jetson)
+step_setup_usbc_display() {
+    if [ "$ENV_TYPE" != "jetson" ]; then
+        return 0
+    fi
+
+    if check_step "setup_usbc_display"; then
+        log "Skipping: USB-C display setup already completed"
+        return 0
+    fi
+
+    log_step "9" "10" "Setting up USB-C display and dock support (optional)"
+    echo ""
+    echo "Setup USB-C display and dock support? (y/N)"
+    echo "This will check your USB-C ports and configure display support."
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        if [ -f "$SCRIPT_DIR/scripts/hardware/setup_usbc_display.sh" ]; then
+            "$SCRIPT_DIR/scripts/hardware/setup_usbc_display.sh"
+            mark_step_complete "setup_usbc_display"
+        else
+            log "WARNING: USB-C display setup script not found"
+        fi
+    else
+        log "Skipping USB-C display setup. Run manually: ./scripts/hardware/setup_usbc_display.sh"
+    fi
+}
+
+# Step 10: Install systemd services (optional, only on Jetson)
 step_install_services() {
     if [ "$ENV_TYPE" != "jetson" ]; then
         return 0
@@ -276,7 +364,7 @@ step_install_services() {
         return 0
     fi
 
-    log_step "7" "7" "Installing systemd services (optional)"
+    log_step "10" "10" "Installing systemd services (optional)"
     echo ""
     echo "Install systemd services for auto-start and maintenance? (y/N)"
     read -r response
@@ -308,6 +396,9 @@ main() {
     step_setup_ros2_workspace
     step_setup_venv
     step_install_precommit
+    step_setup_bluetooth
+    step_setup_wifi
+    step_setup_usbc_display
     step_install_services
 
     log_section "Setup Complete!"
@@ -324,7 +415,16 @@ main() {
     echo "   ros2 launch system_monitor system_monitor.launch.py"
     echo ""
     if [ "$ENV_TYPE" = "jetson" ]; then
-        echo "4. Install auto-start services (optional):"
+        echo "4. Setup Bluetooth (if needed):"
+        echo "   ./scripts/system/setup_bluetooth.sh"
+        echo ""
+        echo "5. Setup WiFi (if needed):"
+        echo "   sudo ./scripts/system/setup_wifi.sh"
+        echo ""
+        echo "6. Setup USB-C display/dock (if needed):"
+        echo "   ./scripts/hardware/setup_usbc_display.sh"
+        echo ""
+        echo "7. Install auto-start services (optional):"
         echo "   sudo ./scripts/system/install_services.sh"
         echo ""
         echo "   This enables:"

@@ -122,6 +122,9 @@ system:
     - x11-xserver-utils
     - x11-utils
     - x11-apps
+    - xrandr
+    # DisplayLink driver for USB-C docks (optional, install separately if needed)
+    # - displaylink-driver
 
   # WiFi and networking
   networking:
@@ -129,6 +132,13 @@ system:
     - iw
     - wpasupplicant
     - network-manager-gnome
+
+  # Bluetooth
+  bluetooth:
+    - bluez
+    - bluez-tools
+    - bluetooth
+    - pulseaudio-module-bluetooth
 
   # Monitoring tools
   monitoring:
@@ -177,4 +187,3 @@ groups:
     - ros2
     - monitoring
     - networking
-
