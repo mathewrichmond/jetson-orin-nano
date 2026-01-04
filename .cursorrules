@@ -1,0 +1,97 @@
+# Isaac Robot System - Cursor AI Rules
+
+This repository contains the software stack for the Isaac robot system running on a Jetson Orin Nano.
+
+## Repository Purpose
+
+This is a **robot control system** repository that:
+- Manages system setup and hardware integration for a Jetson Orin Nano
+- Implements a VLA (Vision-Language-Action) model controller
+- Integrates Realsense cameras, motor controllers, and other hardware
+- Provides system monitoring, logging, and control mode switching
+- Supports sub-module controllers (Raspberry Pi, etc.)
+
+## Key Principles
+
+1. **Safety First**: This is a robot system. All code changes must consider safety implications.
+2. **Stability**: The system should be self-updating, self-cleaning, and self-restoring where possible.
+3. **Documentation**: Code should be well-documented for both humans and AI tools.
+4. **Modularity**: Hardware drivers, control modes, and utilities should be modular and reusable.
+
+## Directory Structure
+
+- `scripts/`: Setup, installation, and maintenance scripts
+  - `system/`: OS-level setup (run with sudo)
+  - `hardware/`: Hardware-specific installation
+  - `monitoring/`: Health checks and diagnostics
+  - `maintenance/`: Self-updating, cleaning, recovery
+
+- `src/`: Source code (ROS 2 packages)
+  - `vla_controller/`: VLA model implementation
+  - `hardware_drivers/`: Hardware driver wrappers
+  - `control_modes/`: Control mode implementations
+  - `utils/`: Shared utilities
+
+- `docs/`: Documentation
+  - `architecture/`: System design docs
+  - `hardware/`: Hardware setup guides
+  - `setup/`: Installation documentation
+  - `api/`: API reference
+
+- `config/`: Configuration files (YAML, JSON, etc.)
+- `hardware/`: Hardware-specific setup and configs
+- `monitoring/`: Monitoring infrastructure
+- `logging/`: Logging configuration and scripts
+- `control/`: Control system definitions
+
+## Code Style Guidelines
+
+- **Python**: Follow PEP 8, use type hints, docstrings for all functions
+- **Bash**: Use `set -e` for error handling, check for root when needed
+- **ROS 2**: Follow ROS 2 conventions, use proper package structure
+- **C++**: Follow ROS 2 C++ style guide if used
+
+## Important Notes
+
+- System currently runs on microSD card (may migrate to SSD later)
+- Network uses dynamic IP with mDNS (isaac.local)
+- ROS 2 Humble is the primary framework
+- All scripts that modify system should check for root privileges
+- Logging should be structured and centralized
+- Control mode switching must include safety checks
+
+## Hardware Considerations
+
+- Jetson Orin Nano has limited resources - optimize for performance
+- Thermal management is important - monitor temperatures
+- Power consumption matters - consider power modes
+- USB devices (Realsense) need proper power and bandwidth allocation
+
+## When Writing Code
+
+1. **Check existing patterns**: Look at similar code in the repo first
+2. **Add error handling**: Robot systems need robust error handling
+3. **Add logging**: Use structured logging for debugging
+4. **Document assumptions**: Note hardware requirements, dependencies
+5. **Consider safety**: Add safety checks for hardware operations
+6. **Test incrementally**: Test hardware integration step-by-step
+
+## Common Tasks
+
+- **Adding hardware**: Create setup script in `scripts/hardware/`, add driver in `src/hardware_drivers/`, document in `docs/hardware/`
+- **Adding control mode**: Implement in `src/control_modes/`, add config in `config/control/`, document switching logic
+- **System changes**: Update `scripts/system/` and document in `docs/setup/`
+- **Monitoring**: Add checks to `scripts/monitoring/` and infrastructure in `monitoring/`
+
+## File Naming Conventions
+
+- Scripts: `snake_case.sh` or `kebab-case.sh`
+- Python: `snake_case.py`
+- ROS packages: `snake_case` (lowercase, underscores)
+- Config files: `kebab-case.yaml` or `snake_case.json`
+- Documentation: `UPPERCASE.md` for main docs, `kebab-case.md` for specific topics
+
+## License
+
+This project is licensed under the MIT License - see LICENSE file for details.
+

@@ -5,8 +5,8 @@
 After flashing and first boot, run the automated setup:
 
 ```bash
-cd ~/Documents
-sudo ./setup_isaac.sh
+cd ~/src/jetson-orin-nano
+sudo ./scripts/system/setup_isaac.sh
 sudo reboot
 ```
 

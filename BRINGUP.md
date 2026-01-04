@@ -25,8 +25,8 @@ This section covers the comprehensive system bringup after first boot, including
 The easiest way to perform the complete bringup is to run the automated setup script:
 
 ```bash
-cd ~/Documents
-sudo ./setup_isaac.sh
+cd ~/src/jetson-orin-nano
+sudo ./scripts/system/setup_isaac.sh
 ```
 
 This script will:
@@ -35,8 +35,9 @@ This script will:
 3. Verify NetworkManager is using DHCP (dynamic IP)
 4. Update all system packages
 5. Install development tools
-6. Install ROS 2 Humble
-7. Configure SSH and create ROS workspace
+6. Install and configure zsh (optional)
+7. Install ROS 2 Humble
+8. Configure SSH and create ROS workspace
 
 **After running the script, reboot:**
 ```bash
@@ -141,18 +142,69 @@ sudo apt-get install -y \
     pciutils
 ```
 
-#### **Step 4: Install ROS 2 Humble**
+#### **Step 4: Install and Configure Zsh (Optional but Recommended)**
+
+Zsh is a powerful shell with better completion, history, and customization options than bash.
+
+**4.1 Install Zsh**
+```bash
+sudo apt-get install -y zsh
+```
+
+**4.2 Set Zsh as Default Shell**
+```bash
+chsh -s $(which zsh)
+```
+
+**Note:** You'll need to log out and log back in (or start a new terminal) for the change to take effect. You can also run `zsh` in your current terminal to try it immediately.
+
+**4.3 Zsh Configuration**
+
+A comprehensive `.zshrc` configuration file is already set up at `~/.zshrc` with:
+- Enhanced history settings (10,000 entries, no duplicates, shared across sessions)
+- Improved tab completion with menu selection and case-insensitive matching
+- Git branch information in the prompt
+- Useful aliases for common commands (ll, la, git shortcuts, ROS shortcuts)
+- Helper functions (mkcd, extract, ros2source)
+- ROS 2 Humble integration (auto-sources if installed)
+- Colcon argcomplete support for ROS 2
+
+**Key Features:**
+- **Prompt:** Shows `user@hostname directory (git_branch) $` with colors
+- **Git Integration:** Automatically shows current git branch in prompt
+- **ROS 2 Support:** Auto-sources ROS 2 Humble and colcon completion
+- **Useful Aliases:**
+  - `ll`, `la`, `l` - Directory listings
+  - `gs`, `ga`, `gc`, `gp` - Git shortcuts
+  - `ros` - Quick ROS 2 source
+  - `ros2ws` - Source ROS workspace
+- **Helper Functions:**
+  - `mkcd <dir>` - Create directory and cd into it
+  - `extract <file>` - Extract various archive formats
+  - `ros2source` - Source ROS 2 workspace from current directory
+  - `ff <name>` - Find files by name
+  - `fd <name>` - Find directories by name
+
+**4.4 Verify Zsh Installation**
+
+After logging back in:
+```bash
+echo $SHELL  # Should show /usr/bin/zsh or /bin/zsh
+zsh --version
+```
+
+#### **Step 5: Install ROS 2 Humble**
 
 ROS 2 Humble is the recommended version for Ubuntu 22.04 (Jammy).
 
-**4.1 Set Locale**
+**5.1 Set Locale**
 ```bash
 sudo locale-gen en_US en_US.UTF-8
 sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
 export LANG=en_US.UTF-8
 ```
 
-**4.2 Add ROS 2 Repository**
+**5.2 Add ROS 2 Repository**
 ```bash
 sudo apt-get install -y software-properties-common
 sudo add-apt-repository universe
@@ -165,7 +217,7 @@ curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2-latest.list > /dev/null
 ```
 
-**4.3 Install ROS 2**
+**5.3 Install ROS 2**
 ```bash
 sudo apt-get update
 sudo apt-get install -y ros-humble-desktop
@@ -181,22 +233,32 @@ sudo rosdep init
 rosdep update
 ```
 
-**4.4 Configure ROS 2 Environment**
+**5.4 Configure ROS 2 Environment**
 
-Add to `~/.bashrc`:
+**For Bash users:**
 ```bash
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-**4.5 Create ROS Workspace**
+**For Zsh users:**
+The `.zshrc` file already includes ROS 2 Humble auto-sourcing. If you need to manually add it:
+```bash
+echo "source /opt/ros/humble/setup.zsh" >> ~/.zshrc
+echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.zsh" >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Note:** The default `.zshrc` configuration automatically sources ROS 2 if it's installed, so manual configuration is usually not needed.
+
+**5.5 Create ROS Workspace**
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws
 ```
 
-#### **Step 5: Verify Installation**
+#### **Step 6: Verify Installation**
 
 After completing setup and rebooting:
 
@@ -225,6 +287,7 @@ ros2 doctor
 - [ ] mDNS is working (`ping isaac.local` works from other computers)
 - [ ] System packages are up to date
 - [ ] Development tools are installed
+- [ ] Zsh is installed and configured (optional)
 - [ ] ROS 2 Humble is installed and working
 - [ ] SSH is enabled and accessible
 - [ ] ROS workspace created at `~/ros2_ws`
@@ -371,6 +434,24 @@ You should now be able to SSH without entering a password\!
   - Check internet connection
   - Try: `sudo rosdep init` (may need to run again)
   - Update: `rosdep update`
+
+### **Zsh Issues**
+
+- **Zsh not found after installation**:
+  - Verify installation: `dpkg -l | grep zsh`
+  - Check shell: `echo $SHELL` (should show zsh path)
+  - If still bash, log out and log back in
+  - Manually change shell: `chsh -s $(which zsh)`
+
+- **ROS 2 not working in zsh**:
+  - Check if ROS is installed: `ls /opt/ros/`
+  - Source manually: `source /opt/ros/humble/setup.zsh`
+  - Verify `.zshrc` includes ROS sourcing (it should by default)
+  - Restart terminal or run: `source ~/.zshrc`
+
+- **Completion not working**:
+  - Run: `rm ~/.zcompdump* && compinit`
+  - Check `.zshrc` has `compinit` (it should by default)
 
 ### **General Issues**
 

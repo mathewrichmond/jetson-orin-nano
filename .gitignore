@@ -1,20 +1,73 @@
-# OS files
-.DS_Store
-Thumbs.db
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
 
-# Editor files
+# ROS 2
+install/
+build/
+log/
+.ros/
+
+# IDE
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
-.vscode/
-.idea/
+.DS_Store
+
+# Logs
+*.log
+logs/
 
 # Temporary files
 *.tmp
-*.log
+*.bak
+*.cache
+
+# System files
+*.pid
+*.lock
 
 # Build artifacts
 *.o
-*.so
 *.a
+*.so
+*.dylib
 
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Local config overrides
+config/local/
+*.local.yaml
+*.local.json
+
+# NFS mount (if mounted locally)
+/mnt/nfs/
+
+# Backup files
+*.backup
+backups/
