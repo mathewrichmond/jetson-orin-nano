@@ -82,6 +82,16 @@
     "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
   },
   "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.profiles.linux": {
+    "bash": {
+      "path": "/bin/bash",
+      "icon": "terminal-bash"
+    },
+    "zsh": {
+      "path": "/usr/bin/zsh",
+      "icon": "terminal"
+    }
+  },
   "terminal.integrated.cwd": "${workspaceFolder}",
 
   // Git settings
