@@ -73,6 +73,11 @@ jetson-orin-nano/
    ./setup.sh
    ```
 
+   Or for non-interactive setup with auto-reboot:
+   ```bash
+   NON_INTERACTIVE=true sudo ./setup.sh
+   ```
+
 2. **Activate environment**:
    ```bash
    source scripts/utils/env_setup.sh

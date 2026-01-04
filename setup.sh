@@ -277,10 +277,17 @@ step_setup_bluetooth() {
     fi
 
     log_step "7" "10" "Setting up Bluetooth (optional)"
-    echo ""
-    echo "Setup Bluetooth support? (y/N)"
-    echo "This will install Bluetooth packages and enable the Bluetooth service."
-    read -r response
+
+    # Auto-answer if non-interactive
+    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+        response="y"
+    else
+        echo ""
+        echo "Setup Bluetooth support? (y/N)"
+        echo "This will install Bluetooth packages and enable the Bluetooth service."
+        read -r response
+    fi
+
     if [[ "$response" =~ ^[Yy]$ ]]; then
         if [ -f "$SCRIPT_DIR/scripts/system/setup_bluetooth.sh" ]; then
             "$SCRIPT_DIR/scripts/system/setup_bluetooth.sh"
@@ -305,10 +312,17 @@ step_setup_wifi() {
     fi
 
     log_step "8" "10" "Setting up WiFi with Ethernet priority (optional)"
-    echo ""
-    echo "Setup WiFi as fallback when Ethernet is disconnected? (y/N)"
-    echo "Ethernet will be preferred, WiFi will connect automatically when Ethernet is unavailable."
-    read -r response
+
+    # Auto-answer if non-interactive
+    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+        response="y"
+    else
+        echo ""
+        echo "Setup WiFi as fallback when Ethernet is disconnected? (y/N)"
+        echo "Ethernet will be preferred, WiFi will connect automatically when Ethernet is unavailable."
+        read -r response
+    fi
+
     if [[ "$response" =~ ^[Yy]$ ]]; then
         if [ -f "$SCRIPT_DIR/scripts/system/setup_wifi.sh" ]; then
             if [ "$EUID" -eq 0 ]; then
@@ -337,10 +351,17 @@ step_setup_usbc_display() {
     fi
 
     log_step "9" "10" "Setting up USB-C display and dock support (optional)"
-    echo ""
-    echo "Setup USB-C display and dock support? (y/N)"
-    echo "This will check your USB-C ports and configure display support."
-    read -r response
+
+    # Auto-answer if non-interactive
+    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+        response="y"
+    else
+        echo ""
+        echo "Setup USB-C display and dock support? (y/N)"
+        echo "This will check your USB-C ports and configure display support."
+        read -r response
+    fi
+
     if [[ "$response" =~ ^[Yy]$ ]]; then
         if [ -f "$SCRIPT_DIR/scripts/hardware/setup_usbc_display.sh" ]; then
             "$SCRIPT_DIR/scripts/hardware/setup_usbc_display.sh"
@@ -365,9 +386,16 @@ step_install_services() {
     fi
 
     log_step "10" "10" "Installing systemd services (optional)"
-    echo ""
-    echo "Install systemd services for auto-start and maintenance? (y/N)"
-    read -r response
+
+    # Auto-answer if non-interactive
+    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+        response="y"
+    else
+        echo ""
+        echo "Install systemd services for auto-start and maintenance? (y/N)"
+        read -r response
+    fi
+
     if [[ "$response" =~ ^[Yy]$ ]]; then
         if [ "$EUID" -eq 0 ]; then
             "$SCRIPT_DIR/scripts/system/install_services.sh"
@@ -377,6 +405,36 @@ step_install_services() {
         mark_step_complete "install_services"
     else
         log "Skipping service installation. Run manually: sudo ./scripts/system/install_services.sh"
+    fi
+}
+
+# Check if reboot is needed
+check_reboot() {
+    if [ -f /var/run/reboot-required ]; then
+        echo ""
+        echo -e "${YELLOW}========================================${NC}"
+        echo -e "${YELLOW}Reboot Required${NC}"
+        echo -e "${YELLOW}========================================${NC}"
+        echo ""
+        echo "The system needs to reboot to complete setup."
+        echo ""
+
+        # Check if running non-interactively (from script)
+        if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+            echo "Rebooting in 10 seconds..."
+            echo "Press Ctrl+C to cancel"
+            sleep 10
+            reboot
+        else
+            echo "Reboot now? (y/N)"
+            read -r response
+            if [[ "$response" =~ ^[Yy]$ ]]; then
+                echo "Rebooting..."
+                reboot
+            else
+                echo "Please reboot manually when ready: sudo reboot"
+            fi
+        fi
     fi
 }
 
@@ -412,28 +470,16 @@ main() {
     echo "   source ~/ros2_ws/install/setup.bash"
     echo ""
     echo "3. Run system monitor:"
-    echo "   ros2 launch system_monitor system_monitor.launch.py"
+    echo "   ros2 launch isaac_robot minimal.launch.py"
     echo ""
-    if [ "$ENV_TYPE" = "jetson" ]; then
-        echo "4. Setup Bluetooth (if needed):"
-        echo "   ./scripts/system/setup_bluetooth.sh"
-        echo ""
-        echo "5. Setup WiFi (if needed):"
-        echo "   sudo ./scripts/system/setup_wifi.sh"
-        echo ""
-        echo "6. Setup USB-C display/dock (if needed):"
-        echo "   ./scripts/hardware/setup_usbc_display.sh"
-        echo ""
-        echo "7. Install auto-start services (optional):"
-        echo "   sudo ./scripts/system/install_services.sh"
-        echo ""
-        echo "   This enables:"
-        echo "   - Auto-start on boot"
-        echo "   - Daily updates (3 AM)"
-        echo "   - Weekly cleanup (Sunday 2 AM)"
-        echo "   - Health checks (every 15 minutes)"
-        echo ""
-    fi
+    echo "4. Or launch robot system:"
+    echo "   ./scripts/system/start_robot.sh"
+    echo ""
+
+    # Check for reboot requirement
+    check_reboot
+
+    echo ""
     echo "To reset setup state, delete: $SETUP_STATE"
 }
 
