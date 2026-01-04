@@ -78,7 +78,8 @@
   // Terminal settings
   "terminal.integrated.env.linux": {
     "ISAAC_PROJECT_ROOT": "${workspaceFolder}",
-    "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+    "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}",
+    "PATH": "${env:HOME}/.local/bin:${env:PATH}"
   },
   "terminal.integrated.defaultProfile.linux": "zsh",
   "terminal.integrated.profiles.linux": {
@@ -88,7 +89,8 @@
     },
     "zsh": {
       "path": "/usr/bin/zsh",
-      "icon": "terminal"
+      "icon": "terminal",
+      "args": []
     }
   },
   "terminal.integrated.cwd": "${workspaceFolder}",

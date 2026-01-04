@@ -139,8 +139,9 @@ step_install_python_packages() {
 
     log_step "3" "10" "Installing Python packages"
 
-    # Upgrade pip
-    pip3 install --upgrade pip setuptools wheel --user || sudo pip3 install --upgrade pip setuptools wheel
+    # Upgrade pip (pin setuptools to <80 for colcon-core compatibility)
+    pip3 install --upgrade pip wheel --user || sudo pip3 install --upgrade pip wheel
+    pip3 install --user "setuptools<80,>=30.3.0" || sudo pip3 install "setuptools<80,>=30.3.0"
 
     # Install PyYAML if needed
     if ! python3 -c "import yaml" 2>/dev/null; then
