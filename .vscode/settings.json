@@ -22,9 +22,10 @@
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit"
     },
-    "editor.rulers": [100]
+    "editor.rulers": [
+      100
+    ]
   },
-
   // ROS 2 settings
   "ros.distro": "humble",
   "ros.workspace": "${env:HOME}/ros2_ws",
@@ -32,20 +33,20 @@
     "/opt/ros/humble/include/**",
     "${env:HOME}/ros2_ws/install/**/include/**"
   ],
-
   // Editor settings
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit"
   },
-  "editor.rulers": [100],
+  "editor.rulers": [
+    100
+  ],
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
-
   // File associations
   "files.associations": {
     "*.launch.py": "python",
@@ -55,7 +56,6 @@
     "*.rviz": "yaml",
     "*.sdf": "xml"
   },
-
   // Exclude patterns
   "files.exclude": {
     "**/__pycache__": true,
@@ -75,13 +75,12 @@
     "**/.pytest_cache": true,
     "**/.mypy_cache": true
   },
-
   // Terminal settings
   "terminal.integrated.env.linux": {
     "ISAAC_PROJECT_ROOT": "${workspaceFolder}",
     "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
   },
-  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.defaultProfile.linux": "zsh",
   "terminal.integrated.profiles.linux": {
     "bash": {
       "path": "/bin/bash",
@@ -93,15 +92,12 @@
     }
   },
   "terminal.integrated.cwd": "${workspaceFolder}",
-
   // Git settings
   "git.enableSmartCommit": true,
   "git.confirmSync": false,
   "git.autofetch": true,
-
   // Docker settings
   "docker.showStartPage": false,
-
   // ROS 2 colcon build
   "files.watcherExclude": {
     "**/build/**": true,
