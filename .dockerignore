@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+.venv
+venv
+env
+ENV
+
+# ROS 2
+install/
+build/
+log/
+.ros/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Setup state (will be mounted as volume)
+.setup_state
+.setup.log
+
+# NFS mount
+/mnt/nfs/
+
+# Backup files
+*.backup
+backups/
+

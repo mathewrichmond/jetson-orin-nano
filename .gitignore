@@ -29,8 +29,16 @@ build/
 log/
 .ros/
 
+# Packaging
+dist/
+*.tar.gz
+*.tar.gz.sha256
+
 # IDE
-.vscode/
+# Keep .vscode/ for shared settings, but ignore user-specific files
+.vscode/settings.json.user
+.vscode/tasks.json.user
+.vscode/launch.json.user
 .idea/
 *.swp
 *.swo

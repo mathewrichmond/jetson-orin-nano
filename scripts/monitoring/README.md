@@ -4,24 +4,40 @@ This directory contains scripts for monitoring system health, performance, and h
 
 ## Scripts
 
-- `system_health_check.sh` - Comprehensive system health check
-- `hardware_status.sh` - Hardware component status
-- `performance_monitor.sh` - Performance metrics collection
+### `system_health_check.sh`
 
-## Usage
+Comprehensive system health check.
 
+**Usage**:
 ```bash
-# Run system health check
 ./scripts/monitoring/system_health_check.sh
-
-# Check hardware status
-./scripts/monitoring/hardware_status.sh
-
-# Monitor performance
-./scripts/monitoring/performance_monitor.sh
 ```
 
-## Status
+### `monitor_temperatures.sh`
 
-*Monitoring scripts to be implemented*
+Real-time temperature monitoring with color-coded status.
 
+**Usage**:
+```bash
+./scripts/monitoring/monitor_temperatures.sh
+```
+
+### `monitor_power.sh`
+
+Power consumption monitoring using tegrastats or power sensors.
+
+**Usage**:
+```bash
+./scripts/monitoring/monitor_power.sh
+```
+
+## Installation
+
+All monitoring packages are installed automatically by the unified setup:
+
+```bash
+cd ~/src/jetson-orin-nano
+./setup.sh
+```
+
+See [SYSTEM_MONITOR.md](../../docs/monitoring/SYSTEM_MONITOR.md) for full documentation.

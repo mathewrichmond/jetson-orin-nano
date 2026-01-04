@@ -1,0 +1,13 @@
+[Unit]
+Description=Isaac Robot System Update Timer
+After=network-online.target
+
+[Timer]
+# Run daily at 3 AM
+OnCalendar=daily
+OnCalendar=03:00
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target

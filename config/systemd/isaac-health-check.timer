@@ -1,0 +1,11 @@
+[Unit]
+Description=Isaac Robot System Health Check Timer
+After=network-online.target
+
+[Timer]
+# Run every 15 minutes
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

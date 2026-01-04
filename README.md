@@ -13,6 +13,16 @@ This repository implements and manages:
 - **Control Mode Switching**: Safe mode transitions and state management
 - **Sub-module Controllers**: Support for Raspberry Pi and other auxiliary controllers
 
+## 🎯 Configuration-Driven Approach
+
+This repository uses a **configuration-driven** approach for package management:
+- All packages are defined in YAML configuration files (`config/system/`)
+- Installation scripts read from these configurations
+- Easy to add/remove packages without editing scripts
+- Single source of truth for all dependencies
+
+See [Package Management Documentation](docs/development/PACKAGE_MANAGEMENT.md) for details.
+
 ## 📁 Repository Structure
 
 ```
@@ -54,14 +64,45 @@ jetson-orin-nano/
 
 ## 🚀 Quick Start
 
-### First-Time System Setup
+### Simple Setup Workflow
 
-After flashing the Jetson Orin Nano:
+1. **Clone and setup**:
+   ```bash
+   git clone <repository-url>
+   cd jetson-orin-nano
+   ./setup.sh
+   ```
+
+2. **Activate environment**:
+   ```bash
+   source scripts/utils/env_setup.sh
+   ```
+
+3. **Run code**:
+   ```bash
+   ros2 launch system_monitor system_monitor.launch.py
+   ```
+
+The setup script works identically on:
+- **Native Jetson hardware**
+- **Docker containers**
+- **Ubuntu development machines**
+
+See [WORKFLOW.md](WORKFLOW.md) for detailed workflow documentation.
+
+### First-Time Jetson Setup
+
+For initial Jetson system setup (after flashing):
 
 ```bash
 cd ~/src/jetson-orin-nano
 sudo ./scripts/system/setup_isaac.sh
 sudo reboot
+```
+
+Then run the main setup:
+```bash
+./setup.sh
 ```
 
 ### Post-Setup Verification
@@ -141,6 +182,17 @@ ssh nano@isaac.local
 - Change default password after first setup
 - SSH keys recommended for remote access
 - Firewall configuration recommended for production use
+
+## 🚀 Deployment
+
+The system supports multiple deployment modes:
+
+- **Dev Sandbox**: Quick deployment of local changes (`./scripts/deployment/deploy_dev.sh`)
+- **Package Installation**: Install from GitHub releases
+- **Auto-Start**: Systemd services for boot-time launch
+- **Dev Priority**: Dev sandbox takes precedence over installed packages
+
+See [Deployment Guide](docs/deployment/DEPLOYMENT.md) for details.
 
 ## 📦 Future Enhancements
 

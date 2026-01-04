@@ -1,8 +1,10 @@
 # Quick Start Guide - Isaac Jetson Orin Nano
 
-## First Boot Setup
+## First-Time Setup
 
-After flashing and first boot, run the automated setup:
+### Step 1: Initial System Setup (Jetson Only)
+
+After flashing the Jetson Orin Nano:
 
 ```bash
 cd ~/src/jetson-orin-nano
@@ -10,39 +12,53 @@ sudo ./scripts/system/setup_isaac.sh
 sudo reboot
 ```
 
-## After Reboot - Verify Setup
+### Step 2: Unified Setup (All Systems)
+
+After initial setup (or on any system):
+
+```bash
+cd ~/src/jetson-orin-nano
+./setup.sh
+```
+
+### Step 3: Activate Environment
+
+```bash
+source scripts/utils/env_setup.sh
+```
+
+## Docker Quick Start
+
+```bash
+# Build and run
+docker-compose build
+docker-compose run --rm isaac-dev
+
+# Inside container
+./setup.sh
+source scripts/utils/env_setup.sh
+```
+
+## Verify Setup
 
 ```bash
 # Check hostname
 hostname  # Should show "isaac"
 
-# Check network (should show dynamic IP)
-ip addr show
-
-# Check mDNS
-avahi-browse -a  # Should show isaac.local
-
-# Test ROS 2
+# Check ROS 2
 source /opt/ros/humble/setup.bash
 ros2 --help
-```
 
-## Connect from Another Computer
-
-```bash
-# Using hostname (recommended)
-ssh nano@isaac.local
-
-# Or find current IP first
-ssh nano@isaac.local "hostname -I"
+# Run system monitor
+ros2 launch system_monitor system_monitor.launch.py
 ```
 
 ## Key Information
 
 - **Hostname**: isaac
 - **Username**: nano
-- **Password**: nano
 - **Network**: Dynamic IP (DHCP) + mDNS hostname resolution
+- **Access**: `ssh nano@isaac.local`
 - **ROS Version**: Humble (ROS 2)
 - **Workspace**: ~/ros2_ws
 
@@ -66,5 +82,6 @@ ros2 pkg create --build-type ament_cmake my_package
 
 ## Documentation
 
-See `BRINGUP.md` for comprehensive setup documentation and troubleshooting.
-
+- **[WORKFLOW.md](WORKFLOW.md)** - Complete development workflow
+- **[SETUP.md](docs/setup/SETUP.md)** - Detailed setup instructions
+- **[BRINGUP.md](BRINGUP.md)** - Comprehensive bringup documentation

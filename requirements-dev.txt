@@ -1,0 +1,56 @@
+# Development Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# Core development
+ipython>=8.0.0
+jupyter>=1.0.0
+notebook>=6.4.0
+jupyterlab>=3.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-asyncio>=0.21.0
+pytest-timeout>=2.1.0
+
+# Code quality
+black>=23.0.0
+flake8>=6.0.0
+pylint>=2.17.0
+mypy>=1.0.0
+isort>=5.12.0
+autopep8>=2.0.0
+yapf>=0.40.0
+bandit>=1.7.0
+safety>=2.3.0
+
+# Pre-commit hooks
+pre-commit>=3.0.0
+
+# Task runner
+invoke>=2.0.0
+
+# Package management
+poetry>=1.4.0
+pipenv>=2023.0.0
+
+# ROS 2 development
+rosdep>=0.22.0
+colcon-common-extensions>=0.3.0
+
+# System monitoring
+psutil>=5.9.0
+
+# Documentation
+sphinx>=6.0.0
+sphinx-rtd-theme>=1.2.0
+myst-parser>=1.0.0
+
+# Utilities
+pyyaml>=6.0
+toml>=0.10.2
+python-dotenv>=1.0.0
+rich>=13.0.0
+click>=8.1.0
+

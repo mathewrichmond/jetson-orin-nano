@@ -7,8 +7,8 @@ This document provides a detailed explanation of the repository structure and wh
 ### `scripts/` - Setup and Maintenance Scripts
 All executable scripts for system setup, hardware installation, monitoring, and maintenance.
 
-- **`scripts/system/`**: System-level setup scripts (run with sudo)
-  - `setup_isaac.sh` - Main system bringup script
+- **`scripts/system/`**: System-level setup scripts
+  - `setup_isaac.sh` - Initial Jetson system setup (first boot only)
 - **`scripts/hardware/`**: Hardware installation scripts
   - Realsense, motor controllers, etc.
 - **`scripts/monitoring/`**: Health check and monitoring scripts
@@ -117,4 +117,3 @@ Source code in `src/` is intended to be integrated into the ROS 2 workspace:
 ## Questions?
 
 See `README.md` for overview or `CONTRIBUTING.md` for development guidelines.
-

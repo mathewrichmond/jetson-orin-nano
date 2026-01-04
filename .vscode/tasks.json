@@ -1,0 +1,152 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup: Run unified setup",
+      "type": "shell",
+      "command": "./setup.sh",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Setup: Reset setup state",
+      "type": "shell",
+      "command": "rm -f .setup_state .setup.log",
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "ROS 2: Build workspace",
+      "type": "shell",
+      "command": "colcon build --symlink-install",
+      "options": {
+        "cwd": "${env:HOME}/ros2_ws"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": {
+        "owner": "colcon",
+        "fileLocation": ["relative", "${env:HOME}/ros2_ws"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "ROS 2: Build package",
+      "type": "shell",
+      "command": "colcon build --packages-select ${input:packageName} --symlink-install",
+      "options": {
+        "cwd": "${env:HOME}/ros2_ws"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS 2: Test workspace",
+      "type": "shell",
+      "command": "colcon test && colcon test-result --verbose",
+      "options": {
+        "cwd": "${env:HOME}/ros2_ws"
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Python: Format code",
+      "type": "shell",
+      "command": "black --line-length 100 .",
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Python: Lint code",
+      "type": "shell",
+      "command": "flake8 . --max-line-length=100 --extend-ignore=E203,W503",
+      "group": "test",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Python: Type check",
+      "type": "shell",
+      "command": "mypy . --ignore-missing-imports",
+      "group": "test",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Pre-commit: Run all hooks",
+      "type": "shell",
+      "command": "pre-commit run --all-files",
+      "group": "test",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Docker: Build image",
+      "type": "shell",
+      "command": "docker-compose build",
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Docker: Run container",
+      "type": "shell",
+      "command": "docker-compose run --rm isaac-dev",
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "System: Health check",
+      "type": "shell",
+      "command": "./scripts/monitoring/system_health_check.sh",
+      "group": "test",
+      "presentation": {
+        "reveal": "always"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "packageName",
+      "type": "promptString",
+      "description": "ROS 2 package name",
+      "default": "system_monitor"
+    }
+  ]
+}

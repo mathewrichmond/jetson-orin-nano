@@ -1,19 +1,37 @@
 # System Setup Scripts
 
-This directory contains scripts for system-level setup and configuration.
+This directory contains system-level setup scripts.
 
 ## Scripts
 
-- `setup_isaac.sh` - Main system setup script (run on first boot)
+### `setup_isaac.sh`
 
-## Usage
+**Purpose**: Initial Jetson system setup (run once after flashing)
 
-Run scripts with sudo:
+**When to use**: First time setup after flashing the Jetson Orin Nano
+
+**What it does**:
+- Sets hostname to `isaac`
+- Configures mDNS (Avahi) for hostname resolution
+- Sets up network configuration
+- Installs basic system packages
+- Installs ROS 2 Humble
+
+**Usage**:
 ```bash
 sudo ./scripts/system/setup_isaac.sh
+sudo reboot
 ```
 
-## Status
+**Note**: This should only be run once. After this, use the unified `setup.sh` script.
 
-*Additional system scripts can be added as needed*
+## Unified Setup
 
+For all development environment setup, use the main setup script:
+
+```bash
+cd ~/src/jetson-orin-nano
+./setup.sh
+```
+
+See [WORKFLOW.md](../../WORKFLOW.md) for complete workflow documentation.

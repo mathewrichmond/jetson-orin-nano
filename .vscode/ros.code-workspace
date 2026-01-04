@@ -1,0 +1,21 @@
+{
+  "folders": [
+    {
+      "name": "Isaac Project",
+      "path": "."
+    },
+    {
+      "name": "ROS 2 Workspace",
+      "path": "${env:HOME}/ros2_ws"
+    }
+  ],
+  "settings": {
+    "ros.distro": "humble",
+    "ros.workspace": "${env:HOME}/ros2_ws",
+    "files.exclude": {
+      "**/build": true,
+      "**/install": true,
+      "**/log": true
+    }
+  }
+}

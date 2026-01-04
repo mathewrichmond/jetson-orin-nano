@@ -1,0 +1,14 @@
+system_monitor:
+  ros__parameters:
+    # Update rate in Hz
+    update_rate: 1.0
+    
+    # Temperature thresholds (°C)
+    temp_warning_threshold: 70.0
+    temp_critical_threshold: 85.0
+    
+    # Resource usage thresholds (%)
+    cpu_warning_threshold: 80.0
+    memory_warning_threshold: 85.0
+    disk_warning_threshold: 85.0
+

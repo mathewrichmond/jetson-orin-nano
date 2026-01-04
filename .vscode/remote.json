@@ -1,0 +1,11 @@
+{
+  "remote.ssh.configFile": "${env:HOME}/.ssh/config",
+  "remote.ssh.defaultExtensions": [
+    "ms-python.python",
+    "ms-iot.vscode-ros",
+    "ms-azuretools.vscode-docker"
+  ],
+  "remote.ssh.remotePlatform": {
+    "isaac.local": "linux"
+  }
+}

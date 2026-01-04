@@ -1,0 +1,93 @@
+# Python Package Configuration
+# Defines Python packages installed via pip
+
+# Core development
+core:
+  - ipython>=8.0.0
+  - jupyter>=1.0.0
+  - notebook>=6.4.0
+  - jupyterlab>=3.0.0
+
+# Testing
+testing:
+  - pytest>=7.0.0
+  - pytest-cov>=4.0.0
+  - pytest-mock>=3.10.0
+  - pytest-asyncio>=0.21.0
+  - pytest-timeout>=2.1.0
+
+# Code quality
+code_quality:
+  - black>=23.0.0
+  - flake8>=6.0.0
+  - pylint>=2.17.0
+  - mypy>=1.0.0
+  - isort>=5.12.0
+  - autopep8>=2.0.0
+  - yapf>=0.40.0
+  - bandit>=1.7.0
+  - safety>=2.3.0
+
+# Pre-commit hooks
+pre_commit:
+  - pre-commit>=3.0.0
+
+# Task runner
+task_runner:
+  - invoke>=2.0.0
+
+# Package management
+package_management:
+  - poetry>=1.4.0
+  - pipenv>=2023.0.0
+
+# ROS 2 development
+ros2_dev:
+  - rosdep>=0.22.0
+  - colcon-common-extensions>=0.3.0
+
+# System monitoring
+monitoring:
+  - psutil>=5.9.0
+
+# Documentation
+documentation:
+  - sphinx>=6.0.0
+  - sphinx-rtd-theme>=1.2.0
+  - myst-parser>=1.0.0
+
+# Utilities
+utilities:
+  - pyyaml>=6.0
+  - toml>=0.10.2
+  - python-dotenv>=1.0.0
+  - rich>=13.0.0
+  - click>=8.1.0
+
+# Package groups
+groups:
+  # All development packages
+  dev_all:
+    - core
+    - testing
+    - code_quality
+    - pre_commit
+    - task_runner
+    - package_management
+    - ros2_dev
+    - monitoring
+    - documentation
+    - utilities
+
+  # Minimal development
+  dev_minimal:
+    - core
+    - testing
+    - code_quality
+    - ros2_dev
+
+  # Code quality only
+  code_quality_only:
+    - code_quality
+    - pre_commit
+

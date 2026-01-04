@@ -1,80 +1,130 @@
 # System Setup Guide
 
-## Initial System Setup
+## Overview
 
-### Prerequisites
-- Jetson Orin Nano flashed with JetPack 5.x
-- Network connection (Ethernet or WiFi)
-- SSH access (optional but recommended)
+The Isaac robot system uses a **unified setup workflow** that works across all environments. This guide covers both initial system setup and development environment setup.
 
-### First Boot Setup
+## Quick Start
 
-1. **Run the automated setup script**:
-   ```bash
-   cd ~/src/jetson-orin-nano
-   sudo ./scripts/system/setup_isaac.sh
-   sudo reboot
-   ```
+### 1. Initial Jetson Setup (First Time Only)
 
-2. **After reboot, verify setup**:
-   ```bash
-   hostname  # Should show "isaac"
-   source /opt/ros/humble/setup.bash
-   ros2 --help
-   ```
-
-### Manual Setup Steps
-
-If you need to customize the setup, see the individual scripts in `scripts/system/`:
-- `setup_isaac.sh` - Main system setup
-- Additional scripts for specific components
-
-## Hardware Setup
-
-### Realsense Cameras
-
-See `docs/hardware/realsense.md` for detailed setup instructions.
-
-### Motor Controllers
-
-See `docs/hardware/motor_controllers.md` for setup and configuration.
-
-### Raspberry Pi Sub-modules
-
-See `docs/hardware/raspberry_pi_modules.md` for integration guide.
-
-## ROS 2 Workspace Setup
-
-The system setup script creates a ROS 2 workspace at `~/ros2_ws`. To use it:
+After flashing the Jetson Orin Nano, run the initial system setup:
 
 ```bash
-cd ~/ros2_ws/src
-# Clone or create your ROS 2 packages here
-colcon build
-source ~/ros2_ws/install/setup.bash
+cd ~/src/jetson-orin-nano
+sudo ./scripts/system/setup_isaac.sh
+sudo reboot
 ```
 
-## Configuration
+This sets up:
+- Hostname (`isaac`)
+- mDNS (hostname resolution)
+- Network configuration
+- Basic system packages
+- ROS 2 Humble
 
-System configurations are stored in `config/`:
-- `config/system/` - System-wide settings
-- `config/hardware/` - Hardware-specific configs
-- `config/control/` - Control mode configurations
+### 2. Unified Setup (All Environments)
 
-## Network Configuration
+After the initial setup (or on any system), use the unified setup:
 
-- **Hostname**: `isaac`
-- **Access**: `ssh nano@isaac.local` (via mDNS)
-- **Dynamic IP**: Configured via NetworkManager/DHCP
+```bash
+cd ~/src/jetson-orin-nano
+./setup.sh
+```
+
+This handles:
+- System package installation
+- Python package installation
+- ROS 2 workspace setup
+- Virtual environment creation
+- Pre-commit hooks
+
+### 3. Activate Environment
+
+```bash
+source scripts/utils/env_setup.sh
+```
+
+## Detailed Setup
+
+### Initial Jetson Setup
+
+The `scripts/system/setup_isaac.sh` script performs:
+
+1. **Hostname Configuration**: Sets hostname to `isaac`
+2. **mDNS Setup**: Configures Avahi for `.local` hostname resolution
+3. **Network Configuration**: Ensures DHCP is enabled
+4. **System Updates**: Updates all system packages
+5. **Development Tools**: Installs basic development tools
+6. **ROS 2 Installation**: Installs ROS 2 Humble
+7. **Final Configuration**: Sets up SSH, ROS workspace, etc.
+
+**Note**: This script should only be run once after flashing the Jetson.
+
+### Unified Setup
+
+The `setup.sh` script is the main entry point for all setup operations:
+
+- **Idempotent**: Safe to run multiple times
+- **Environment-aware**: Detects Jetson/Docker/Ubuntu
+- **Configuration-driven**: Uses YAML configs for packages
+- **State tracking**: Remembers completed steps
+
+See [WORKFLOW.md](../../WORKFLOW.md) for detailed workflow documentation.
+
+## Docker Setup
+
+For Docker environments:
+
+```bash
+# Build container
+docker-compose build
+
+# Run container
+docker-compose run --rm isaac-dev
+
+# Inside container, run setup
+./setup.sh
+```
+
+## Verification
+
+After setup, verify installation:
+
+```bash
+# Check hostname
+hostname  # Should show "isaac"
+
+# Check ROS 2
+source /opt/ros/humble/setup.bash
+ros2 --help
+
+# Check system health
+./scripts/monitoring/system_health_check.sh
+```
 
 ## Troubleshooting
 
-See `BRINGUP.md` in the root directory for detailed troubleshooting steps.
+### Setup Fails
+
+1. Check setup log: `cat .setup.log`
+2. Check setup state: `cat .setup_state`
+3. Reset and retry: `rm .setup_state && ./setup.sh`
+
+### ROS 2 Not Found
+
+- On Jetson: Ensure `scripts/system/setup_isaac.sh` was run first
+- In Docker: Use `docker-compose run isaac-ros` (has ROS 2 pre-installed)
+- On Ubuntu: Install ROS 2 manually or use Docker
+
+### Package Installation Fails
+
+1. Update package list: `sudo apt-get update`
+2. Check configuration: `python3 scripts/utils/package_manager.py list system`
+3. Try dry-run: `python3 scripts/utils/package_manager.py install-system --groups dev_minimal --dry-run`
 
 ## Next Steps
 
-1. Set up hardware components (see `docs/hardware/`)
-2. Configure control modes (see `docs/architecture/ARCHITECTURE.md`)
-3. Set up monitoring (see `scripts/monitoring/`)
-4. Configure logging (see `logging/config/`)
-
+- See [WORKFLOW.md](../../WORKFLOW.md) for development workflow
+- See [DEVELOPMENT_ENVIRONMENT.md](../development/DEVELOPMENT_ENVIRONMENT.md) for development setup
+- See [PACKAGE_MANAGEMENT.md](../development/PACKAGE_MANAGEMENT.md) for package management

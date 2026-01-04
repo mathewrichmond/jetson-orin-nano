@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  isaac-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: isaac-dev
+    volumes:
+      # Mount source code
+      - .:/workspace
+      # Mount ROS 2 workspace (if exists)
+      - ~/ros2_ws:/home/nano/ros2_ws
+      # Persist setup state
+      - .setup_state:/workspace/.setup_state
+      - .setup.log:/workspace/.setup.log
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - TZ=UTC
+      - SETUP_LOG=/workspace/.setup.log
+      - SETUP_STATE=/workspace/.setup_state
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  isaac-ros:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2
+    container_name: isaac-ros
+    volumes:
+      - .:/workspace
+      - ~/ros2_ws:/home/nano/ros2_ws
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+

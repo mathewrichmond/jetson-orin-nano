@@ -1,0 +1,24 @@
+[MASTER]
+ignore=CVS
+ignore-patterns=test_.*\.py
+
+[MESSAGES CONTROL]
+disable=missing-docstring,too-few-public-methods,too-many-arguments,too-many-locals
+
+[FORMAT]
+max-line-length=100
+indent-string='    '
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,id,pkg,msg,node
+
+[DESIGN]
+max-args=10
+max-locals=20
+max-returns=6
+max-branches=15
+max-statements=50
+
+[IMPORTS]
+ignore-imports=yes
+

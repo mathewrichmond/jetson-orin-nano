@@ -1,0 +1,21 @@
+[Unit]
+Description=Isaac System Monitor
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nano
+Group=nano
+Environment="ROS_DOMAIN_ID=0"
+
+# Source ROS 2 and find Isaac root, then launch monitor
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash 2>/dev/null || true; source ~/ros2_ws/install/setup.bash 2>/dev/null || true; ISAAC_ROOT=$(python3 /home/nano/src/jetson-orin-nano/scripts/utils/find_isaac_root.py 2>/dev/null || python3 /opt/isaac-robot/scripts/utils/find_isaac_root.py 2>/dev/null || echo "/opt/isaac-robot"); cd "$ISAAC_ROOT"; exec ros2 launch system_monitor system_monitor.launch.py'
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

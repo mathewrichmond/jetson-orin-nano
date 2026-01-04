@@ -1,0 +1,16 @@
+[Unit]
+Description=Isaac Robot System Update
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+Environment="ISAAC_ROOT=/home/nano/src/jetson-orin-nano"
+Environment="LOG_FILE=/var/log/isaac-update.log"
+
+# Find Isaac root and run update
+ExecStart=/bin/bash -c 'ISAAC_ROOT=$(python3 /home/nano/src/jetson-orin-nano/scripts/utils/find_isaac_root.py 2>/dev/null || python3 /opt/isaac-robot/scripts/utils/find_isaac_root.py 2>/dev/null || echo "/opt/isaac-robot"); exec "$ISAAC_ROOT/scripts/maintenance/self_update.sh"'
+
+StandardOutput=journal
+StandardError=journal

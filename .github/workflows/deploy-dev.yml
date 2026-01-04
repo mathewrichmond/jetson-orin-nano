@@ -1,0 +1,50 @@
+name: Deploy Dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_host:
+        description: 'Target hostname'
+        required: true
+        default: 'isaac.local'
+
+jobs:
+  deploy-dev:
+    name: Deploy to Dev Sandbox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to target
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ github.event.inputs.target_host }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "."
+          target: "/home/nano/src/jetson-orin-nano"
+          strip_components: 0
+          exclude: |
+            .git
+            __pycache__
+            *.pyc
+            .venv
+            venv
+            build
+            install
+            log
+            dist
+            .setup_state
+            .setup.log
+
+      - name: Restart services
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ github.event.inputs.target_host }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /home/nano/src/jetson-orin-nano
+            chmod +x setup.sh scripts/*/*.sh
+            sudo systemctl restart isaac-robot.service || true
+            sudo systemctl restart isaac-system-monitor.service || true

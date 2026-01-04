@@ -1,0 +1,12 @@
+# Setup State File
+# This file tracks completed setup steps
+# Delete this file to reset setup state and re-run setup
+
+# Example completed steps:
+# update_system
+# install_system_packages
+# install_python_packages
+# setup_ros2_workspace
+# setup_venv
+# install_precommit
+

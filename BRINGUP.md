@@ -20,14 +20,24 @@ Password: nano
 
 This section covers the comprehensive system bringup after first boot, including network configuration with dynamic IP and hostname resolution, system updates, and ROS installation.
 
-### **Quick Start: Automated Setup Script**
+### **Quick Start: Automated Setup**
 
-The easiest way to perform the complete bringup is to run the automated setup script:
+The setup process has two steps:
 
+**Step 1: Initial System Setup** (Run once after flashing):
 ```bash
 cd ~/src/jetson-orin-nano
 sudo ./scripts/system/setup_isaac.sh
+sudo reboot
 ```
+
+**Step 2: Unified Development Setup** (Run after initial setup):
+```bash
+cd ~/src/jetson-orin-nano
+./setup.sh
+```
+
+The unified setup script (`setup.sh`) handles all development environment setup and works identically on Jetson, Docker, and Ubuntu systems.
 
 This script will:
 1. Set hostname to `isaac`

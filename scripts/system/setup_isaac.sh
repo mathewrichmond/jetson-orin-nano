@@ -1,12 +1,17 @@
 #!/bin/bash
-# Comprehensive System Bringup Script for Jetson Orin Nano (Isaac)
-# Run this script after first boot
+# Initial Jetson System Setup
+# Run this ONCE after first flashing the Jetson Orin Nano
+# This sets up hostname, mDNS, and basic system configuration
+# After this, use the main setup.sh script for development environment
 
-set -e  # Exit on error
+set -e
 
 echo "=========================================="
-echo "Isaac Jetson Orin Nano System Bringup"
+echo "Isaac Jetson Orin Nano - Initial System Setup"
 echo "=========================================="
+echo ""
+echo "This script sets up the base system configuration."
+echo "After completion, run './setup.sh' for development environment."
 echo ""
 
 # Colors for output
@@ -29,19 +34,14 @@ echo "✓ Hostname set to 'isaac'"
 
 # Step 2: Configure Avahi (mDNS) for hostname resolution
 echo -e "${GREEN}[2/7] Configuring Avahi mDNS for hostname resolution...${NC}"
-# Enable workstation publishing in avahi
 sed -i 's/#publish-workstation=no/publish-workstation=yes/' /etc/avahi/avahi-daemon.conf
-# Set hostname in avahi config (optional, will use system hostname by default)
-# Uncomment and set if needed: sed -i 's/#host-name=foo/host-name=isaac/' /etc/avahi/avahi-daemon.conf
 systemctl restart avahi-daemon
 echo "✓ Avahi configured and restarted"
 
 # Step 3: Verify NetworkManager is using DHCP
 echo -e "${GREEN}[3/7] Verifying NetworkManager DHCP configuration...${NC}"
-# Check current network configuration
 if nmcli connection show | grep -q "ethernet\|wifi"; then
     echo "NetworkManager is managing network connections"
-    # Ensure DHCP is enabled (should be default)
     nmcli connection modify "$(nmcli -t -f NAME connection show --active | head -1)" ipv4.method auto 2>/dev/null || true
     echo "✓ NetworkManager configured for DHCP (dynamic IP)"
 else
@@ -58,7 +58,7 @@ apt-get autoclean
 echo "✓ System updated"
 
 # Step 5: Install development tools
-echo -e "${GREEN}[5/7] Installing development tools...${NC}"
+echo -e "${GREEN}[5/7] Installing basic development tools...${NC}"
 apt-get install -y \
     build-essential \
     cmake \
@@ -86,10 +86,7 @@ apt-get install -y \
     rsync \
     zip \
     unzip \
-    neofetch
-
-# Install additional useful tools
-apt-get install -y \
+    neofetch \
     can-utils \
     i2c-tools \
     usbutils \
@@ -155,20 +152,19 @@ echo "✓ Configuration complete"
 
 echo ""
 echo -e "${GREEN}=========================================="
-echo "Setup Complete!"
+echo "Initial System Setup Complete!"
 echo "==========================================${NC}"
 echo ""
 echo "Next steps:"
 echo "1. Reboot the system: sudo reboot"
-echo "2. After reboot, verify hostname: hostname (should show 'isaac')"
-echo "3. Verify mDNS: avahi-browse -a (should show isaac.local)"
-echo "4. Test ROS 2: source /opt/ros/humble/setup.bash && ros2 --help"
+echo "2. After reboot, clone the repository:"
+echo "   git clone <repository-url> ~/src/jetson-orin-nano"
+echo "3. Run the unified setup:"
+echo "   cd ~/src/jetson-orin-nano"
+echo "   ./setup.sh"
 echo ""
 echo "To connect from another computer:"
 echo "  ssh nano@isaac.local"
-echo "  or"
-echo "  ssh nano@<current-ip-address>"
 echo ""
 echo "Current IP address:"
 ip addr show | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1
-

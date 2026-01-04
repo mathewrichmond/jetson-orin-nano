@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+      }
+    },
+    {
+      "name": "Python: System Monitor Node",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "system_monitor.system_monitor_node",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${env:PYTHONPATH}",
+        "ROS_DOMAIN_ID": "0"
+      },
+      "preLaunchTask": "ROS 2: Build workspace"
+    },
+    {
+      "name": "ROS 2: Launch System Monitor",
+      "type": "ros",
+      "request": "launch",
+      "target": "system_monitor.launch.py",
+      "package": "system_monitor",
+      "preLaunchTask": "ROS 2: Build workspace"
+    },
+    {
+      "name": "ROS 2: Attach to Node",
+      "type": "ros",
+      "request": "attach",
+      "processName": "system_monitor_node"
+    },
+    {
+      "name": "Python: Package Manager",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/utils/package_manager.py",
+      "args": [
+        "install-system",
+        "--groups",
+        "dev_minimal",
+        "--dry-run"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}

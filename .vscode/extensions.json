@@ -1,0 +1,47 @@
+{
+  "recommendations": [
+    // Python
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.flake8",
+    "ms-python.mypy-type-checker",
+
+    // ROS 2
+    "ms-iot.vscode-ros",
+
+    // General development
+    "editorconfig.editorconfig",
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+    "ms-vscode.makefile-tools",
+
+    // Git
+    "eamodio.gitlens",
+
+    // Docker
+    "ms-azuretools.vscode-docker",
+
+    // Shell
+    "timonwong.shellcheck",
+
+    // Markdown
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+
+    // C/C++
+    "ms-vscode.cpptools",
+    "ms-vscode.cpptools-extension-pack",
+
+    // Remote development
+    "ms-vscode-remote.remote-ssh",
+    "ms-vscode-remote.remote-containers",
+
+    // Utilities
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+    "gruntfuggly.todo-tree"
+  ],
+  "unwantedRecommendations": []
+}

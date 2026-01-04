@@ -1,0 +1,52 @@
+# Dockerfile with ROS 2 Humble pre-installed
+# For environments where ROS 2 is needed
+
+FROM osrf/ros:humble-desktop-jammy
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Set working directory
+WORKDIR /workspace
+
+# Install additional tools
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    python3-rosdep \
+    python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -s /bin/bash nano && \
+    echo "nano ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Copy project files
+COPY --chown=nano:nano . /workspace
+
+# Switch to non-root user
+USER nano
+
+# Set up environment
+ENV PATH="/home/nano/.local/bin:$PATH"
+ENV PYTHONPATH="/workspace:$PYTHONPATH"
+
+# Source ROS 2 in bashrc
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+
+# Initialize rosdep
+RUN sudo rosdep init && rosdep update || true
+
+# Run setup script
+RUN /workspace/setup.sh || true
+
+# Default command
+CMD ["/bin/bash"]
+
