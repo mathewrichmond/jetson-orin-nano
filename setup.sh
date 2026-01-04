@@ -194,11 +194,17 @@ step_setup_ros2_workspace() {
             fi
         fi
 
-        # Link system_monitor if it exists
-        if [ -d "$SCRIPT_DIR/src/system_monitor" ]; then
-            cd ~/ros2_ws/src
-            ln -sf "$SCRIPT_DIR/src/system_monitor" system_monitor 2>/dev/null || true
-        fi
+        # Link packages from src directory
+        cd ~/ros2_ws/src
+        for pkg_dir in "$SCRIPT_DIR/src"/*; do
+            if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.xml" ]; then
+                pkg_name=$(basename "$pkg_dir")
+                if [ ! -L "$pkg_name" ] && [ ! -d "$pkg_name" ]; then
+                    ln -sf "$pkg_dir" "$pkg_name" 2>/dev/null || true
+                    log "Linked $pkg_name package to workspace"
+                fi
+            fi
+        done
 
         # Install dependencies
         if command -v rosdep &> /dev/null; then
@@ -374,7 +380,64 @@ step_setup_usbc_display() {
     fi
 }
 
-# Step 10: Install systemd services (optional, only on Jetson)
+# Step 10: Install RealSense cameras (optional, only on Jetson)
+step_install_realsense() {
+    if [ "$ENV_TYPE" != "jetson" ]; then
+        return 0
+    fi
+
+    if check_step "install_realsense"; then
+        log "Skipping: RealSense installation already completed"
+        return 0
+    fi
+
+    log_step "10" "12" "Installing RealSense cameras (optional)"
+
+    # Auto-answer if non-interactive
+    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+        response="y"
+    else
+        echo ""
+        echo "Install Intel RealSense camera support? (y/N)"
+        echo "This will install the RealSense SDK and ROS 2 wrapper."
+        read -r response
+    fi
+
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        if [ -f "$SCRIPT_DIR/scripts/utils/hardware_manager.py" ]; then
+            if [ "$EUID" -eq 0 ]; then
+                python3 "$SCRIPT_DIR/scripts/utils/hardware_manager.py" install-realsense
+            else
+                sudo python3 "$SCRIPT_DIR/scripts/utils/hardware_manager.py" install-realsense
+            fi
+
+            # Build ROS package if ROS 2 workspace exists
+            if [ -f "/opt/ros/humble/setup.bash" ] && [ -d ~/ros2_ws ]; then
+                log "Building RealSense ROS 2 package..."
+                source /opt/ros/humble/setup.bash
+                python3 "$SCRIPT_DIR/scripts/utils/hardware_manager.py" build-realsense-ros || log "ROS package build failed (may need manual build)"
+            fi
+
+            mark_step_complete "install_realsense"
+        else
+            log "WARNING: Hardware manager not found, using fallback script"
+            if [ -f "$SCRIPT_DIR/scripts/hardware/install_realsense.sh" ]; then
+                if [ "$EUID" -eq 0 ]; then
+                    "$SCRIPT_DIR/scripts/hardware/install_realsense.sh"
+                else
+                    sudo "$SCRIPT_DIR/scripts/hardware/install_realsense.sh"
+                fi
+                mark_step_complete "install_realsense"
+            else
+                log "WARNING: RealSense installation script not found"
+            fi
+        fi
+    else
+        log "Skipping RealSense installation. Run manually: sudo python3 scripts/utils/hardware_manager.py install-realsense"
+    fi
+}
+
+# Step 11: Install systemd services (optional, only on Jetson)
 step_install_services() {
     if [ "$ENV_TYPE" != "jetson" ]; then
         return 0
@@ -385,7 +448,7 @@ step_install_services() {
         return 0
     fi
 
-    log_step "10" "10" "Installing systemd services (optional)"
+    log_step "11" "12" "Installing systemd services (optional)"
 
     # Auto-answer if non-interactive
     if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
@@ -406,6 +469,65 @@ step_install_services() {
     else
         log "Skipping service installation. Run manually: sudo ./scripts/system/install_services.sh"
     fi
+}
+
+# Step 12: Build ROS 2 packages (including RealSense if installed)
+step_build_ros2_packages() {
+    if check_step "build_ros2_packages"; then
+        log "Skipping: ROS 2 packages already built"
+        return 0
+    fi
+
+    log_step "12" "12" "Building ROS 2 packages"
+
+    # Check if ROS 2 is installed
+    if [ ! -f "/opt/ros/humble/setup.bash" ]; then
+        log "Skipping: ROS 2 not installed"
+        return 0
+    fi
+
+    # Check if workspace exists
+    if [ ! -d ~/ros2_ws/src ]; then
+        log "Skipping: ROS 2 workspace not set up"
+        return 0
+    fi
+
+    source /opt/ros/humble/setup.bash
+
+    # Link realsense_camera package if it exists
+    if [ -d "$SCRIPT_DIR/src/hardware_drivers/realsense_camera" ]; then
+        cd ~/ros2_ws/src
+        if [ ! -L realsense_camera ] && [ ! -d realsense_camera ]; then
+            ln -sf "$SCRIPT_DIR/src/hardware_drivers/realsense_camera" realsense_camera
+            log "Linked realsense_camera package to workspace"
+        fi
+    fi
+
+    # Link other packages
+    for pkg_dir in "$SCRIPT_DIR/src"/*; do
+        if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.xml" ]; then
+            pkg_name=$(basename "$pkg_dir")
+            cd ~/ros2_ws/src
+            if [ ! -L "$pkg_name" ] && [ ! -d "$pkg_name" ]; then
+                ln -sf "$pkg_dir" "$pkg_name"
+                log "Linked $pkg_name package to workspace"
+            fi
+        fi
+    done
+
+    # Install dependencies
+    if command -v rosdep &> /dev/null; then
+        cd ~/ros2_ws
+        rosdep update || true
+        rosdep install --from-paths src --ignore-src -r -y || true
+    fi
+
+    # Build workspace
+    log "Building ROS 2 workspace..."
+    cd ~/ros2_ws
+    colcon build --symlink-install || log "Build completed with warnings"
+
+    mark_step_complete "build_ros2_packages"
 }
 
 # Check if reboot is needed
@@ -457,7 +579,9 @@ main() {
     step_setup_bluetooth
     step_setup_wifi
     step_setup_usbc_display
+    step_install_realsense
     step_install_services
+    step_build_ros2_packages
 
     log_section "Setup Complete!"
     echo ""
@@ -472,7 +596,10 @@ main() {
     echo "3. Run system monitor:"
     echo "   ros2 launch isaac_robot minimal.launch.py"
     echo ""
-    echo "4. Or launch robot system:"
+    echo "4. Or launch robot system (with cameras if installed):"
+    echo "   ros2 launch isaac_robot full.launch.py"
+    echo ""
+    echo "5. Or use start script:"
     echo "   ./scripts/system/start_robot.sh"
     echo ""
 

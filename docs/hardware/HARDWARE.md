@@ -5,9 +5,10 @@ This document provides an overview of hardware components integrated with the Is
 ## Supported Hardware
 
 ### Cameras
-- **Intel Realsense**: D435/D455 series (planned)
-  - Setup: See `hardware/realsense/` directory
+- **Intel Realsense**: D435/D455 series (integrated)
+  - Setup: Via unified setup or `scripts/utils/hardware_manager.py`
   - Drivers: Intel Realsense SDK 2.0 + ROS 2 wrapper
+  - Documentation: [RealSense Setup](realsense.md) | [Hardware Setup Guide](HARDWARE_SETUP.md)
 
 ### Motor Controllers
 - **TBD**: Motor controller models to be determined
@@ -21,14 +22,21 @@ This document provides an overview of hardware components integrated with the Is
 
 ## Hardware Setup Process
 
+Hardware components can be installed through the unified setup or individually:
+
 1. **Physical Installation**: Mount and connect hardware
-2. **Driver Installation**: Run hardware-specific setup scripts
+2. **Driver Installation**:
+   - Via unified setup: `./setup.sh` (answer 'yes' to hardware prompts)
+   - Via hardware manager: `sudo python3 scripts/utils/hardware_manager.py install-<component>`
 3. **Configuration**: Configure hardware parameters
 4. **Testing**: Verify hardware operation
 5. **Integration**: Integrate with ROS 2 system
 
+See [Hardware Setup Guide](HARDWARE_SETUP.md) for detailed instructions.
+
 ## Hardware-Specific Documentation
 
+- [Hardware Setup Guide](HARDWARE_SETUP.md) - Unified hardware installation guide
 - [Realsense Setup](realsense.md) - Camera installation and configuration
 - [Motor Controllers](motor_controllers.md) - Motor controller setup
 - [Raspberry Pi Modules](raspberry_pi_modules.md) - Sub-module integration
@@ -64,4 +72,3 @@ This document provides an overview of hardware components integrated with the Is
 - Additional sensors (IMU, LiDAR, etc.)
 - Actuators (grippers, manipulators, etc.)
 - Communication modules (WiFi, Bluetooth, etc.)
-

@@ -25,6 +25,7 @@ NON_INTERACTIVE=true sudo ./setup.sh
 - Bluetooth (optional)
 - WiFi (optional)
 - USB-C display (optional)
+- RealSense cameras (optional)
 - Systemd services (optional)
 
 ## After Setup
@@ -75,7 +76,3 @@ The script will:
 - **Detailed Setup**: See [Setup Guide](setup/SETUP.md)
 - **Development Workflow**: See [Development Workflow](development/WORKFLOW.md)
 - **First-Time Jetson Setup**: See [Bringup Guide](setup/BRINGUP.md)
-
-
-
-
