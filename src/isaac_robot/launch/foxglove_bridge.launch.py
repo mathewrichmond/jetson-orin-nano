@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""
+Foxglove Bridge Launch File
+Provides native Foxglove Studio connection (better than rosbridge)
+"""
+
+import os
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'port',
+            default_value='8765',
+            description='Port for Foxglove Bridge WebSocket'
+        ),
+        DeclareLaunchArgument(
+            'address',
+            default_value='0.0.0.0',
+            description='Address to bind Foxglove Bridge (0.0.0.0 for all interfaces)'
+        ),
+        DeclareLaunchArgument(
+            'tls',
+            default_value='false',
+            description='Enable TLS encryption'
+        ),
+        DeclareLaunchArgument(
+            'certfile',
+            default_value='',
+            description='Path to certificate file (if TLS enabled)'
+        ),
+        DeclareLaunchArgument(
+            'keyfile',
+            default_value='',
+            description='Path to key file (if TLS enabled)'
+        ),
+
+        # Foxglove Bridge Node
+        # Note: Port is passed as integer directly (default 8765)
+        Node(
+            package='foxglove_bridge',
+            executable='foxglove_bridge',
+            name='foxglove_bridge',
+            parameters=[{
+                'port': 8765,  # Default port for Foxglove Bridge
+                'address': LaunchConfiguration('address'),
+            }],
+            output='screen',
+        ),
+    ])

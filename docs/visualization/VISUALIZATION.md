@@ -42,10 +42,11 @@ The system provides generic visualization infrastructure:
 
 3. **In Foxglove Studio**:
    - Click "Open connection"
-   - Select "ROS 2" connection type
-   - Enter robot IP address (or use `isaac.local` if mDNS is configured)
-   - Port: `9090` (default rosbridge port)
+   - Select **"WebSocket"** connection type (NOT "ROS 2" - that's for Foxglove Bridge)
+   - Enter: `ws://192.168.0.155:9090` (or `ws://isaac.local:9090` if mDNS configured)
    - Click "Open"
+
+   **Note**: If you see instructions for Foxglove Bridge, you selected "ROS 2" by mistake. Use "WebSocket" instead.
 
 4. **Load Layout** (optional):
    - File → Import Layout

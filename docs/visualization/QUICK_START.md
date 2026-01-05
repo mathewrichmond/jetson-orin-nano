@@ -14,10 +14,12 @@ Quick reference for visualizing **any ROS 2 topics** - raw data, processed strea
    ```
 
 3. **In Foxglove Studio**:
-   - Open → ROS 2
-   - Host: `<robot-ip>` (or `isaac.local`)
-   - Port: `9090`
-   - Open
+   - Click "Open connection"
+   - Select **"WebSocket"** (NOT "ROS 2")
+   - Enter: `ws://<robot-ip>:9090` (e.g., `ws://192.168.0.155:9090`)
+   - Click "Open"
+
+   **Important**: Use "WebSocket" connection type, not "ROS 2" (which is for Foxglove Bridge)
 
 4. **Load Layout** (optional):
    - File → Import Layout
