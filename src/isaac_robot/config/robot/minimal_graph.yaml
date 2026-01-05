@@ -13,6 +13,8 @@ robot:
       temp_critical_threshold: 85.0
 
 groups:
+  core:
+    - system_monitor
   minimal:
     - system_monitor
 

@@ -13,6 +13,22 @@ find_package(rclpy REQUIRED)
 # Install Python modules
 ament_python_install_package(${PROJECT_NAME})
 
+# Create entry point script for symlink installs
+install(CODE "
+  file(MAKE_DIRECTORY \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}\")
+  file(WRITE \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/hello_world_node\"
+    \"#!/usr/bin/env python3\\n\"
+    \"from hello_world.hello_world_node import main\\n\"
+    \"if __name__ == '__main__':\\n\"
+    \"    main()\\n\"
+  )
+  file(CHMOD \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/hello_world_node\"
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                GROUP_READ GROUP_EXECUTE
+                WORLD_READ WORLD_EXECUTE
+  )
+")
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()

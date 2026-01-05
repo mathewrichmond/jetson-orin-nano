@@ -46,16 +46,16 @@ fi
 echo "Launching robot system with graph: $GRAPH_SELECTION"
 case "$GRAPH_SELECTION" in
     minimal)
-        ros2 launch isaac_robot minimal.launch.py
+        ros2 launch isaac_robot graph.launch.py graph_config:=minimal_graph.yaml group:=core
         ;;
     full)
-        ros2 launch isaac_robot full.launch.py
+        ros2 launch isaac_robot graph.launch.py graph_config:=full_graph.yaml group:=all
         ;;
     robot)
-        ros2 launch isaac_robot robot.launch.py
+        ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=all
         ;;
     *)
-        echo "Warning: Unknown graph '$GRAPH_SELECTION', using minimal"
-        ros2 launch isaac_robot minimal.launch.py
+        echo "Warning: Unknown graph '$GRAPH_SELECTION', using robot_graph.yaml"
+        ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=all
         ;;
 esac

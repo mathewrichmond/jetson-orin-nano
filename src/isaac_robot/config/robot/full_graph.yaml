@@ -25,13 +25,29 @@ robot:
       update_rate: 10.0
       max_speed: 1.0
 
+  realsense_camera:
+    enabled: true
+    package: realsense_camera
+    node: realsense_camera_node
+    namespace: ""
+    parameters:
+      enable_color: true
+      enable_depth: true
+      enable_pointcloud: true
+      color_width: 640
+      color_height: 480
+      color_fps: 30
+      depth_width: 640
+      depth_height: 480
+      depth_fps: 30
+      publish_rate: 30.0
+
   hardware_drivers:
     enabled: true
     package: hardware_drivers
     node: hardware_drivers_node
     namespace: /hardware
     parameters:
-      realsense_enabled: true
       motor_controllers_enabled: true
       camera_fps: 30
 
@@ -39,5 +55,6 @@ groups:
   full:
     - system_monitor
     - vla_controller
+    - realsense_camera
     - hardware_drivers
 

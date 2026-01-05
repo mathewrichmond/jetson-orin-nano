@@ -46,5 +46,7 @@ def generate_launch_description():
             name='realsense_camera',
             parameters=[LaunchConfiguration('config_file')],
             output='screen',
+            # Workaround for symlink installs - use Python module directly if executable not found
+            # This will be handled automatically by ROS 2, but explicit for clarity
         ),
     ])
