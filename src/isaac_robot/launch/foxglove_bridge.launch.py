@@ -40,13 +40,14 @@ def generate_launch_description():
         ),
 
         # Foxglove Bridge Node
-        # Note: Port and address are passed as parameters
+        # Note: Port needs to be integer, address as string
+        from launch.substitutions import PythonExpression
         Node(
             package='foxglove_bridge',
             executable='foxglove_bridge',
             name='foxglove_bridge',
             parameters=[{
-                'port': LaunchConfiguration('port'),
+                'port': PythonExpression(["int('", LaunchConfiguration('port'), "')"]),
                 'address': LaunchConfiguration('address'),
             }],
             output='screen',

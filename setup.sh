@@ -485,14 +485,58 @@ step_install_services() {
     fi
 }
 
-# Step 12: Build ROS 2 packages (including RealSense if installed)
+# Step 12: Setup visualization tools (rosbridge and Foxglove Bridge)
+step_setup_visualization() {
+    if check_step "setup_visualization"; then
+        log "Skipping: Visualization tools already set up"
+        return 0
+    fi
+
+    log_step "12" "13" "Setting up visualization tools (rosbridge and Foxglove Bridge)"
+
+    # Check if ROS 2 is installed
+    if [ ! -f "/opt/ros/humble/setup.bash" ]; then
+        log "Skipping: ROS 2 not installed"
+        return 0
+    fi
+
+    source /opt/ros/humble/setup.bash
+
+    # Install rosbridge_suite if not already installed
+    if ! ros2 pkg list | grep -q rosbridge_suite; then
+        log "Installing rosbridge_suite..."
+        if ! check_root; then
+            sudo apt install -y ros-humble-rosbridge-suite || log "rosbridge installation failed (may need manual install)"
+        else
+            apt install -y ros-humble-rosbridge-suite || log "rosbridge installation failed (may need manual install)"
+        fi
+    else
+        log "rosbridge_suite already installed"
+    fi
+
+    # Install foxglove_bridge if not already installed
+    if ! ros2 pkg list | grep -q foxglove_bridge; then
+        log "Installing foxglove_bridge..."
+        if ! check_root; then
+            sudo apt install -y ros-humble-foxglove-bridge || log "foxglove_bridge installation failed (may need manual install)"
+        else
+            apt install -y ros-humble-foxglove-bridge || log "foxglove_bridge installation failed (may need manual install)"
+        fi
+    else
+        log "foxglove_bridge already installed"
+    fi
+
+    mark_step_complete "setup_visualization"
+}
+
+# Step 13: Build ROS 2 packages (including RealSense if installed)
 step_build_ros2_packages() {
     if check_step "build_ros2_packages"; then
         log "Skipping: ROS 2 packages already built"
         return 0
     fi
 
-    log_step "12" "12" "Building ROS 2 packages"
+    log_step "13" "13" "Building ROS 2 packages"
 
     # Check if ROS 2 is installed
     if [ ! -f "/opt/ros/humble/setup.bash" ]; then
@@ -607,6 +651,7 @@ main() {
     step_setup_usbc_display
     step_install_realsense
     step_install_services
+    step_setup_visualization
     step_build_ros2_packages
 
     log_section "Setup Complete!"

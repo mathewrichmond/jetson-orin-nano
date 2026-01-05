@@ -71,6 +71,11 @@ system:
     - ros-humble-desktop
     - ros-dev-tools
 
+  # Visualization tools
+  visualization:
+    - ros-humble-rosbridge-suite
+    - ros-humble-foxglove-bridge
+
   # C++ development
   cpp:
     - gcc
@@ -187,3 +192,4 @@ groups:
     - ros2
     - monitoring
     - networking
+    - visualization
