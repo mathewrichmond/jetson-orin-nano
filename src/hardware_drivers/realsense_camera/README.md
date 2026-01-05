@@ -22,6 +22,7 @@ For each camera (e.g., `camera_front`, `camera_rear`):
 - `/{camera_name}/points` - Pointcloud (sensor_msgs/PointCloud2, optional)
 
 Status:
+
 - `/realsense/status` - Camera status messages (std_msgs/String)
 
 ## Parameters
@@ -42,7 +43,7 @@ Status:
 
 ## Usage
 
-### Launch single node (auto-detects cameras)
+### Launch cameras
 
 ```bash
 ros2 launch realsense_camera realsense_camera.launch.py
@@ -60,6 +61,79 @@ ros2 launch realsense_camera realsense_camera.launch.py config_file:=/path/to/co
 ros2 topic list | grep camera
 ros2 topic echo /camera_front/color/image_raw
 ros2 topic echo /camera_front/depth/image_rect_raw
+```
+
+## Visualization
+
+**Visualization is separate from camera nodes** - this allows you to visualize any topics, including processed/fused data.
+
+**Launch cameras**:
+```bash
+ros2 launch realsense_camera realsense_camera.launch.py
+```
+
+**Launch visualization** (works with any ROS 2 topics):
+```bash
+# Web-based (rosbridge) - works on Mac/Windows/Ubuntu
+ros2 launch isaac_robot rosbridge.launch.py
+
+# Unified visualization
+ros2 launch isaac_robot unified_visualization.launch.py viz_backend:=rosbridge
+```
+
+Then connect Foxglove Studio or web browser and visualize **any topics**:
+- Raw camera feeds: `/camera_front/color/image_raw`
+- Processed streams: `/processed/video`, `/fused/stereo/image`
+- Pointclouds: `/camera_front/points`, `/fused/pointcloud`
+- System metrics: `/system/temperature/cpu`, `/system/cpu/usage`
+
+See [Visualization Guide](../../docs/visualization/VISUALIZATION.md) and [Visualizing Topics](../../docs/visualization/VISUALIZING_TOPICS.md) for details.
+
+### Remote Visualization
+
+To visualize cameras from a remote machine:
+
+1. **Set ROS_DOMAIN_ID** (must match on both machines):
+
+   ```bash
+   export ROS_DOMAIN_ID=0  # Use same ID on robot and remote machine
+   ```
+
+2. **On robot**: Launch camera node:
+
+   ```bash
+   ros2 launch realsense_camera realsense_camera.launch.py
+   ```
+
+3. **On remote machine**: Launch visualization (works with any topics):
+
+   ```bash
+   ros2 launch isaac_robot rosbridge.launch.py
+   ```
+
+   Then connect Foxglove Studio or web browser to visualize any topics.
+
+### rqt_image_view (Lightweight Alternative)
+
+
+For simple 2D image viewing without RViz2:
+
+```bash
+# View color image
+rqt_image_view /camera_front/color/image_raw
+
+# View depth image
+rqt_image_view /camera_front/depth/image_rect_raw
+
+# View rear camera
+rqt_image_view /camera_rear/color/image_raw
+```
+
+Or use rqt with multiple plugins:
+
+```bash
+rqt
+# Then add Image View plugin and select topics
 ```
 
 ## Building

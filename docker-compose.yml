@@ -40,3 +40,21 @@ services:
     tty: true
     command: /bin/bash
 
+  isaac-viz:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2
+    container_name: isaac-viz
+    volumes:
+      - .:/workspace
+      - ~/ros2_ws:/home/nano/ros2_ws
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - ROSBRIDGE_PORT=${ROSBRIDGE_PORT:-9090}
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: >
+      /bin/bash -c "source /opt/ros/humble/setup.bash &&
+      source ~/ros2_ws/install/setup.bash 2>/dev/null || true &&
+      ros2 launch isaac_robot rosbridge.launch.py"
