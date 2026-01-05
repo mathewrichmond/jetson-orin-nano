@@ -18,7 +18,7 @@ def load_graph_config(context):
     """Load graph configuration and return node actions"""
     graph_config = context.launch_configurations.get('graph_config', 'robot_graph.yaml')
     group = context.launch_configurations.get('group', 'all')
-    
+
     # Find config file
     config_path = Path(graph_config)
     if not config_path.exists():
@@ -29,46 +29,46 @@ def load_graph_config(context):
             config_path = Path(package_share) / 'config' / 'robot' / config_path.name
         except:
             pass
-    
+
     if not config_path.exists():
         # Try source space
         source_config = Path(__file__).parent.parent / 'config' / 'robot' / config_path.name
         if source_config.exists():
             config_path = source_config
-    
+
     if not config_path.exists():
         raise FileNotFoundError(f"Graph config file not found: {graph_config}")
-    
+
     # Load config
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f) or {}
-    
+
     nodes_config = config.get('robot', {})
     groups = config.get('groups', {})
-    
+
     # Get nodes to launch
     if group == 'all':
         node_names = list(nodes_config.keys())
     else:
         node_names = groups.get(group, [])
-    
+
     # Create node actions
     actions = []
     for node_name in node_names:
         node_config = nodes_config.get(node_name, {})
         if not node_config.get('enabled', True):
             continue
-        
+
         package = node_config.get('package')
         executable = node_config.get('node')
         namespace = node_config.get('namespace', '')
         parameters = node_config.get('parameters', {})
-        
+
         if not package or not executable:
             continue
-        
+
         param_list = [parameters] if parameters else []
-        
+
         actions.append(Node(
             package=package,
             executable=executable,
@@ -77,7 +77,7 @@ def load_graph_config(context):
             parameters=param_list,
             output='screen',
         ))
-    
+
     return actions
 
 
@@ -94,7 +94,7 @@ def generate_launch_description():
         'robot',
         'robot_graph.yaml'
     )
-    
+
     # Try source space if install space doesn't exist
     if not os.path.exists(default_config):
         default_config = os.path.join(
@@ -106,11 +106,11 @@ def generate_launch_description():
         )
         if not os.path.exists(default_config):
             default_config = 'robot_graph.yaml'
-    
+
     def load_graph_wrapper(context):
         """Wrapper to load graph and return actions"""
         return load_graph_config(context)
-    
+
     return LaunchDescription([
         DeclareLaunchArgument(
             'graph_config',
@@ -124,4 +124,3 @@ def generate_launch_description():
         ),
         OpaqueFunction(function=load_graph_wrapper),
     ])
-

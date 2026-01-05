@@ -34,7 +34,7 @@ install(CODE "
 install(CODE "
   # Create lib directory if it doesn't exist
   file(MAKE_DIRECTORY \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}\")
-  
+
   # Create entry point script
   file(WRITE \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/realsense_camera_node\"
     \"#!/usr/bin/env python3\\n\"
@@ -42,7 +42,7 @@ install(CODE "
     \"if __name__ == '__main__':\\n\"
     \"    main()\\n\"
   )
-  
+
   # Make it executable
   file(CHMOD \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/realsense_camera_node\"
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE

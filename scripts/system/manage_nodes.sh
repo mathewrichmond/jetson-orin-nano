@@ -51,11 +51,11 @@ EOF
 start_nodes() {
     local graph="${1:-robot_graph.yaml}"
     local group="${2:-all}"
-    
+
     echo "=========================================="
     echo "Starting nodes from graph: $graph (group: $group)"
     echo "=========================================="
-    
+
     cd "$ISAAC_ROOT"
     ros2 launch isaac_robot graph.launch.py \
         graph_config:="$graph" \
@@ -66,17 +66,17 @@ stop_nodes() {
     echo "=========================================="
     echo "Stopping all ROS 2 nodes"
     echo "=========================================="
-    
+
     # Stop via systemd if running as service
     if systemctl is-active --quiet isaac-robot.service 2>/dev/null; then
         echo "Stopping isaac-robot.service..."
         sudo systemctl stop isaac-robot.service
     fi
-    
+
     # Kill any remaining ROS 2 processes
     pkill -f "ros2 launch" || true
     pkill -f "ros2 run" || true
-    
+
     # List any remaining nodes
     if ros2 node list &>/dev/null; then
         echo "Remaining nodes:"
@@ -90,14 +90,14 @@ show_status() {
     echo "=========================================="
     echo "Node Status"
     echo "=========================================="
-    
+
     # Check systemd service
     if systemctl is-enabled isaac-robot.service &>/dev/null; then
         echo "Systemd Service:"
         systemctl status isaac-robot.service --no-pager -l || true
         echo ""
     fi
-    
+
     # List ROS 2 nodes
     if ros2 node list &>/dev/null; then
         echo "Running ROS 2 Nodes:"
@@ -111,7 +111,7 @@ show_status() {
     else
         echo "No ROS 2 nodes running"
     fi
-    
+
     # Show topics
     echo ""
     echo "Active Topics:"
@@ -128,22 +128,22 @@ show_status() {
 
 list_nodes() {
     local graph="${1:-robot_graph.yaml}"
-    
+
     echo "=========================================="
     echo "Available Nodes in Graph: $graph"
     echo "=========================================="
-    
+
     # Try to load graph config
     local config_file="$ISAAC_ROOT/config/robot/$graph"
     if [ ! -f "$config_file" ]; then
         config_file="$ISAAC_ROOT/src/isaac_robot/config/robot/$graph"
     fi
-    
+
     if [ ! -f "$config_file" ]; then
         echo "Error: Graph config not found: $graph"
         return 1
     fi
-    
+
     echo "Nodes:"
     python3 << EOF
 import yaml
@@ -156,7 +156,7 @@ with open('$config_file', 'r') as f:
         executable = node_config.get('node', '?')
         status = '✓' if enabled else '✗'
         print(f"  {status} {name} ({package}/{executable})")
-    
+
     print("\nGroups:")
     groups = config.get('groups', {})
     for group_name, node_list in groups.items():
@@ -166,7 +166,7 @@ EOF
 
 show_logs() {
     local node="${1:-}"
-    
+
     if [ -n "$node" ]; then
         echo "Logs for node: $node"
         journalctl -u isaac-robot.service -f --no-pager | grep "$node" || true
@@ -203,4 +203,3 @@ case "${1:-}" in
         exit 1
         ;;
 esac
-

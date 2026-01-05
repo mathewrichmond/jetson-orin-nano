@@ -109,17 +109,16 @@ remappings:
 groups:
   core:
     - system_monitor
-  
+
   control:
     - vla_controller
-  
+
   hardware:
     - realsense_camera
     - hardware_drivers
-  
+
   all:
     - system_monitor
     - vla_controller
     - realsense_camera
     - hardware_drivers
-
