@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    name: Lint and Format Check
+    name: Lint Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,23 +20,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install black flake8 pylint mypy isort
+          pip install black flake8 pylint mypy isort bandit
 
-      - name: Check formatting with Black
-        run: black --check --line-length 100 .
+      - name: Run lint tests
+        run: |
+          ./scripts/testing/run_tests.sh lint
 
-      - name: Check import sorting
-        run: isort --check-only --profile black .
-
-      - name: Lint with Flake8
-        run: flake8 . --max-line-length=100 --extend-ignore=E203,W503 --exclude=.venv,venv,build,install,log
-
-      - name: Type check with MyPy
-        run: mypy . --ignore-missing-imports || true
-
-  test:
-    name: Test
+  unit:
+    name: Unit Tests
     runs-on: ubuntu-latest
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -48,10 +41,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements-dev.txt
+          pip install pytest pytest-cov pytest-mock
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
-          pytest tests/ -v --cov=. --cov-report=xml || true
+          ./scripts/testing/run_tests.sh unit --coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
@@ -59,10 +53,83 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false
 
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install ROS 2 Humble
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y locales
+          sudo locale-gen en_US en_US.UTF-8
+          sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+          export LANG=en_US.UTF-8
+
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository universe
+          sudo apt-get update && sudo apt-get install -y curl gnupg lsb-release
+
+          sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
+          sudo sh -c 'echo "deb http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
+          sudo apt-get update
+          sudo apt-get install -y ros-humble-desktop python3-rosdep python3-colcon-common-extensions
+          sudo rosdep init || true
+          rosdep update
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install pytest pytest-cov pytest-mock
+
+      - name: Build ROS 2 workspace
+        run: |
+          mkdir -p ~/ros2_ws/src
+          # Link packages
+          ln -sf $PWD/src/* ~/ros2_ws/src/ || true
+          cd ~/ros2_ws
+          source /opt/ros/humble/setup.bash
+          rosdep install --from-paths src --ignore-src -r -y || true
+          colcon build --symlink-install || true
+
+      - name: Run integration tests
+        run: |
+          source /opt/ros/humble/setup.bash
+          source ~/ros2_ws/install/setup.bash || true
+          ./scripts/testing/run_tests.sh integration
+
+  bench:
+    name: Bench Tests (Manual Trigger)
+    runs-on: self-hosted
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install pytest pytest-cov
+
+      - name: Run bench tests
+        run: |
+          ./scripts/testing/run_tests.sh bench
+
   build-package:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint, unit, integration]
     steps:
       - uses: actions/checkout@v4
 

@@ -139,14 +139,13 @@ echo ""
 # This allows Ctrl+C to stop both
 trap 'kill 0' EXIT
 
-# Launch camera node in background
-echo "Starting camera node..."
-ros2 launch realsense_camera realsense_camera.launch.py &
-CAMERA_PID=$!
+# Launch camera node + rosbridge using graph launcher
+echo "Starting camera node + rosbridge..."
+ros2 launch isaac_robot graph.launch.py \
+    graph_config:=robot_graph.yaml \
+    group:=hardware &
 
-# Wait a moment for camera to start
+# Launch rosbridge separately (not in graph yet)
 sleep 2
-
-# Launch rosbridge
 echo "Starting rosbridge server..."
 ros2 launch isaac_robot rosbridge.launch.py rosbridge_address:=0.0.0.0

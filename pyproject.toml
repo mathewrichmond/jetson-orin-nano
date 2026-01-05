@@ -37,6 +37,13 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=. --cov-report=html --cov-report=term"
+markers = [
+    "lint: Lint tests (code quality)",
+    "unit: Unit tests (hermetic, mocked)",
+    "integration: Integration tests (node/graph level)",
+    "bench: Bench tests (real hardware)",
+    "hardware: Tests requiring hardware",
+]
 
 [tool.coverage.run]
 source = ["src"]
@@ -55,4 +62,3 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
-
