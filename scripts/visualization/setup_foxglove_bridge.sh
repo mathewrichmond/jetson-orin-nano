@@ -4,9 +4,6 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
 echo "=========================================="
 echo "Foxglove Bridge Setup"
 echo "=========================================="
@@ -46,9 +43,20 @@ echo ""
 echo "Or use the launch file:"
 echo "  ros2 launch isaac_robot foxglove_bridge.launch.py"
 echo ""
+# Get IP address for connection info
+IP_ADDRESS="<robot-ip>"
+if command -v ip &> /dev/null; then
+    IP_ADDRESS=$(ip -4 addr show 2>/dev/null | grep -oE 'inet [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | grep -v '127.0.0.1' | awk '{print $2}' | head -1)
+elif command -v hostname &> /dev/null; then
+    IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "<robot-ip>")
+fi
+
+HOSTNAME=$(hostname 2>/dev/null || echo "isaac")
+MDNS_NAME="${HOSTNAME}.local"
+
 echo "In Foxglove Studio:"
 echo "  1. Select 'ROS 2' framework"
-echo "  2. Enter robot IP: 192.168.0.155"
+echo "  2. Enter robot IP: $IP_ADDRESS (or $MDNS_NAME if mDNS configured)"
 echo "  3. Port: 8765"
 echo "  4. Connect"
 echo ""

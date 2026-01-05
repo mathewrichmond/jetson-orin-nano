@@ -40,13 +40,13 @@ def generate_launch_description():
         ),
 
         # Foxglove Bridge Node
-        # Note: Port is passed as integer directly (default 8765)
+        # Note: Port and address are passed as parameters
         Node(
             package='foxglove_bridge',
             executable='foxglove_bridge',
             name='foxglove_bridge',
             parameters=[{
-                'port': 8765,  # Default port for Foxglove Bridge
+                'port': LaunchConfiguration('port'),
                 'address': LaunchConfiguration('address'),
             }],
             output='screen',
