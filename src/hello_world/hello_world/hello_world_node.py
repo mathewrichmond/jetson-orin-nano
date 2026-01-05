@@ -4,10 +4,11 @@ Hello World Node
 Simple ROS 2 node to verify the Isaac robot system is working
 """
 
+import time
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-import time
 
 
 class HelloWorldNode(Node):

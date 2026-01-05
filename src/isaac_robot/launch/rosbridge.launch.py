@@ -25,8 +25,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'fragment_timeout',
-            default_value='600.0',
-            description='Fragment timeout in seconds'
+            default_value='600',
+            description='Fragment timeout in seconds (integer)'
         ),
         DeclareLaunchArgument(
             'delay_between_messages',
@@ -35,8 +35,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'max_message_size',
-            default_value='None',
-            description='Maximum message size (None for unlimited)'
+            default_value='-1',
+            description='Maximum message size (-1 for unlimited)'
         ),
         DeclareLaunchArgument(
             'unregister_timeout',
@@ -45,17 +45,19 @@ def generate_launch_description():
         ),
 
         # Rosbridge Server for web-based visualization
+        # Note: Parameters are passed as strings and rosbridge converts them
+        # For integer parameters, we use integer defaults
         Node(
             package='rosbridge_server',
             executable='rosbridge_websocket',
             name='rosbridge_websocket',
             parameters=[{
-                'port': LaunchConfiguration('rosbridge_port'),
+                'port': 9090,  # Use integer directly
                 'address': LaunchConfiguration('rosbridge_address'),
-                'fragment_timeout': LaunchConfiguration('fragment_timeout'),
-                'delay_between_messages': LaunchConfiguration('delay_between_messages'),
-                'max_message_size': LaunchConfiguration('max_message_size'),
-                'unregister_timeout': LaunchConfiguration('unregister_timeout'),
+                'fragment_timeout': 600,  # Use integer directly
+                'delay_between_messages': 0.0,
+                'max_message_size': -1,  # -1 means unlimited
+                'unregister_timeout': 10.0,
             }],
             output='screen',
         ),

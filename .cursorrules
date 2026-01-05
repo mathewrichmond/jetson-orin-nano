@@ -47,9 +47,24 @@ This is a **robot control system** repository that:
 ## Code Style Guidelines
 
 - **Python**: Follow PEP 8, use type hints, docstrings for all functions
+  - **Imports**: ALL imports must be at the top of the file, grouped as:
+    1. Standard library imports
+    2. Third-party imports (ROS 2, numpy, etc.)
+    3. Local/package imports
+  - Use `isort` with `black` profile for import sorting
 - **Bash**: Use `set -e` for error handling, check for root when needed
 - **ROS 2**: Follow ROS 2 conventions, use proper package structure
 - **C++**: Follow ROS 2 C++ style guide if used
+
+## Configuration Management
+
+- **All node configs**: Must be stored in `config/` directory, organized by category:
+  - `config/hardware/` - Hardware driver configs (cameras, motors, etc.)
+  - `config/system/` - System node configs (monitors, services, etc.)
+  - `config/robot/` - Robot graph configurations
+  - `config/control/` - Control mode configs
+- **No package-specific configs**: Configs should not live in `src/<package>/config/`
+- **Config resolution**: Launch files should check centralized `config/` first, then fall back to package configs for backward compatibility
 
 ## Important Notes
 

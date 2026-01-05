@@ -5,18 +5,19 @@ Publishes color and depth images from Intel RealSense cameras
 Supports multiple cameras with configurable namespaces
 """
 
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
-from std_msgs.msg import Header, String
-from geometry_msgs.msg import TransformStamped
-import numpy as np
-from cv_bridge import CvBridge
-import pyrealsense2 as rs
-from typing import Optional, Dict, List
 import threading
 import time
 from collections import deque
+from typing import Dict, List, Optional
+
+import numpy as np
+import pyrealsense2 as rs
+import rclpy
+from cv_bridge import CvBridge
+from geometry_msgs.msg import TransformStamped
+from rclpy.node import Node
+from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
+from std_msgs.msg import Header, String
 
 
 class RealSenseCameraNode(Node):
@@ -40,9 +41,16 @@ class RealSenseCameraNode(Node):
         self.declare_parameter('publish_rate', 30.0)
         self.declare_parameter('align_depth_to_color', True)
 
-        # Get parameters
-        self.camera_serials = self.get_parameter('camera_serial_numbers').value
-        self.camera_names = self.get_parameter('camera_names').value
+        # Get parameters (with safe fallback to defaults)
+        try:
+            self.camera_serials = self.get_parameter('camera_serial_numbers').value
+        except Exception:
+            self.camera_serials = []
+
+        try:
+            self.camera_names = self.get_parameter('camera_names').value
+        except Exception:
+            self.camera_names = ['camera_front', 'camera_rear']
         self.enable_color = self.get_parameter('enable_color').value
         self.enable_depth = self.get_parameter('enable_depth').value
         self.enable_pointcloud = self.get_parameter('enable_pointcloud').value

@@ -4,15 +4,15 @@ Main Robot Launch File
 Launches the complete robot system based on graph configuration
 """
 
-from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.substitutions import FindPackageShare
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-import yaml
 import os
+import yaml
 from pathlib import Path
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def load_graph_config(config_file: str) -> dict:
@@ -53,8 +53,6 @@ def generate_launch_description():
     # For now, we'll use a simpler approach with launch arguments
 
     # System Monitor (always enabled in core group)
-    import os
-    from launch.actions import ExecuteProcess
     script_path = os.path.expanduser('~/ros2_ws/install/system_monitor/local/lib/python3.10/dist-packages/system_monitor/system_monitor_node.py')
     system_monitor_node = ExecuteProcess(
         cmd=[

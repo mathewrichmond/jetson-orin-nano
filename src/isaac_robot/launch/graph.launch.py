@@ -5,12 +5,12 @@ Launches nodes from graph configuration YAML file
 Uses GraphManager to dynamically load and launch nodes from YAML config
 """
 
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
 import os
 import yaml
 from pathlib import Path
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -31,7 +31,18 @@ def load_graph_config(context):
             pass
 
     if not config_path.exists():
-        # Try source space
+        # Try centralized config directory
+        isaac_root = Path('/home/nano/src/jetson-orin-nano')
+        if not isaac_root.exists():
+            isaac_root = Path('/opt/isaac-robot')
+
+        if isaac_root.exists():
+            centralized_config = isaac_root / 'config' / 'robot' / config_path.name
+            if centralized_config.exists():
+                config_path = centralized_config
+
+    if not config_path.exists():
+        # Try source space (legacy)
         source_config = Path(__file__).parent.parent / 'config' / 'robot' / config_path.name
         if source_config.exists():
             config_path = source_config

@@ -5,16 +5,16 @@ Loads graph configuration from YAML and launches nodes accordingly
 Provides consistent node management for the Isaac robot system
 """
 
+import os
 import yaml
+from pathlib import Path
+from typing import Dict, List, Any, Optional
 import rclpy
 from rclpy.node import Node
 from launch import LaunchDescription
-from launch_ros.actions import Node as LaunchNode
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-import os
+from launch_ros.actions import Node as LaunchNode
 
 
 class GraphManager:
@@ -60,7 +60,18 @@ class GraphManager:
                 pass
 
         if not config_path.exists():
-            # Try source space
+            # Try centralized config directory
+            isaac_root = Path('/home/nano/src/jetson-orin-nano')
+            if not isaac_root.exists():
+                isaac_root = Path('/opt/isaac-robot')
+
+            if isaac_root.exists():
+                centralized_config = isaac_root / 'config' / 'robot' / config_path.name
+                if centralized_config.exists():
+                    config_path = centralized_config
+
+        if not config_path.exists():
+            # Try source space (legacy)
             source_config = Path(__file__).parent.parent.parent / 'config' / 'robot' / config_path.name
             if source_config.exists():
                 config_path = source_config

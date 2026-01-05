@@ -1,6 +1,7 @@
-from setuptools import setup
 import os
 from glob import glob
+
+from setuptools import setup
 
 package_name = 'system_monitor'
 
@@ -28,4 +29,3 @@ setup(
         ],
     },
 )
-
