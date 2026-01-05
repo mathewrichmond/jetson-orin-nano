@@ -13,11 +13,17 @@ fi
 
 # Source ROS 2 if available
 if [ -f "/opt/ros/humble/setup.bash" ]; then
+    # Unset any incorrectly set prefix variables that might cause issues
+    unset AMENT_CURRENT_PREFIX COLCON_CURRENT_PREFIX
+    # shellcheck source=/opt/ros/humble/setup.bash
     source /opt/ros/humble/setup.bash
 fi
 
 # Source ROS 2 workspace if it exists
 if [ -f ~/ros2_ws/install/setup.bash ]; then
+    # Ensure prefix variables are clean before sourcing workspace
+    unset AMENT_CURRENT_PREFIX COLCON_CURRENT_PREFIX
+    # shellcheck source=~/ros2_ws/install/setup.bash
     source ~/ros2_ws/install/setup.bash
 fi
 
@@ -29,7 +35,7 @@ export ISAAC_PROJECT_ROOT="$PROJECT_ROOT"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Change to project directory
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT" || return
 
 # Print environment info
 echo "Isaac Development Environment Activated"
@@ -40,4 +46,3 @@ if [ -f "/opt/ros/humble/setup.bash" ]; then
 else
     echo "ROS 2: Not available"
 fi
-

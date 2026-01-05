@@ -46,6 +46,19 @@ if [ -d "${PROJECT_ROOT}/src/isaac_robot" ]; then
     ln -sf "${PROJECT_ROOT}/src/isaac_robot" src/ 2>/dev/null || true
 fi
 
+# Clean problematic symlink directories (fixes ament_cmake_python symlink errors)
+echo -e "${BLUE}Cleaning problematic build directories...${NC}"
+for pkg_dir in src/*/; do
+    if [ -d "$pkg_dir" ]; then
+        pkg_name=$(basename "$pkg_dir")
+        symlink_dir="build/${pkg_name}/ament_cmake_python/${pkg_name}/${pkg_name}"
+        if [ -d "$symlink_dir" ]; then
+            rm -rf "$symlink_dir"
+            echo "  Cleaned $symlink_dir"
+        fi
+    fi
+done
+
 # Build packages
 echo -e "${GREEN}Building packages...${NC}"
 colcon build --symlink-install "$@" 2>&1 | tail -20

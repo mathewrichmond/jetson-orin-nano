@@ -1,2 +1,12 @@
 update_system
 install_system_packages
+install_python_packages
+setup_ros2_workspace
+setup_venv
+install_precommit
+setup_bluetooth
+setup_wifi
+setup_usbc_display
+install_realsense
+install_services
+build_ros2_packages

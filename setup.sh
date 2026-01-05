@@ -214,6 +214,19 @@ step_setup_ros2_workspace() {
             rosdep install --from-paths src --ignore-src -r -y || true
         fi
 
+        # Clean problematic symlink directories (fixes ament_cmake_python symlink errors)
+        log "Cleaning problematic build directories..."
+        cd ~/ros2_ws
+        for pkg_dir in src/*/; do
+            if [ -d "$pkg_dir" ]; then
+                pkg_name=$(basename "$pkg_dir")
+                symlink_dir="build/${pkg_name}/ament_cmake_python/${pkg_name}/${pkg_name}"
+                if [ -d "$symlink_dir" ]; then
+                    rm -rf "$symlink_dir" 2>/dev/null || true
+                fi
+            fi
+        done
+
         # Build workspace
         log "Building ROS 2 workspace..."
         colcon build --symlink-install || log "Build completed with warnings"
@@ -523,9 +536,21 @@ step_build_ros2_packages() {
         rosdep install --from-paths src --ignore-src -r -y || true
     fi
 
+    # Clean problematic symlink directories (fixes ament_cmake_python symlink errors)
+    log "Cleaning problematic build directories..."
+    cd ~/ros2_ws
+    for pkg_dir in src/*/; do
+        if [ -d "$pkg_dir" ]; then
+            pkg_name=$(basename "$pkg_dir")
+            symlink_dir="build/${pkg_name}/ament_cmake_python/${pkg_name}/${pkg_name}"
+            if [ -d "$symlink_dir" ]; then
+                rm -rf "$symlink_dir" 2>/dev/null || true
+            fi
+        fi
+    done
+
     # Build workspace
     log "Building ROS 2 workspace..."
-    cd ~/ros2_ws
     colcon build --symlink-install || log "Build completed with warnings"
 
     mark_step_complete "build_ros2_packages"
