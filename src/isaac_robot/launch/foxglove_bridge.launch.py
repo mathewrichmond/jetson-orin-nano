@@ -6,9 +6,9 @@ Provides native Foxglove Studio connection (better than rosbridge)
 
 import os
 from launch import LaunchDescription
-from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -40,14 +40,14 @@ def generate_launch_description():
         ),
 
         # Foxglove Bridge Node
-        # Note: Port needs to be integer, address as string
-        from launch.substitutions import PythonExpression
+        # Note: Port needs to be integer, use default value directly
+        # Address can be string from LaunchConfiguration
         Node(
             package='foxglove_bridge',
             executable='foxglove_bridge',
             name='foxglove_bridge',
             parameters=[{
-                'port': PythonExpression(["int('", LaunchConfiguration('port'), "')"]),
+                'port': 8765,  # Default port (can be changed via command line args if needed)
                 'address': LaunchConfiguration('address'),
             }],
             output='screen',

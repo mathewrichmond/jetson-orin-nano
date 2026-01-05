@@ -16,7 +16,8 @@ Environment="PYTHONPATH=/home/nano/src/jetson-orin-nano:/opt/isaac-robot"
 # Environment="ROBOT_GRAPH=minimal"
 
 # Find Isaac root (dev takes precedence) and start robot
-ExecStart=/bin/bash -c 'ISAAC_ROOT=$(python3 /home/nano/src/jetson-orin-nano/scripts/utils/find_isaac_root.py 2>/dev/null || python3 /opt/isaac-robot/scripts/utils/find_isaac_root.py 2>/dev/null || echo "/opt/isaac-robot"); cd "$ISAAC_ROOT"; exec "$ISAAC_ROOT/scripts/system/start_robot.sh"'
+# Uses selected graph from config/robot/selected_graph.txt
+ExecStart=/bin/bash -c 'ISAAC_ROOT=$(python3 /home/nano/src/jetson-orin-nano/scripts/utils/find_isaac_root.py 2>/dev/null || python3 /opt/isaac-robot/scripts/utils/find_isaac_root.py 2>/dev/null || echo "/opt/isaac-robot"); cd "$ISAAC_ROOT"; ROBOT_GRAPH=$(python3 "$ISAAC_ROOT/scripts/utils/get_graph.sh" 2>/dev/null || echo "minimal"); exec "$ISAAC_ROOT/scripts/system/start_robot.sh"'
 
 # Restart on failure with exponential backoff
 Restart=on-failure

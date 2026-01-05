@@ -13,11 +13,11 @@ GRAPH="${1:-${ROBOT_GRAPH:-minimal}}"
 
 # Validate graph name
 case "$GRAPH" in
-    minimal|full|robot)
+    minimal|full|robot|bench_test)
         ;;
     *)
         echo "Error: Invalid graph '$GRAPH'"
-        echo "Valid options: minimal, full, robot"
+        echo "Valid options: minimal, full, robot, bench_test"
         exit 1
         ;;
 esac

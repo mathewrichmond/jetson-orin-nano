@@ -1,0 +1,89 @@
+# Bench Test Graph Configuration
+# Includes cameras and visualization for bench testing
+# Used for hardware validation and remote visualization
+
+robot:
+  # System Monitor (for health monitoring during tests)
+  system_monitor:
+    enabled: true
+    package: system_monitor
+    node: system_monitor_node
+    namespace: /system
+    parameters:
+      update_rate: 1.0
+      temp_warning_threshold: 70.0
+      temp_critical_threshold: 85.0
+      cpu_warning_threshold: 80.0
+      memory_warning_threshold: 85.0
+      disk_warning_threshold: 85.0
+    topics:
+      publish:
+        - /system/status
+        - /system/temperature/cpu
+        - /system/temperature/gpu
+        - /system/cpu/usage
+        - /system/memory/usage
+        - /system/disk/usage
+      subscribe:
+        - /realsense/status
+
+  # RealSense Cameras (for bench testing)
+  realsense_camera:
+    enabled: true
+    package: realsense_camera
+    node: realsense_camera_node
+    namespace: ""
+    parameters:
+      enable_color: true
+      enable_depth: true
+      enable_pointcloud: false
+      color_width: 640
+      color_height: 480
+      color_fps: 30
+      depth_width: 640
+      depth_height: 480
+      depth_fps: 30
+      publish_rate: 30.0
+    topics:
+      publish:
+        - /camera_front/color/image_raw
+        - /camera_front/color/camera_info
+        - /camera_front/depth/image_rect_raw
+        - /camera_front/depth/camera_info
+        - /camera_rear/color/image_raw
+        - /camera_rear/color/camera_info
+        - /camera_rear/depth/image_rect_raw
+        - /camera_rear/depth/camera_info
+        - /realsense/status
+      subscribe: []
+
+  # Foxglove Bridge (for visualization)
+  foxglove_bridge:
+    enabled: true
+    package: foxglove_bridge
+    node: foxglove_bridge
+    namespace: ""
+    parameters:
+      port: 8765
+      address: "0.0.0.0"
+    topics:
+      publish: []  # Bridge publishes/subscribes to all topics
+      subscribe: []
+
+# Node groups
+groups:
+  bench_test:
+    - system_monitor
+    - realsense_camera
+    - foxglove_bridge
+
+  cameras:
+    - realsense_camera
+
+  visualization:
+    - foxglove_bridge
+
+  all:
+    - system_monitor
+    - realsense_camera
+    - foxglove_bridge

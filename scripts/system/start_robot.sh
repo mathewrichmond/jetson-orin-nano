@@ -54,6 +54,9 @@ case "$GRAPH_SELECTION" in
     robot)
         ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=all
         ;;
+    bench_test)
+        ros2 launch isaac_robot graph.launch.py graph_config:=bench_test_graph.yaml group:=bench_test
+        ;;
     *)
         echo "Warning: Unknown graph '$GRAPH_SELECTION', using robot_graph.yaml"
         ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=all

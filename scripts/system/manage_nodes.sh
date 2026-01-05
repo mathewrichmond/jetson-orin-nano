@@ -49,17 +49,40 @@ EOF
 }
 
 start_nodes() {
-    local graph="${1:-robot_graph.yaml}"
+    # Get graph from argument, or use selected graph
+    local graph_arg="${1:-}"
     local group="${2:-all}"
 
+    # Convert graph name to config file if needed
+    local graph_config=""
+    if [ -z "$graph_arg" ]; then
+        # Use selected graph
+        local selected_graph=$("${UTILS_DIR}/get_graph.sh" 2>/dev/null || echo "minimal")
+        graph_config="${selected_graph}_graph.yaml"
+    elif [[ "$graph_arg" == *.yaml ]]; then
+        # Already a config file
+        graph_config="$graph_arg"
+    else
+        # Graph name (minimal, full, robot)
+        graph_config="${graph_arg}_graph.yaml"
+    fi
+
     echo "=========================================="
-    echo "Starting nodes from graph: $graph (group: $group)"
+    echo "Starting nodes from graph: $graph_config (group: $group)"
     echo "=========================================="
 
     cd "$ISAAC_ROOT"
-    ros2 launch isaac_robot graph.launch.py \
-        graph_config:="$graph" \
-        group:="$group"
+
+    # Use graph.launch.py if it exists, otherwise fall back to robot.launch.py
+    if [ -f "$ISAAC_ROOT/src/isaac_robot/launch/graph.launch.py" ] || \
+       [ -f "/opt/isaac-robot/src/isaac_robot/launch/graph.launch.py" ]; then
+        ros2 launch isaac_robot graph.launch.py \
+            graph_config:="$graph_config" \
+            group:="$group"
+    else
+        # Fallback: use start_robot.sh which handles graph selection
+        "$ISAAC_ROOT/scripts/system/start_robot.sh"
+    fi
 }
 
 stop_nodes() {

@@ -68,4 +68,3 @@ case "$VIZ_BACKEND" in
         exit 1
         ;;
 esac
-
