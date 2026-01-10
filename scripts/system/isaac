@@ -86,9 +86,9 @@ cmd_start() {
     fi
 
     # Start via service if enabled, otherwise direct launch
-    if systemctl is-enabled --quiet isaac-robot.service 2>/dev/null; then
+    if systemctl --user is-enabled --quiet isaac-robot.service 2>/dev/null; then
         echo "Starting via systemd service..."
-        sudo systemctl start isaac-robot.service
+        systemctl --user start isaac-robot.service
     else
         echo "Starting directly..."
         cd "$ISAAC_ROOT"
@@ -102,9 +102,9 @@ cmd_stop() {
     echo -e "${BLUE}========================================${NC}"
 
     # Stop via systemd if running as service
-    if systemctl is-active --quiet isaac-robot.service 2>/dev/null; then
+    if systemctl --user is-active --quiet isaac-robot.service 2>/dev/null; then
         echo "Stopping systemd service..."
-        sudo systemctl stop isaac-robot.service
+        systemctl --user stop isaac-robot.service
     fi
 
     # Stop any direct launches
@@ -220,18 +220,18 @@ cmd_switch() {
     echo -e "${BLUE}Switching to graph: $graph${NC}"
     "${UTILS_DIR}/select_graph.sh" "$graph"
 
-    # Update systemd service override if it exists
-    if systemctl list-unit-files | grep -q isaac-robot.service; then
+    # Update systemd service override if it exists (user service)
+    if systemctl --user list-unit-files 2>/dev/null | grep -q isaac-robot.service; then
         echo "Updating systemd service configuration..."
-        # Create override directory
-        sudo mkdir -p /etc/systemd/system/isaac-robot.service.d/
+        # Create override directory (user service)
+        mkdir -p ~/.config/systemd/user/isaac-robot.service.d/
 
         # Create override file with graph selection
-        sudo tee /etc/systemd/system/isaac-robot.service.d/graph-override.conf > /dev/null << EOF
+        tee ~/.config/systemd/user/isaac-robot.service.d/graph-override.conf > /dev/null << EOF
 [Service]
 Environment="ROBOT_GRAPH=$graph"
 EOF
-        sudo systemctl daemon-reload
+        systemctl --user daemon-reload
         echo -e "${GREEN}✓ Graph switched to: $graph${NC}"
         echo "Service will use new graph on next start/restart"
     else
@@ -241,10 +241,10 @@ EOF
 
 cmd_logs() {
     if systemctl is-active --quiet isaac-robot.service 2>/dev/null; then
-        sudo journalctl -u isaac-robot.service -f --no-pager
+        journalctl --user -u isaac-robot.service -f --no-pager
     else
         echo "Service not running. Showing recent logs:"
-        sudo journalctl -u isaac-robot.service -n 50 --no-pager || echo "No logs available"
+        journalctl --user -u isaac-robot.service -n 50 --no-pager || echo "No logs available"
     fi
 }
 
@@ -253,23 +253,23 @@ cmd_service() {
 
     case "$action" in
         start)
-            sudo systemctl start isaac-robot.service
+            systemctl --user start isaac-robot.service
             echo -e "${GREEN}✓ Service started${NC}"
             ;;
         stop)
-            sudo systemctl stop isaac-robot.service
+            systemctl --user stop isaac-robot.service
             echo -e "${GREEN}✓ Service stopped${NC}"
             ;;
         restart)
-            sudo systemctl restart isaac-robot.service
+            systemctl --user restart isaac-robot.service
             echo -e "${GREEN}✓ Service restarted${NC}"
             ;;
         enable)
-            sudo systemctl enable isaac-robot.service
+            systemctl --user enable isaac-robot.service
             echo -e "${GREEN}✓ Service enabled (will start on boot)${NC}"
             ;;
         disable)
-            sudo systemctl disable isaac-robot.service
+            systemctl --user disable isaac-robot.service
             echo -e "${GREEN}✓ Service disabled${NC}"
             ;;
         status)

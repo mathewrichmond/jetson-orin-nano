@@ -2,68 +2,60 @@
 
 Quick reference for managing ROS 2 nodes in the Isaac robot system.
 
-## Entry Points
+## Centralized Graph Management (Required)
 
-All nodes have consistent entry points:
-
-```bash
-# System monitor
-ros2 run system_monitor system_monitor_node
-
-# RealSense cameras
-ros2 run realsense_camera realsense_camera_node
-
-# Hello world (example)
-ros2 run hello_world hello_world_node
-```
-
-## Graph-Based Management
+**ALWAYS use graph management. Never launch nodes ad hoc.**
 
 ### Start Nodes
 
 ```bash
-# Start from graph config
-ros2 launch isaac_robot graph.launch.py \
-    graph_config:=robot_graph.yaml \
-    group:=all
+# Start robot graph (production)
+./scripts/system/manage_graph.sh start robot
 
-# Or use management script
-./scripts/system/manage_nodes.sh start robot_graph.yaml all
+# Start monitor graph (viewing/logging)
+./scripts/system/manage_graph.sh start monitor
+
+# Check status
+./scripts/system/manage_graph.sh status
+
+# Verify data streams
+./scripts/system/manage_graph.sh verify
 ```
+
+### ⚠️ Do NOT Use These
+
+- ❌ `ros2 launch` - Use `manage_graph.sh` instead
+- ❌ `ros2 run` - Nodes should be in graph config
+- ❌ Individual node launch - Use graph management
 
 ### Available Graphs
 
-- `robot_graph.yaml` - Default configuration
-- `minimal_graph.yaml` - System monitor only
-- `full_graph.yaml` - All components
+- `robot` - Target/production graph (all robot nodes)
+- `monitor` - Viewer/logger graph (monitoring tools)
 
-### Available Groups
-
-- `core` - Essential nodes (system_monitor)
-- `hardware` - Hardware drivers (realsense_camera)
-- `control` - Control nodes (vla_controller)
-- `all` - All enabled nodes
-
-## Management Script
+## Graph Management Commands
 
 ```bash
-# Start
-./scripts/system/manage_nodes.sh start [graph] [group]
+# Select graph
+./scripts/system/manage_graph.sh select [robot|monitor]
 
-# Stop
-./scripts/system/manage_nodes.sh stop
+# Start graph
+./scripts/system/manage_graph.sh start [robot|monitor]
 
-# Status
-./scripts/system/manage_nodes.sh status
+# Stop graph
+./scripts/system/manage_graph.sh stop
 
-# List nodes in graph
-./scripts/system/manage_nodes.sh list [graph]
+# Restart graph
+./scripts/system/manage_graph.sh restart [robot|monitor]
 
-# Restart
-./scripts/system/manage_nodes.sh restart [graph] [group]
+# Check status
+./scripts/system/manage_graph.sh status
 
-# Logs
-./scripts/system/manage_nodes.sh logs [node_name]
+# Verify data streams
+./scripts/system/manage_graph.sh verify
+
+# View logs
+./scripts/system/manage_graph.sh logs
 ```
 
 ## Systemd Service
@@ -105,8 +97,11 @@ ros2 pkg executables
 
 1. Add entry point to `setup.py`
 2. Add entry point script to `CMakeLists.txt`
-3. Add to graph config YAML
+3. **Add to graph config** (`config/robot/robot_graph.yaml` or `config/robot/monitor_graph.yaml`)
 4. Rebuild: `colcon build --packages-select package_name`
+5. **Use graph management** to start: `./scripts/system/manage_graph.sh start robot`
+
+**Never use `ros2 run` in production** - always add to graph config and use graph management.
 5. Test: `ros2 run package_name node_name`
 
 See [Node Management Guide](NODE_MANAGEMENT.md) for details.

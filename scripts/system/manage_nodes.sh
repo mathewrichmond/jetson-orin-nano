@@ -93,7 +93,7 @@ stop_nodes() {
     # Stop via systemd if running as service
     if systemctl is-active --quiet isaac-robot.service 2>/dev/null; then
         echo "Stopping isaac-robot.service..."
-        sudo systemctl stop isaac-robot.service
+        systemctl --user stop isaac-robot.service 2>/dev/null || true
     fi
 
     # Kill any remaining ROS 2 processes

@@ -24,15 +24,14 @@ Commands:
   verify               Verify data streams from all sensors
 
 Graph Options:
-  minimal              Minimal system (system monitor only)
-  full                 Full system (all components)
-  robot                Default robot configuration
-  bench_test           Bench test configuration (all hardware)
+  robot                Target/production graph (all robot nodes)
+  monitor              Viewer/logger graph (monitoring and visualization tools)
 
 Examples:
-  $0 start bench_test
+  $0 start robot
+  $0 start monitor
   $0 status
-  $0 select bench_test
+  $0 select robot
   $0 verify
 
 EOF
@@ -42,32 +41,44 @@ start_graph() {
     local graph="${1:-}"
 
     if [ -z "$graph" ]; then
-        graph=$("${UTILS_DIR}/get_graph.sh" 2>/dev/null || echo "minimal")
+        graph=$("${UTILS_DIR}/get_graph.sh" 2>/dev/null || echo "robot")
     fi
 
     # Select graph
     "${UTILS_DIR}/select_graph.sh" "$graph"
 
-    # Start via systemd if available, otherwise direct
-    if systemctl is-enabled isaac-robot.service &>/dev/null 2>&1; then
+    # Start via systemd user service (no sudo required)
+    if systemctl --user is-enabled isaac-robot.service &>/dev/null 2>&1; then
         echo "Starting robot system via systemd (graph: $graph)..."
-        sudo systemctl start isaac-robot.service
-        sudo systemctl status isaac-robot.service --no-pager -l
+        systemctl --user start isaac-robot.service
+        systemctl --user status isaac-robot.service --no-pager -l || true
     else
-        echo "Starting robot system directly (graph: $graph)..."
+        echo "Systemd service not installed. Starting directly (graph: $graph)..."
+        echo "To install systemd service: ./scripts/system/setup_boot_service.sh"
         "${SCRIPT_DIR}/start_robot.sh"
     fi
 }
 
 stop_graph() {
-    if systemctl is-active --quiet isaac-robot.service 2>/dev/null; then
-        echo "Stopping robot system via systemd..."
-        sudo systemctl stop isaac-robot.service
-    else
-        echo "Stopping robot system..."
-        pkill -f "ros2 launch" || true
-        pkill -f "ros2 run" || true
+    echo "Stopping robot system..."
+
+    # Stop systemd user service if running (no sudo needed)
+    if systemctl --user is-active --quiet isaac-robot.service 2>/dev/null; then
+        echo "Stopping systemd service..."
+        systemctl --user stop isaac-robot.service
     fi
+
+    # Also stop any direct ROS 2 processes (in case started directly)
+    pkill -f "ros2 launch" || true
+    pkill -f "ros2 run" || true
+    pkill -f "realsense_camera_node" || true
+    pkill -f "system_monitor_node" || true
+    pkill -f "usb_microphone_node" || true
+    pkill -f "odrive_controller_node" || true
+    pkill -f "irobot_serial_node" || true
+
+    sleep 1
+    echo "Robot system stopped"
 }
 
 restart_graph() {
@@ -83,26 +94,34 @@ show_status() {
     echo "=========================================="
     echo ""
 
-    # Systemd service status
-    if systemctl is-enabled isaac-robot.service &>/dev/null 2>&1; then
-        echo "Systemd Service:"
-        systemctl status isaac-robot.service --no-pager -l || true
-        echo ""
-    fi
-
     # Current graph selection
     echo "Current Graph Selection:"
     "${UTILS_DIR}/get_graph.sh" 2>/dev/null || echo "  (not set)"
     echo ""
 
+    # Systemd user service status
+    if systemctl --user is-enabled isaac-robot.service &>/dev/null 2>&1; then
+        echo "Systemd Service:"
+        systemctl --user status isaac-robot.service --no-pager -l || true
+        echo ""
+    fi
+
     # ROS 2 nodes
     if command -v ros2 &> /dev/null; then
+        # Source ROS 2 if needed
+        if [ -f "/opt/ros/humble/setup.bash" ]; then
+            source /opt/ros/humble/setup.bash 2>/dev/null
+        fi
+        if [ -f ~/ros2_ws/install/setup.bash ]; then
+            source ~/ros2_ws/install/setup.bash 2>/dev/null
+        fi
+
         if ros2 node list &>/dev/null 2>&1; then
             echo "Running ROS 2 Nodes:"
             ros2 node list
             echo ""
             echo "Active Topics:"
-            ros2 topic list 2>/dev/null | head -20
+            ros2 topic list 2>/dev/null | grep -v "^/parameter\|^/rosout" | head -20
         else
             echo "No ROS 2 nodes running"
         fi
@@ -114,7 +133,7 @@ select_graph() {
 
     if [ -z "$graph" ]; then
         echo "Error: Graph name required"
-        echo "Valid options: minimal, full, robot, bench_test"
+        echo "Valid options: robot, monitor"
         exit 1
     fi
 
@@ -125,10 +144,18 @@ select_graph() {
 }
 
 show_logs() {
-    if systemctl is-active --quiet isaac-robot.service 2>/dev/null; then
-        sudo journalctl -u isaac-robot.service -f --no-pager
+    # Check if systemd user service is running
+    if systemctl --user is-active --quiet isaac-robot.service 2>/dev/null; then
+        echo "Viewing systemd service logs (Ctrl+C to exit)..."
+        journalctl --user -u isaac-robot.service -f --no-pager
+    elif pgrep -f "ros2 launch" > /dev/null 2>&1; then
+        echo "Robot system is running directly (not via systemd)"
+        echo "Logs are in: ~/.ros/log/"
+        echo ""
+        echo "To view systemd service logs (if installed):"
+        echo "  journalctl --user -u isaac-robot.service -f"
     else
-        echo "Service not running. Start with: $0 start"
+        echo "Robot system not running. Start with: $0 start"
     fi
 }
 

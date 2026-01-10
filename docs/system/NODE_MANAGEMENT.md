@@ -117,33 +117,43 @@ Uses `ROBOT_GRAPH` environment variable or defaults to `robot_graph.yaml`.
 
 ## Launching Nodes
 
-### Graph-Based Launch (Recommended)
+**IMPORTANT**: Always use centralized graph management. Do NOT launch nodes ad hoc.
+
+### Centralized Graph Management (Required)
 
 ```bash
-# Launch from graph config
-ros2 launch isaac_robot graph.launch.py \
-    graph_config:=robot_graph.yaml \
-    group:=all
+# Start robot graph (production)
+./scripts/system/manage_graph.sh start robot
+
+# Start monitor graph (viewing/logging)
+./scripts/system/manage_graph.sh start monitor
+
+# Check status
+./scripts/system/manage_graph.sh status
+
+# Verify data streams
+./scripts/system/manage_graph.sh verify
 ```
 
-### Individual Node Launch
+### ⚠️ Do NOT Use These Commands
 
-```bash
-# Launch single node
-ros2 run package_name node_name
+**Never use these in production:**
+- ❌ `ros2 launch isaac_robot graph.launch.py` - Use `manage_graph.sh` instead
+- ❌ `ros2 run <package> <node>` - Nodes should be in graph config
+- ❌ `ros2 launch <package> <launch_file>` - Use graph management
 
-# With parameters
-ros2 run package_name node_name --ros-args -p param1:=value1
-```
+**Why?**
+- Nodes won't have correct namespaces
+- Parameters won't match production config
+- Service management won't work
+- Graph state becomes inconsistent
 
-### Package Launch Files
+### Development Testing
 
-Each package can provide launch files:
-
-```bash
-ros2 launch realsense_camera realsense_camera.launch.py
-ros2 launch system_monitor system_monitor.launch.py
-```
+For initial node development (before adding to graph):
+- Use `ros2 run` only for testing the node itself
+- Once working, add to graph config (`config/robot/robot_graph.yaml`)
+- Then use graph management to launch: `./scripts/system/manage_graph.sh start robot`
 
 ## Systemd Integration
 

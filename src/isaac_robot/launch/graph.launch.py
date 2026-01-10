@@ -80,14 +80,23 @@ def load_graph_config(context):
 
         param_list = [parameters] if parameters else []
 
-        actions.append(Node(
-            package=package,
-            executable=executable,
-            name=node_name,
-            namespace=namespace if namespace else None,
-            parameters=param_list,
-            output='screen',
-        ))
+        # Try to find executable - ROS 2 will handle this automatically
+        # but we can add fallback for Python modules if needed
+        try:
+            actions.append(Node(
+                package=package,
+                executable=executable,
+                name=node_name,
+                namespace=namespace if namespace else None,
+                parameters=param_list,
+                output='screen',
+            ))
+        except Exception as e:
+            # If Node creation fails, log warning but continue
+            # This allows the launch file to work even if some executables aren't found
+            import sys
+            print(f"Warning: Could not create node {node_name} ({package}/{executable}): {e}", file=sys.stderr)
+            continue
 
     return actions
 

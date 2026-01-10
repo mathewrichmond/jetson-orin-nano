@@ -22,14 +22,16 @@ ISAAC_ROOT="${ISAAC_ROOT:-$(python3 "$PROJECT_ROOT/scripts/utils/find_isaac_root
 
 # Restore services if they're not running
 log "Checking services..."
-if ! systemctl is-active --quiet isaac-system-monitor.service; then
-    log "Restarting isaac-system-monitor..."
-    sudo systemctl restart isaac-system-monitor.service || log "Failed to restart"
+# Note: isaac-system-monitor is a system service (may need sudo)
+if ! systemctl is-active --quiet isaac-system-monitor.service 2>/dev/null; then
+    log "Restarting isaac-system-monitor (may require sudo)..."
+    sudo systemctl restart isaac-system-monitor.service 2>/dev/null || log "Failed to restart (may need sudo)"
 fi
 
-if ! systemctl is-active --quiet isaac-robot.service; then
+# Robot service is a user service (no sudo needed)
+if ! systemctl --user is-active --quiet isaac-robot.service 2>/dev/null; then
     log "Restarting isaac-robot..."
-    sudo systemctl restart isaac-robot.service || log "Failed to restart"
+    systemctl --user restart isaac-robot.service || log "Failed to restart"
 fi
 
 # Restore ROS 2 workspace if needed

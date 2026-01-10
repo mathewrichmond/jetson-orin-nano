@@ -91,8 +91,8 @@ read -r response
 if [[ "$response" =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}Restarting services...${NC}"
     ssh "${TARGET_USER}@${TARGET_HOST}" << EOF
-        sudo systemctl restart isaac-robot.service || true
-        sudo systemctl restart isaac-system-monitor.service || true
+        systemctl --user restart isaac-robot.service 2>/dev/null || true
+        sudo systemctl restart isaac-system-monitor.service 2>/dev/null || true
 EOF
 fi
 

@@ -91,12 +91,30 @@ This is a **robot control system** repository that:
 5. **Consider safety**: Add safety checks for hardware operations
 6. **Test incrementally**: Test hardware integration step-by-step
 
+## Node and Graph Management
+
+**CRITICAL**: Always use centralized graph management. Never launch nodes ad hoc.
+
+- **ALWAYS use**: `./scripts/system/manage_graph.sh` for all node operations
+- **NEVER use**: `ros2 launch` or `ros2 run` directly (except for initial development/testing)
+- **Graph configurations**: Only two graphs exist: `robot` (production) and `monitor` (viewing/logging)
+- **Graph selection**: Use `./scripts/system/manage_graph.sh select [robot|monitor]`
+- **Starting nodes**: Use `./scripts/system/manage_graph.sh start [robot|monitor]`
+- **Adding nodes**: Add to `config/robot/robot_graph.yaml` or `config/robot/monitor_graph.yaml`, then use graph management
+- **Systemd integration**: All graph management goes through systemd service (`isaac-robot.service`)
+
+When writing code or documentation:
+- Always reference `manage_graph.sh` commands, not `ros2 launch` or `ros2 run`
+- Show graph management as the primary method
+- Only mention `ros2 run` for initial node development before adding to graph
+
 ## Common Tasks
 
-- **Adding hardware**: Create setup script in `scripts/hardware/`, add driver in `src/hardware_drivers/`, document in `docs/hardware/`
-- **Adding control mode**: Implement in `src/control_modes/`, add config in `config/control/`, document switching logic
+- **Adding hardware**: Create setup script in `scripts/hardware/`, add driver in `src/hardware_drivers/`, add to graph config in `config/robot/robot_graph.yaml`, document in `docs/hardware/`
+- **Adding control mode**: Implement in `src/control_modes/`, add config in `config/control/`, add to graph config, document switching logic
 - **System changes**: Update `scripts/system/` and document in `docs/setup/`
 - **Monitoring**: Add checks to `scripts/monitoring/` and infrastructure in `monitoring/`
+- **Launching nodes**: Use `./scripts/system/manage_graph.sh start [robot|monitor]` - never use `ros2 launch` or `ros2 run` directly
 
 ## File Naming Conventions
 

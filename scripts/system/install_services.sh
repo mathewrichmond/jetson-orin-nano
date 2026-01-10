@@ -16,9 +16,12 @@ echo "=========================================="
 echo "Installing Systemd Services and Timers"
 echo "=========================================="
 
-# Copy service files
-echo "Installing service files..."
-cp "${PROJECT_ROOT}/config/systemd/isaac-robot.service" /etc/systemd/system/
+# Install robot service as user service (no sudo required)
+echo "Installing robot service as user service..."
+"${PROJECT_ROOT}/scripts/system/setup_boot_service.sh"
+
+# Copy other service files (system services for maintenance)
+echo "Installing maintenance service files..."
 cp "${PROJECT_ROOT}/config/systemd/isaac-system-monitor.service" /etc/systemd/system/
 cp "${PROJECT_ROOT}/config/systemd/isaac-update.service" /etc/systemd/system/
 cp "${PROJECT_ROOT}/config/systemd/isaac-cleanup.service" /etc/systemd/system/
@@ -54,15 +57,18 @@ systemctl start isaac-update.timer
 systemctl start isaac-cleanup.timer
 systemctl start isaac-health-check.timer
 
-# Enable services
-echo "Enabling services..."
+# Enable maintenance services
+echo "Enabling maintenance services..."
 systemctl enable isaac-system-monitor.service
-systemctl enable isaac-robot.service
 
-# Start services
-echo "Starting services..."
+# Start maintenance services
+echo "Starting maintenance services..."
 systemctl start isaac-system-monitor.service || echo "Note: isaac-system-monitor may need ROS 2 setup"
-systemctl start isaac-robot.service || echo "Note: isaac-robot may need ROS 2 setup"
+
+# Note: Robot service is managed via user service (already set up above)
+echo ""
+echo "Robot service installed as user service (no sudo required)"
+echo "  Use: ./scripts/system/manage_graph.sh start robot"
 
 echo ""
 echo "=========================================="

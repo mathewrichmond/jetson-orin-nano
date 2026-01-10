@@ -1,6 +1,8 @@
 #!/bin/bash
 # Select Robot Graph Configuration
-# Usage: select_graph.sh [minimal|full|robot]
+# Usage: select_graph.sh [robot|monitor]
+#   robot: Target/production graph (all robot nodes)
+#   monitor: Viewer/logger graph (monitoring and visualization tools)
 
 set -e
 
@@ -11,13 +13,13 @@ GRAPH_CONFIG_FILE="${PROJECT_ROOT}/config/robot/selected_graph.txt"
 # Get graph from argument or environment variable
 GRAPH="${1:-${ROBOT_GRAPH:-minimal}}"
 
-# Validate graph name
+# Validate graph name (only robot or monitor)
 case "$GRAPH" in
-    minimal|full|robot|bench_test)
+    robot|monitor)
         ;;
     *)
         echo "Error: Invalid graph '$GRAPH'"
-        echo "Valid options: minimal, full, robot, bench_test"
+        echo "Valid options: robot, monitor"
         exit 1
         ;;
 esac

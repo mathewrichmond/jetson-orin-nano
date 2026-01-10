@@ -7,17 +7,18 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=nano
-Group=nano
 Environment="ISAAC_DEV_DIR=/home/nano/src/jetson-orin-nano"
 Environment="ISAAC_INSTALL_DIR=/opt/isaac-robot"
 Environment="PYTHONPATH=/home/nano/src/jetson-orin-nano:/opt/isaac-robot"
-# Graph selection: minimal, full, or robot (can be overridden via systemd edit)
-# Environment="ROBOT_GRAPH=minimal"
+# Graph selection: robot or monitor (can be overridden via systemd edit)
+# Uses config/robot/selected_graph.txt or defaults to robot
+#   robot: Target/production graph (all robot nodes)
+#   monitor: Viewer/logger graph (monitoring and visualization tools)
+# Environment="ROBOT_GRAPH=robot"
 
 # Find Isaac root (dev takes precedence) and start robot
 # Uses selected graph from config/robot/selected_graph.txt
-ExecStart=/bin/bash -c 'ISAAC_ROOT=$(python3 /home/nano/src/jetson-orin-nano/scripts/utils/find_isaac_root.py 2>/dev/null || python3 /opt/isaac-robot/scripts/utils/find_isaac_root.py 2>/dev/null || echo "/opt/isaac-robot"); cd "$ISAAC_ROOT"; ROBOT_GRAPH=$(python3 "$ISAAC_ROOT/scripts/utils/get_graph.sh" 2>/dev/null || echo "minimal"); exec "$ISAAC_ROOT/scripts/system/start_robot.sh"'
+ExecStart=/bin/bash -c 'ISAAC_ROOT=$(python3 /home/nano/src/jetson-orin-nano/scripts/utils/find_isaac_root.py 2>/dev/null || python3 /opt/isaac-robot/scripts/utils/find_isaac_root.py 2>/dev/null || echo "/opt/isaac-robot"); cd "$ISAAC_ROOT"; ROBOT_GRAPH=$(python3 "$ISAAC_ROOT/scripts/utils/get_graph.sh" 2>/dev/null || echo "robot"); exec "$ISAAC_ROOT/scripts/system/start_robot.sh"'
 
 # Restart on failure with exponential backoff
 Restart=on-failure
@@ -32,4 +33,4 @@ StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

@@ -60,10 +60,12 @@ The script will:
 - See [USB-C Display](hardware/USBC_DISPLAY.md) for details
 
 ### Robot System
-- **Launch minimal**: `ros2 launch isaac_robot minimal.launch.py`
-- **Launch full**: `ros2 launch isaac_robot full.launch.py`
-- **Select graph**: `./scripts/utils/select_graph.sh <graph>`
-- See [Robot Graph Configuration](robot/GRAPH_CONFIG.md) for details
+- **Start robot graph**: `./scripts/system/manage_graph.sh start robot`
+- **Start monitor graph**: `./scripts/system/manage_graph.sh start monitor`
+- **Select graph**: `./scripts/system/manage_graph.sh select [robot|monitor]`
+- **Check status**: `./scripts/system/manage_graph.sh status`
+- **Verify streams**: `./scripts/system/manage_graph.sh verify`
+- See [Graph Management](system/GRAPH_MANAGEMENT_SYSTEMD.md) for details
 
 ### Deployment
 - **Quick deploy**: `./scripts/deployment/quick_deploy.sh`

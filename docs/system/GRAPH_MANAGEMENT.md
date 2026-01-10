@@ -1,4 +1,8 @@
-# Graph Management Guide
+# Graph Management
+
+**IMPORTANT**: Full graph management should be done through systemd daemon scripts. See [Graph Management via Systemd](GRAPH_MANAGEMENT_SYSTEMD.md) for the recommended production approach.
+
+This document covers graph management concepts and manual operations. Guide
 
 ## Overview
 

@@ -45,20 +45,17 @@ fi
 # Launch robot system with selected graph
 echo "Launching robot system with graph: $GRAPH_SELECTION"
 case "$GRAPH_SELECTION" in
-    minimal)
-        ros2 launch isaac_robot graph.launch.py graph_config:=minimal_graph.yaml group:=core
-        ;;
-    full)
-        ros2 launch isaac_robot graph.launch.py graph_config:=full_graph.yaml group:=all
-        ;;
     robot)
+        # Target/production graph - all robot nodes
         ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=all
         ;;
-    bench_test)
-        ros2 launch isaac_robot graph.launch.py graph_config:=bench_test_graph.yaml group:=bench_test
+    monitor)
+        # Monitor/viewer graph - visualization and logging tools
+        ros2 launch isaac_robot graph.launch.py graph_config:=monitor_graph.yaml group:=all
         ;;
     *)
-        echo "Warning: Unknown graph '$GRAPH_SELECTION', using robot_graph.yaml"
+        # Default: robot graph
+        echo "Warning: Unknown graph '$GRAPH_SELECTION', using robot graph"
         ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=all
         ;;
 esac
