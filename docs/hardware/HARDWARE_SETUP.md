@@ -293,6 +293,175 @@ ros2 topic echo /irobot/battery
 
 See [iRobot Setup](irobot.md) for detailed configuration.
 
+## Bench Setup Verification
+
+This section covers verification of the complete bench setup with all hardware components connected.
+
+### Hardware Components
+
+The bench setup includes:
+1. **Two RealSense cameras** (USB) - Front and rear cameras
+2. **USB microphone** - Audio input for voice commands
+3. **ODrive motor controller** - Motor control with accelerometer (motors not yet connected)
+4. **iRobot Developer Kit** - Serial connection (USB) for robot base
+
+### Step 1: Physical Hardware Verification
+
+Run the hardware verification script to check all hardware is detected:
+
+```bash
+cd ~/src/jetson-orin-nano
+./scripts/hardware/verify_all_hardware.sh
+```
+
+This script checks:
+- USB device detection (cameras, microphone, serial devices)
+- Serial port permissions
+- Audio device availability
+- ROS 2 package build status
+
+**Expected Output:**
+- ✓ 2 RealSense cameras detected
+- ✓ USB microphone detected
+- ✓ Serial devices found (for ODrive and iRobot)
+- ✓ ROS 2 packages built
+
+### Step 2: Build ROS 2 Packages
+
+Ensure all hardware driver packages are built:
+
+```bash
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --packages-select realsense_camera usb_microphone odrive_controller irobot_serial
+source install/setup.bash
+```
+
+### Step 3: Test Individual Nodes
+
+Test each hardware node individually to verify functionality:
+
+```bash
+# Test RealSense cameras
+ros2 run realsense_camera realsense_camera_node
+# In another terminal, check topics:
+ros2 topic list | grep camera
+ros2 topic echo /realsense/status
+
+# Test USB microphone
+ros2 run usb_microphone usb_microphone_node
+# In another terminal:
+ros2 topic echo /microphone/status
+
+# Test ODrive controller
+ros2 run odrive_controller odrive_controller_node
+# In another terminal:
+ros2 topic echo /odrive/status
+
+# Test iRobot serial
+ros2 run irobot_serial irobot_serial_node
+# In another terminal:
+ros2 topic echo /irobot/status
+```
+
+### Step 4: Automated Node Testing
+
+Run the comprehensive hardware node test script:
+
+```bash
+cd ~/src/jetson-orin-nano
+./scripts/hardware/test_hardware_nodes.sh
+```
+
+This script:
+- Launches each hardware node
+- Verifies topics are publishing
+- Checks node functionality
+- Provides detailed test results
+
+### Step 5: Launch Full Bench System
+
+Launch all hardware nodes together using the graph configuration:
+
+```bash
+cd ~/src/jetson-orin-nano
+source ~/ros2_ws/install/setup.bash
+ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=bench_test
+```
+
+This launches:
+- System monitor
+- RealSense cameras (front and rear)
+- USB microphone
+- ODrive controller
+- iRobot serial connection
+
+### Step 6: Verify Topics and Data
+
+In another terminal, verify all topics are active:
+
+```bash
+source ~/ros2_ws/install/setup.bash
+
+# List all topics
+ros2 topic list
+
+# Check camera topics
+ros2 topic echo /camera_front/color/image_raw --once
+ros2 topic echo /camera_rear/color/image_raw --once
+ros2 topic echo /realsense/status
+
+# Check microphone
+ros2 topic echo /microphone/status
+
+# Check ODrive
+ros2 topic echo /odrive/status
+ros2 topic echo /odrive/imu
+
+# Check iRobot
+ros2 topic echo /irobot/status
+ros2 topic echo /irobot/battery
+```
+
+### Troubleshooting Bench Setup
+
+#### Cameras Not Detected
+- Check USB connections (use USB 3.0 ports)
+- Verify power supply (cameras need adequate power)
+- Check udev rules: `ls -l /etc/udev/rules.d/99-realsense-libusb.rules`
+- Reload udev: `sudo udevadm control --reload-rules && sudo udevadm trigger`
+
+#### Serial Devices Not Found
+- Check device permissions: `ls -l /dev/ttyUSB*`
+- Add user to dialout group: `sudo usermod -a -G dialout $USER` (then log out/in)
+- Identify devices: `lsusb` and `dmesg | tail` after plugging in
+
+#### Microphone Not Working
+- List audio devices: `arecord -l`
+- Check PulseAudio: `pactl list sources short`
+- Test recording: `arecord -d 5 test.wav && aplay test.wav`
+
+#### Nodes Not Starting
+- Verify packages built: `ros2 pkg list | grep <package_name>`
+- Check logs: `ros2 run <package> <node> --ros-args --log-level debug`
+- Verify config files exist in `config/hardware/`
+
+#### Topics Not Publishing
+- Check node is running: `ros2 node list`
+- Verify node namespace matches topic namespace
+- Check for errors in node output
+- Verify hardware is actually connected and powered
+
+### Next Steps
+
+After successful bench verification:
+1. **Configure serial ports** - Update `/dev/ttyUSB*` assignments in config files if needed
+2. **Calibrate cameras** - Run camera calibration if needed
+3. **Test motor control** - Once motors are connected, test ODrive motor commands
+4. **Integrate with control system** - Connect hardware to VLA controller when ready
+
+See [Graph Configuration](../robot/GRAPH_CONFIG.md) for details on node configuration and topic mappings.
+
 ## Hardware Verification
 
 Run the comprehensive hardware verification script:

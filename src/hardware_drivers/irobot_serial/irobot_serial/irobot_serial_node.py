@@ -52,7 +52,7 @@ class iRobotSerialNode(Node):
         )
 
         # Timer for status updates
-        self.status_timer = self.create_timer(1.0 / self.publish_rate, self.publish_status)
+        self.status_timer = self.create_timer(1.0 / self.publish_rate, self._publish_status_callback)
 
         # Start connection thread
         self.connect_thread = threading.Thread(target=self._connect_irobot, daemon=True)

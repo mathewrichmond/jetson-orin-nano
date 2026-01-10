@@ -280,12 +280,59 @@ else
     echo "  None found"
 fi
 
+# ============================================
+# ROS 2 Integration Check
+# ============================================
+print_section "ROS 2 Integration Check"
+
+# Check if ROS 2 is sourced
+if [ -z "$ROS_DISTRO" ]; then
+    print_warning "ROS 2 not sourced (set ROS_DISTRO)"
+    echo "  Source ROS 2: source /opt/ros/humble/setup.bash"
+else
+    print_success "ROS 2 environment detected (${ROS_DISTRO})"
+fi
+
+# Check if workspace is built
+if [ -f ~/ros2_ws/install/setup.bash ]; then
+    print_success "ROS 2 workspace found"
+
+    # Check if hardware packages are built
+    source ~/ros2_ws/install/setup.bash 2>/dev/null || true
+
+    PACKAGES_BUILT=0
+    PACKAGES_MISSING=0
+
+    for pkg in realsense_camera usb_microphone odrive_controller irobot_serial; do
+        if ros2 pkg list 2>/dev/null | grep -q "^${pkg}$"; then
+            print_success "${pkg} package built"
+            ((PACKAGES_BUILT++))
+        else
+            print_warning "${pkg} package not built"
+            ((PACKAGES_MISSING++))
+        fi
+    done
+
+    if [ $PACKAGES_MISSING -gt 0 ]; then
+        echo "  Build missing packages:"
+        echo "    cd ~/ros2_ws"
+        echo "    colcon build --packages-select <package_name>"
+    fi
+else
+    print_warning "ROS 2 workspace not found at ~/ros2_ws"
+fi
+
 echo ""
 echo "Next Steps:"
 echo "  1. Verify all hardware is physically connected"
 echo "  2. Check USB power supply (some devices need powered USB hub)"
-echo "  3. Test each component individually"
-echo "  4. Run ROS 2 nodes to verify software integration"
+echo "  3. Build ROS 2 packages: cd ~/ros2_ws && colcon build"
+echo "  4. Test hardware nodes: ./scripts/hardware/test_hardware_nodes.sh"
+echo "  5. Launch full system: ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=bench_test"
 echo ""
 
-exit 0
+if [ "$ALL_PASSED" = true ] && [ $PACKAGES_BUILT -eq 4 ]; then
+    exit 0
+else
+    exit 1
+fi

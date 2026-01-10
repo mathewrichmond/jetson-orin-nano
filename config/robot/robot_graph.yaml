@@ -78,19 +78,64 @@ robot:
         - /realsense/status
       subscribe: []
 
-  # Hardware Drivers (placeholder for future)
-  hardware_drivers:
-    enabled: false
-    package: hardware_drivers
-    node: hardware_drivers_node
+  # USB Microphone
+  usb_microphone:
+    enabled: true
+    package: usb_microphone
+    node: usb_microphone_node
     namespace: /hardware
     parameters:
-      motor_controllers_enabled: true
+      device: 'default'
+      sample_rate: 16000
+      channels: 1
+      format: 'S16_LE'
+      chunk_size: 1024
+      publish_rate: 10.0
     topics:
       publish:
-        - /hardware/motor/status
+        - /microphone/status
+      subscribe: []
+
+  # ODrive Motor Controller
+  odrive_controller:
+    enabled: true
+    package: odrive_controller
+    node: odrive_controller_node
+    namespace: /hardware
+    parameters:
+      serial_port: '/dev/ttyUSB0'
+      baudrate: 115200
+      timeout: 1.0
+      use_can: false
+      can_interface: 'can0'
+      can_node_id: 0
+      publish_rate: 50.0
+      enable_accelerometer: true
+    topics:
+      publish:
+        - /odrive/status
+        - /odrive/imu
       subscribe:
-        - /control/commands
+        - /cmd_vel
+
+  # iRobot Developer Kit Serial
+  irobot_serial:
+    enabled: true
+    package: irobot_serial
+    node: irobot_serial_node
+    namespace: /hardware
+    parameters:
+      serial_port: '/dev/ttyUSB1'
+      baudrate: 115200
+      timeout: 1.0
+      publish_rate: 10.0
+      robot_type: 'create2'
+    topics:
+      publish:
+        - /irobot/status
+        - /irobot/battery
+      subscribe:
+        - /cmd_vel
 
   # Communication with sub-modules (placeholder)
   submodules:
