@@ -55,7 +55,7 @@ robot:
     parameters:
       enable_color: true
       enable_depth: true
-      enable_pointcloud: false
+      enable_pointcloud: true
       color_width: 640
       color_height: 480
       color_fps: 30
@@ -73,6 +73,8 @@ robot:
         - /camera_rear/color/camera_info
         - /camera_rear/depth/image_rect_raw
         - /camera_rear/depth/camera_info
+        - /camera_front/points
+        - /camera_rear/points
         - /realsense/status
       subscribe: []
 

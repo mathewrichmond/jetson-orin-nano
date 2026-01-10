@@ -1,0 +1,104 @@
+{
+  "layout": {
+    "name": "Isaac Robot - Camera View",
+    "root": {
+      "direction": "column",
+      "first": {
+        "direction": "row",
+        "first": {
+          "direction": "column",
+          "first": {
+            "type": "Image",
+            "config": {
+              "topic": "/camera_front/color/image_raw",
+              "cameraTopic": "/camera_front/color/camera_info",
+              "flip": "horizontal",
+              "title": "Front Camera - Color"
+            }
+          },
+          "second": {
+            "type": "Image",
+            "config": {
+              "topic": "/camera_front/depth/image_rect_raw",
+              "cameraTopic": "/camera_front/depth/camera_info",
+              "colorMode": "turbo",
+              "flip": "horizontal",
+              "title": "Front Camera - Depth"
+            }
+          }
+        },
+        "second": {
+          "direction": "column",
+          "first": {
+            "type": "Image",
+            "config": {
+              "topic": "/camera_rear/color/image_raw",
+              "cameraTopic": "/camera_rear/color/camera_info",
+              "flip": "horizontal",
+              "title": "Rear Camera - Color"
+            }
+          },
+          "second": {
+            "type": "Image",
+            "config": {
+              "topic": "/camera_rear/depth/image_rect_raw",
+              "cameraTopic": "/camera_rear/depth/camera_info",
+              "colorMode": "turbo",
+              "flip": "horizontal",
+              "title": "Rear Camera - Depth"
+            }
+          }
+        }
+      },
+      "second": {
+        "direction": "row",
+        "first": {
+          "type": "RawMessages",
+          "config": {
+            "topic": "/realsense/status",
+            "title": "Camera Status"
+          }
+        },
+        "second": {
+          "type": "Plot",
+          "config": {
+            "title": "System Metrics",
+            "paths": [
+              {
+                "value": "/system/temperature/cpu",
+                "enabled": true,
+                "color": "#ff0000",
+                "label": "CPU Temp"
+              },
+              {
+                "value": "/system/temperature/gpu",
+                "enabled": true,
+                "color": "#00ff00",
+                "label": "GPU Temp"
+              },
+              {
+                "value": "/system/cpu/usage",
+                "enabled": true,
+                "color": "#0000ff",
+                "label": "CPU Usage"
+              },
+              {
+                "value": "/system/memory/usage",
+                "enabled": true,
+                "color": "#ff00ff",
+                "label": "Memory"
+              }
+            ],
+            "minYValue": 0,
+            "maxYValue": 100
+          }
+        }
+      }
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1.0
+  }
+}

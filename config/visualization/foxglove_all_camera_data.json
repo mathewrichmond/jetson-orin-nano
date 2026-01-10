@@ -1,0 +1,236 @@
+{
+  "configById": {
+    "Image!front_color": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/camera_front/color/image_raw",
+        "calibrationTopic": "/camera_front/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
+    },
+    "Image!front_depth": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/camera_front/depth/image_rect_raw",
+        "calibrationTopic": "/camera_front/depth/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false,
+      "colorMode": "turbo",
+      "minValue": 0,
+      "maxValue": 5000
+    },
+    "Image!rear_color": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/camera_rear/color/image_raw",
+        "calibrationTopic": "/camera_rear/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
+    },
+    "Image!rear_depth": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/camera_rear/depth/image_rect_raw",
+        "calibrationTopic": "/camera_rear/depth/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false,
+      "colorMode": "turbo",
+      "minValue": 0,
+      "maxValue": 5000
+    },
+    "3D!front_points": {
+      "cameraState": {
+        "distance": 5,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {
+        "/camera_front/points": {
+          "visible": true,
+          "frameLocked": false
+        }
+      },
+      "publish": {}
+    },
+    "3D!rear_points": {
+      "cameraState": {
+        "distance": 5,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {
+        "/camera_rear/points": {
+          "visible": true,
+          "frameLocked": false
+        }
+      },
+      "publish": {}
+    },
+    "RawMessages!status": {
+      "topicPath": "/realsense/status"
+    },
+    "Plot!temperature": {
+      "paths": [
+        {
+          "value": "/system/temperature/cpu.temperature",
+          "enabled": true,
+          "color": "#ff0000"
+        },
+        {
+          "value": "/system/temperature/gpu.temperature",
+          "enabled": true,
+          "color": "#00ff00"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 100,
+      "showLegend": true
+    },
+    "Plot!system_usage": {
+      "paths": [
+        {
+          "value": "/system/cpu/usage.data",
+          "enabled": true,
+          "color": "#0000ff"
+        },
+        {
+          "value": "/system/memory/usage.data",
+          "enabled": true,
+          "color": "#ff00ff"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 100,
+      "showLegend": true
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": {
+      "direction": "column",
+      "first": {
+        "direction": "row",
+        "first": {
+          "direction": "column",
+          "first": "Image!front_color",
+          "second": "Image!front_depth"
+        },
+        "second": {
+          "direction": "column",
+          "first": "Image!rear_color",
+          "second": "Image!rear_depth"
+        }
+      },
+      "second": {
+        "direction": "row",
+        "first": "3D!front_points",
+        "second": "3D!rear_points"
+      }
+    },
+    "second": {
+      "direction": "column",
+      "first": "RawMessages!status",
+      "second": "Plot!temperature",
+      "third": "Plot!system_usage"
+    }
+  }
+}

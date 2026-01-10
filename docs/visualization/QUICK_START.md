@@ -23,7 +23,7 @@ Quick reference for visualizing **any ROS 2 topics** - raw data, processed strea
 
 4. **Load Layout** (optional):
    - File → Import Layout
-   - Select: `src/hardware_drivers/realsense_camera/config/foxglove_layout.json` (for cameras)
+   - Select: `config/visualization/foxglove_cameras_layout.json` (for cameras)
    - Or create your own custom layout
 
 ## Web Browser (Any Platform)

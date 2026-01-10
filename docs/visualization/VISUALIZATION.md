@@ -50,7 +50,7 @@ The system provides generic visualization infrastructure:
 
 4. **Load Layout** (optional):
    - File → Import Layout
-   - Select `src/hardware_drivers/realsense_camera/config/foxglove_layout.json` (for cameras)
+   - Select `config/visualization/foxglove_cameras_layout.json` (for cameras)
    - Or create your own custom layout
 
 ### Option 2: Web-Based Visualization (Docker)
@@ -188,10 +188,13 @@ docker run -it --rm \
 
 ### Layout Configuration
 
-A pre-configured layout is available at:
+Pre-configured layouts are available in:
 ```
-src/hardware_drivers/realsense_camera/config/foxglove_layout.json
+config/visualization/
 ```
+- `foxglove_cameras_layout.json` - Camera view with system metrics (recommended)
+- `foxglove_cameras_only_layout.json` - Clean camera-only view
+- `foxglove_layout.json` - Original layout
 
 This layout includes:
 - Camera front/rear color images

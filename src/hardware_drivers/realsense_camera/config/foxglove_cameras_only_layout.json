@@ -1,0 +1,57 @@
+{
+  "layout": {
+    "name": "Isaac Robot - Cameras Only",
+    "root": {
+      "direction": "row",
+      "first": {
+        "direction": "column",
+        "first": {
+          "type": "Image",
+          "config": {
+            "topic": "/camera_front/color/image_raw",
+            "cameraTopic": "/camera_front/color/camera_info",
+            "flip": "horizontal",
+            "title": "Front - Color"
+          }
+        },
+        "second": {
+          "type": "Image",
+          "config": {
+            "topic": "/camera_front/depth/image_rect_raw",
+            "cameraTopic": "/camera_front/depth/camera_info",
+            "colorMode": "turbo",
+            "flip": "horizontal",
+            "title": "Front - Depth"
+          }
+        }
+      },
+      "second": {
+        "direction": "column",
+        "first": {
+          "type": "Image",
+          "config": {
+            "topic": "/camera_rear/color/image_raw",
+            "cameraTopic": "/camera_rear/color/camera_info",
+            "flip": "horizontal",
+            "title": "Rear - Color"
+          }
+        },
+        "second": {
+          "type": "Image",
+          "config": {
+            "topic": "/camera_rear/depth/image_rect_raw",
+            "cameraTopic": "/camera_rear/depth/camera_info",
+            "colorMode": "turbo",
+            "flip": "horizontal",
+            "title": "Rear - Depth"
+          }
+        }
+      }
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1.0
+  }
+}

@@ -15,6 +15,10 @@ This directory contains **all** configuration files for the Isaac robot system. 
   - `minimal_graph.yaml` - Minimal system graph
   - `full_graph.yaml` - Full system graph
 - `control/` - Control mode configurations
+- `visualization/` - Visualization configurations
+  - `foxglove_cameras_layout.json` - Foxglove Studio camera layout
+  - `foxglove_cameras_only_layout.json` - Camera-only layout
+  - `foxglove_layout.json` - Original camera layout
 - `systemd/` - Systemd service files
 
 ## Configuration Management
@@ -26,6 +30,7 @@ This directory contains **all** configuration files for the Isaac robot system. 
 - System configs → `config/system/`
 - Robot graphs → `config/robot/`
 - Control configs → `config/control/`
+- Visualization configs → `config/visualization/`
 
 ### Config Resolution
 
