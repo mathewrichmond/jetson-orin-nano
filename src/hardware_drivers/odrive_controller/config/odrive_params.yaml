@@ -1,0 +1,17 @@
+/**:
+  ros__parameters:
+    # Serial connection parameters
+    serial_port: '/dev/ttyUSB0'
+    baudrate: 115200
+    timeout: 1.0
+
+    # CAN connection parameters (alternative to serial)
+    use_can: false
+    can_interface: 'can0'
+    can_node_id: 0
+
+    # Publishing parameters
+    publish_rate: 50.0  # Hz
+
+    # Accelerometer/IMU
+    enable_accelerometer: true

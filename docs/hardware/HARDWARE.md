@@ -11,9 +11,25 @@ This document provides an overview of hardware components integrated with the Is
   - Documentation: [RealSense Setup](realsense.md) | [Hardware Setup Guide](HARDWARE_SETUP.md)
 
 ### Motor Controllers
-- **TBD**: Motor controller models to be determined
-  - Setup: See `hardware/motor_controllers/` directory
-  - Communication: CAN, I2C, or serial (TBD)
+- **ODrive**: ODrive motor controller with accelerometer
+  - Setup: See [ODrive Setup](odrive.md)
+  - Communication: Serial (USB) or CAN bus
+  - Features: Motor control, IMU/accelerometer data
+  - Documentation: [ODrive Setup](odrive.md)
+
+### Audio Input
+- **USB Microphone**: USB audio input device
+  - Setup: See [USB Microphone Setup](usb_microphone.md)
+  - Communication: USB audio (ALSA/PulseAudio)
+  - Features: Audio capture for voice commands
+  - Documentation: [USB Microphone Setup](usb_microphone.md)
+
+### Robot Base
+- **iRobot Developer Kit**: iRobot Create/Roomba base
+  - Setup: See [iRobot Setup](irobot.md)
+  - Communication: Serial (USB)
+  - Features: Mobile base control, battery monitoring
+  - Documentation: [iRobot Setup](irobot.md)
 
 ### Sub-module Controllers
 - **Raspberry Pi**: For distributed control (planned)
@@ -38,7 +54,10 @@ See [Hardware Setup Guide](HARDWARE_SETUP.md) for detailed instructions.
 
 - [Hardware Setup Guide](HARDWARE_SETUP.md) - Unified hardware installation guide
 - [Realsense Setup](realsense.md) - Camera installation and configuration
-- [Motor Controllers](motor_controllers.md) - Motor controller setup
+- [ODrive Setup](odrive.md) - ODrive motor controller setup
+- [USB Microphone Setup](usb_microphone.md) - USB microphone setup
+- [iRobot Setup](irobot.md) - iRobot Create/Roomba setup
+- [Motor Controllers](motor_controllers.md) - General motor controller information
 - [Raspberry Pi Modules](raspberry_pi_modules.md) - Sub-module integration
 
 ## Power Considerations

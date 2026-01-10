@@ -119,10 +119,21 @@ groups:
 
   hardware:
     - realsense_camera
-    - hardware_drivers
+    - usb_microphone
+    - odrive_controller
+    - irobot_serial
+
+  bench_test:
+    - system_monitor
+    - realsense_camera
+    - usb_microphone
+    - odrive_controller
+    - irobot_serial
 
   all:
     - system_monitor
     - vla_controller
     - realsense_camera
-    - hardware_drivers
+    - usb_microphone
+    - odrive_controller
+    - irobot_serial

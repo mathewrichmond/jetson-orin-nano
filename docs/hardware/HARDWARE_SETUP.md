@@ -193,8 +193,125 @@ rm .hardware_state
    sudo udevadm trigger
    ```
 
+## ODrive Motor Controller
+
+### Installation
+
+ODrive controllers are integrated via ROS 2:
+
+```bash
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --packages-select odrive_controller
+source install/setup.bash
+```
+
+### Configuration
+
+Configure ODrive in `config/hardware/odrive_params.yaml`:
+- Set serial port (e.g., `/dev/ttyUSB0`)
+- Configure baudrate (typically 115200)
+- Enable accelerometer if available
+
+### Verification
+
+```bash
+# Launch ODrive node
+ros2 launch odrive_controller odrive_controller.launch.py
+
+# Check status
+ros2 topic echo /odrive/status
+```
+
+See [ODrive Setup](odrive.md) for detailed configuration.
+
+## USB Microphone
+
+### Installation
+
+USB microphones are integrated via ROS 2:
+
+```bash
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --packages-select usb_microphone
+source install/setup.bash
+```
+
+### Configuration
+
+Configure microphone in `config/hardware/microphone_params.yaml`:
+- Set device name (use `arecord -l` to find device)
+- Configure sample rate and format
+- Set chunk size and publish rate
+
+### Verification
+
+```bash
+# Launch microphone node
+ros2 launch usb_microphone usb_microphone.launch.py
+
+# Check status
+ros2 topic echo /microphone/status
+
+# Test recording
+arecord -d 5 test.wav
+```
+
+See [USB Microphone Setup](usb_microphone.md) for detailed configuration.
+
+## iRobot Developer Kit
+
+### Installation
+
+iRobot Create/Roomba integration via ROS 2:
+
+```bash
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --packages-select irobot_serial
+source install/setup.bash
+```
+
+### Configuration
+
+Configure iRobot in `config/hardware/irobot_params.yaml`:
+- Set serial port (e.g., `/dev/ttyUSB1`)
+- Configure baudrate (115200 for Create 2)
+- Set robot type (create2 or roomba)
+
+### Verification
+
+```bash
+# Launch iRobot node
+ros2 launch irobot_serial irobot_serial.launch.py
+
+# Check status
+ros2 topic echo /irobot/status
+ros2 topic echo /irobot/battery
+```
+
+See [iRobot Setup](irobot.md) for detailed configuration.
+
+## Hardware Verification
+
+Run the comprehensive hardware verification script:
+
+```bash
+./scripts/hardware/verify_all_hardware.sh
+```
+
+This script checks:
+- Two RealSense cameras (USB)
+- USB microphone
+- ODrive motor controller and accelerometer
+- iRobot developer kit serial connection
+
 ## Next Steps
 
 - See [RealSense Setup](realsense.md) for detailed camera configuration
+- See [ODrive Setup](odrive.md) for motor controller configuration
+- See [USB Microphone Setup](usb_microphone.md) for microphone configuration
+- See [iRobot Setup](irobot.md) for robot base configuration
 - See [Hardware Integration](../hardware/HARDWARE.md) for hardware overview
 - See [System Setup](../setup/SETUP.md) for full system setup

@@ -529,6 +529,32 @@ step_setup_visualization() {
     mark_step_complete "setup_visualization"
 }
 
+# Step 12: Hardware verification
+step_verify_hardware() {
+    if check_step "verify_hardware"; then
+        log "Skipping: Hardware verification already completed"
+        return 0
+    fi
+
+    log_step "12" "13" "Hardware verification"
+
+    if [ "$ENV_TYPE" != "jetson" ]; then
+        log "Skipping hardware verification (not on Jetson)"
+        mark_step_complete "verify_hardware"
+        return 0
+    fi
+
+    if ask_yes_no "Run hardware verification? (checks all connected hardware)"; then
+        "${SCRIPT_DIR}/scripts/hardware/setup_hardware.sh" verify || {
+            log "Hardware verification completed with warnings"
+        }
+        mark_step_complete "verify_hardware"
+    else
+        log "Hardware verification skipped"
+        mark_step_complete "verify_hardware"
+    fi
+}
+
 # Step 13: Build ROS 2 packages (including RealSense if installed)
 step_build_ros2_packages() {
     if check_step "build_ros2_packages"; then
@@ -536,7 +562,7 @@ step_build_ros2_packages() {
         return 0
     fi
 
-    log_step "13" "13" "Building ROS 2 packages"
+    log_step "13" "14" "Building ROS 2 packages"
 
     # Check if ROS 2 is installed
     if [ ! -f "/opt/ros/humble/setup.bash" ]; then
@@ -652,6 +678,7 @@ main() {
     step_install_realsense
     step_install_services
     step_setup_visualization
+    step_verify_hardware
     step_build_ros2_packages
 
     log_section "Setup Complete!"

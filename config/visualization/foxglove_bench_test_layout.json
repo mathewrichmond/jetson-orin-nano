@@ -1,0 +1,195 @@
+{
+  "layout": {
+    "name": "Isaac Robot - Bench Test (All Sensors)",
+    "root": {
+      "direction": "row",
+      "first": {
+        "direction": "column",
+        "first": {
+          "direction": "row",
+          "first": {
+            "direction": "column",
+            "first": {
+              "type": "Image",
+              "config": {
+                "topic": "/camera_front/color/image_raw",
+                "cameraTopic": "/camera_front/color/camera_info",
+                "flip": "horizontal"
+              }
+            },
+            "second": {
+              "type": "Image",
+              "config": {
+                "topic": "/camera_front/depth/image_rect_raw",
+                "cameraTopic": "/camera_front/depth/camera_info",
+                "colorMode": "turbo",
+                "flip": "horizontal"
+              }
+            }
+          },
+          "second": {
+            "direction": "column",
+            "first": {
+              "type": "Image",
+              "config": {
+                "topic": "/camera_rear/color/image_raw",
+                "cameraTopic": "/camera_rear/color/camera_info",
+                "flip": "horizontal"
+              }
+            },
+            "second": {
+              "type": "Image",
+              "config": {
+                "topic": "/camera_rear/depth/image_rect_raw",
+                "cameraTopic": "/camera_rear/depth/camera_info",
+                "colorMode": "turbo",
+                "flip": "horizontal"
+              }
+            }
+          }
+        },
+        "second": {
+          "type": "RawMessages",
+          "config": {
+            "topic": "/realsense/status"
+          }
+        }
+      },
+      "second": {
+        "direction": "column",
+        "first": {
+          "direction": "row",
+          "first": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/system/temperature/cpu",
+                  "enabled": true,
+                  "color": "#ff0000",
+                  "label": "CPU Temp"
+                },
+                {
+                  "value": "/system/temperature/gpu",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "GPU Temp"
+                }
+              ],
+              "minYValue": 0,
+              "maxYValue": 100,
+              "showLegend": true
+            }
+          },
+          "second": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/system/cpu/usage",
+                  "enabled": true,
+                  "color": "#0000ff",
+                  "label": "CPU Usage"
+                },
+                {
+                  "value": "/system/memory/usage",
+                  "enabled": true,
+                  "color": "#ff00ff",
+                  "label": "Memory Usage"
+                }
+              ],
+              "minYValue": 0,
+              "maxYValue": 100,
+              "showLegend": true
+            }
+          }
+        },
+        "second": {
+          "direction": "row",
+          "first": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/odrive/imu.linear_acceleration.x",
+                  "enabled": true,
+                  "color": "#ff0000",
+                  "label": "Accel X"
+                },
+                {
+                  "value": "/odrive/imu.linear_acceleration.y",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "Accel Y"
+                },
+                {
+                  "value": "/odrive/imu.linear_acceleration.z",
+                  "enabled": true,
+                  "color": "#0000ff",
+                  "label": "Accel Z"
+                }
+              ],
+              "minYValue": -10,
+              "maxYValue": 10,
+              "showLegend": true
+            }
+          },
+          "second": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/irobot/battery.percentage",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "Battery %"
+                },
+                {
+                  "value": "/irobot/battery.voltage",
+                  "enabled": true,
+                  "color": "#ff8800",
+                  "label": "Voltage"
+                }
+              ],
+              "minYValue": 0,
+              "maxYValue": 15,
+              "showLegend": true
+            }
+          }
+        },
+        "third": {
+          "direction": "column",
+          "first": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/microphone/status"
+            }
+          },
+          "second": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/odrive/status"
+            }
+          },
+          "third": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/irobot/status"
+            }
+          },
+          "fourth": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/system/status"
+            }
+          }
+        }
+      }
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1.0
+  }
+}
