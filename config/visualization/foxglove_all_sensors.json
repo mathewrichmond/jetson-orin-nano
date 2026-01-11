@@ -1,0 +1,350 @@
+{
+  "layout": {
+    "name": "Isaac Robot - All Sensors",
+    "root": {
+      "direction": "row",
+      "first": {
+        "direction": "column",
+        "first": {
+          "direction": "row",
+          "first": {
+            "direction": "column",
+            "first": {
+              "type": "Image",
+              "config": {
+                "topic": "/hardware/camera_front/color/image_raw",
+                "cameraTopic": "/hardware/camera_front/color/camera_info",
+                "flip": "horizontal"
+              }
+            },
+            "second": {
+              "type": "Image",
+              "config": {
+                "topic": "/hardware/camera_front/depth/image_rect_raw",
+                "cameraTopic": "/hardware/camera_front/depth/camera_info",
+                "colorMode": "turbo",
+                "flip": "horizontal"
+              }
+            }
+          },
+          "second": {
+            "direction": "column",
+            "first": {
+              "type": "Image",
+              "config": {
+                "topic": "/hardware/camera_rear/color/image_raw",
+                "cameraTopic": "/hardware/camera_rear/color/camera_info",
+                "flip": "horizontal"
+              }
+            },
+            "second": {
+              "type": "Image",
+              "config": {
+                "topic": "/hardware/camera_rear/depth/image_rect_raw",
+                "cameraTopic": "/hardware/camera_rear/depth/camera_info",
+                "colorMode": "turbo",
+                "flip": "horizontal"
+              }
+            }
+          }
+        },
+        "second": {
+          "type": "ThreeDee",
+          "config": {
+            "layers": {
+              "camera_front_points": {
+                "visible": true,
+                "frameId": "camera_front_depth_optical_frame",
+                "type": "pointcloud",
+                "topic": "/hardware/camera_front/points",
+                "colorField": "z",
+                "colorMode": "colormap",
+                "colorMap": "turbo"
+              },
+              "camera_rear_points": {
+                "visible": true,
+                "frameId": "camera_rear_depth_optical_frame",
+                "type": "pointcloud",
+                "topic": "/hardware/camera_rear/points",
+                "colorField": "z",
+                "colorMode": "colormap",
+                "colorMap": "turbo"
+              }
+            }
+          }
+        }
+      },
+      "second": {
+        "direction": "column",
+        "first": {
+          "direction": "row",
+          "first": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/system/temperature/cpu.temperature",
+                  "enabled": true,
+                  "color": "#ff0000",
+                  "label": "CPU Temp"
+                },
+                {
+                  "value": "/system/temperature/gpu.temperature",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "GPU Temp"
+                }
+              ],
+              "minYValue": 0,
+              "maxYValue": 100,
+              "showLegend": true
+            }
+          },
+          "second": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/system/cpu/usage.percentage",
+                  "enabled": true,
+                  "color": "#0000ff",
+                  "label": "CPU Usage"
+                },
+                {
+                  "value": "/system/memory/usage.percentage",
+                  "enabled": true,
+                  "color": "#ff00ff",
+                  "label": "Memory Usage"
+                },
+                {
+                  "value": "/system/disk/usage.percentage",
+                  "enabled": true,
+                  "color": "#ffff00",
+                  "label": "Disk Usage"
+                }
+              ],
+              "minYValue": 0,
+              "maxYValue": 100,
+              "showLegend": true
+            }
+          }
+        },
+        "second": {
+          "direction": "row",
+          "first": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/phat/imu.linear_acceleration.x",
+                  "enabled": true,
+                  "color": "#ff0000",
+                  "label": "PHAT Accel X"
+                },
+                {
+                  "value": "/phat/imu.linear_acceleration.y",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "PHAT Accel Y"
+                },
+                {
+                  "value": "/phat/imu.linear_acceleration.z",
+                  "enabled": true,
+                  "color": "#0000ff",
+                  "label": "PHAT Accel Z"
+                }
+              ],
+              "minYValue": -20,
+              "maxYValue": 20,
+              "showLegend": true
+            }
+          },
+          "second": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/phat/imu.angular_velocity.x",
+                  "enabled": true,
+                  "color": "#ff0000",
+                  "label": "PHAT Gyro X"
+                },
+                {
+                  "value": "/phat/imu.angular_velocity.y",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "PHAT Gyro Y"
+                },
+                {
+                  "value": "/phat/imu.angular_velocity.z",
+                  "enabled": true,
+                  "color": "#0000ff",
+                  "label": "PHAT Gyro Z"
+                }
+              ],
+              "minYValue": -5,
+              "maxYValue": 5,
+              "showLegend": true
+            }
+          }
+        },
+        "third": {
+          "direction": "row",
+          "first": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/odrive/imu.linear_acceleration.x",
+                  "enabled": true,
+                  "color": "#ff0000",
+                  "label": "ODrive Accel X"
+                },
+                {
+                  "value": "/odrive/imu.linear_acceleration.y",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "ODrive Accel Y"
+                },
+                {
+                  "value": "/odrive/imu.linear_acceleration.z",
+                  "enabled": true,
+                  "color": "#0000ff",
+                  "label": "ODrive Accel Z"
+                }
+              ],
+              "minYValue": -20,
+              "maxYValue": 20,
+              "showLegend": true
+            }
+          },
+          "second": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/odrive/imu.angular_velocity.x",
+                  "enabled": true,
+                  "color": "#ff0000",
+                  "label": "ODrive Gyro X"
+                },
+                {
+                  "value": "/odrive/imu.angular_velocity.y",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "ODrive Gyro Y"
+                },
+                {
+                  "value": "/odrive/imu.angular_velocity.z",
+                  "enabled": true,
+                  "color": "#0000ff",
+                  "label": "ODrive Gyro Z"
+                }
+              ],
+              "minYValue": -5,
+              "maxYValue": 5,
+              "showLegend": true
+            }
+          }
+        },
+        "fourth": {
+          "direction": "row",
+          "first": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/irobot/battery.percentage",
+                  "enabled": true,
+                  "color": "#00ff00",
+                  "label": "Battery %"
+                },
+                {
+                  "value": "/irobot/battery.voltage",
+                  "enabled": true,
+                  "color": "#ff8800",
+                  "label": "Voltage"
+                }
+              ],
+              "minYValue": 0,
+              "maxYValue": 15,
+              "showLegend": true
+            }
+          },
+          "second": {
+            "type": "Plot",
+            "config": {
+              "paths": [
+                {
+                  "value": "/system/power.voltage",
+                  "enabled": true,
+                  "color": "#00ffff",
+                  "label": "System Voltage"
+                },
+                {
+                  "value": "/system/power.current",
+                  "enabled": true,
+                  "color": "#ff00ff",
+                  "label": "System Current"
+                }
+              ],
+              "minYValue": 0,
+              "maxYValue": 20,
+              "showLegend": true
+            }
+          }
+        },
+        "fifth": {
+          "direction": "column",
+          "first": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/hardware/realsense/status"
+            }
+          },
+          "second": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/phat/status"
+            }
+          },
+          "third": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/odrive/status"
+            }
+          },
+          "fourth": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/irobot/status"
+            }
+          },
+          "fifth": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/microphone/status"
+            }
+          },
+          "sixth": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/system/status"
+            }
+          },
+          "seventh": {
+            "type": "RawMessages",
+            "config": {
+              "topic": "/system/alerts"
+            }
+          }
+        }
+      }
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1.0
+  }
+}
