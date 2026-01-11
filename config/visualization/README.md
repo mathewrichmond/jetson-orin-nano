@@ -10,13 +10,14 @@ Foxglove Studio layout files for visualizing robot data.
 
 ### Available Layout
 
-**`foxglove_all_camera_data.json`** - Complete camera data view
-- Front camera (color + depth images)
-- Rear camera (color + depth images)
-- Front & rear pointclouds (if enabled)
-- Camera status messages
-- System metrics (CPU/GPU temp, CPU/memory usage)
-- Uses the correct Foxglove Studio format (should import without errors)
+**`foxglove_all_sensors.json`** - Complete sensor visualization layout
+- **Cameras**: Front & rear color + depth images with pointclouds
+- **System Monitoring**: CPU/GPU temperature, CPU/memory usage
+- **ODrive IMU**: Accelerometer and gyroscope data (X, Y, Z)
+- **PHAT IMU**: Accelerometer and gyroscope data (X, Y, Z)
+- **iRobot Battery**: Battery percentage and voltage
+- **Status Messages**: All sensor status topics
+- Uses the correct Foxglove Studio `configById` format (should import without errors)
 
 ### Usage
 

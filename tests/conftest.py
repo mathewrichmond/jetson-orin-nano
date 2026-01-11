@@ -1,9 +1,13 @@
 """
 Pytest configuration and shared fixtures for unified testing framework
 """
-import pytest
-import sys
+
+# Standard library
 from pathlib import Path
+import sys
+
+# Third-party
+import pytest
 
 # Add src to path for imports
 REPO_ROOT = Path(__file__).parent.parent
@@ -19,14 +23,15 @@ def repo_root():
 @pytest.fixture(scope="session")
 def ros2_workspace():
     """Return ROS 2 workspace path"""
+    # Standard library
     import os
+
     return Path(os.path.expanduser("~/ros2_ws"))
 
 
 @pytest.fixture(scope="session")
 def isaac_root():
     """Return Isaac root directory (dev or installed)"""
-    import os
     dev_dir = Path("/home/nano/src/jetson-orin-nano")
     install_dir = Path("/opt/isaac-robot")
 

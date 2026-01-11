@@ -5,69 +5,70 @@ Publishes color and depth images from Intel RealSense cameras
 Supports multiple cameras with configurable namespaces
 """
 
+# Standard library
+from collections import deque
 import threading
 import time
-from collections import deque
 from typing import Dict, List, Optional
 
+# Third-party
+from cv_bridge import CvBridge
 import numpy as np
 import pyrealsense2 as rs
 import rclpy
-from cv_bridge import CvBridge
-from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
-from std_msgs.msg import Header, String
+from std_msgs.msg import String
 
 
 class RealSenseCameraNode(Node):
     """ROS 2 node for Intel RealSense depth cameras"""
 
     def __init__(self):
-        super().__init__('realsense_camera_node')
+        super().__init__("realsense_camera_node")
 
         # Parameters
-        self.declare_parameter('camera_serial_numbers', [])
-        self.declare_parameter('camera_names', ['camera_front', 'camera_rear'])
-        self.declare_parameter('enable_color', True)
-        self.declare_parameter('enable_depth', True)
-        self.declare_parameter('enable_pointcloud', False)
-        self.declare_parameter('color_width', 640)
-        self.declare_parameter('color_height', 480)
-        self.declare_parameter('color_fps', 30)
-        self.declare_parameter('depth_width', 640)
-        self.declare_parameter('depth_height', 480)
-        self.declare_parameter('depth_fps', 30)
-        self.declare_parameter('publish_rate', 30.0)
-        self.declare_parameter('align_depth_to_color', True)
-        self.declare_parameter('status_topic', 'realsense/status')
-        self.declare_parameter('frame_timeout_ms', 1000)  # Milliseconds to wait for frames
-        self.declare_parameter('shutdown_delay', 0.5)  # Seconds to wait for threads on shutdown
+        self.declare_parameter("camera_serial_numbers", [])
+        self.declare_parameter("camera_names", ["camera_front", "camera_rear"])
+        self.declare_parameter("enable_color", True)
+        self.declare_parameter("enable_depth", True)
+        self.declare_parameter("enable_pointcloud", False)
+        self.declare_parameter("color_width", 640)
+        self.declare_parameter("color_height", 480)
+        self.declare_parameter("color_fps", 30)
+        self.declare_parameter("depth_width", 640)
+        self.declare_parameter("depth_height", 480)
+        self.declare_parameter("depth_fps", 30)
+        self.declare_parameter("publish_rate", 30.0)
+        self.declare_parameter("align_depth_to_color", True)
+        self.declare_parameter("status_topic", "realsense/status")
+        self.declare_parameter("frame_timeout_ms", 1000)  # Milliseconds to wait for frames
+        self.declare_parameter("shutdown_delay", 0.5)  # Seconds to wait for threads on shutdown
 
         # Get parameters (with safe fallback to defaults)
         try:
-            self.camera_serials = self.get_parameter('camera_serial_numbers').value
+            self.camera_serials = self.get_parameter("camera_serial_numbers").value
         except Exception:
             self.camera_serials = []
 
         try:
-            self.camera_names = self.get_parameter('camera_names').value
+            self.camera_names = self.get_parameter("camera_names").value
         except Exception:
-            self.camera_names = ['camera_front', 'camera_rear']
-        self.enable_color = self.get_parameter('enable_color').value
-        self.enable_depth = self.get_parameter('enable_depth').value
-        self.enable_pointcloud = self.get_parameter('enable_pointcloud').value
-        self.color_width = self.get_parameter('color_width').value
-        self.color_height = self.get_parameter('color_height').value
-        self.color_fps = self.get_parameter('color_fps').value
-        self.depth_width = self.get_parameter('depth_width').value
-        self.depth_height = self.get_parameter('depth_height').value
-        self.depth_fps = self.get_parameter('depth_fps').value
-        self.publish_rate = self.get_parameter('publish_rate').value
-        self.align_depth_to_color = self.get_parameter('align_depth_to_color').value
-        self.status_topic = self.get_parameter('status_topic').value
-        self.frame_timeout_ms = self.get_parameter('frame_timeout_ms').value
-        self.shutdown_delay = self.get_parameter('shutdown_delay').value
+            self.camera_names = ["camera_front", "camera_rear"]
+        self.enable_color = self.get_parameter("enable_color").value
+        self.enable_depth = self.get_parameter("enable_depth").value
+        self.enable_pointcloud = self.get_parameter("enable_pointcloud").value
+        self.color_width = self.get_parameter("color_width").value
+        self.color_height = self.get_parameter("color_height").value
+        self.color_fps = self.get_parameter("color_fps").value
+        self.depth_width = self.get_parameter("depth_width").value
+        self.depth_height = self.get_parameter("depth_height").value
+        self.depth_fps = self.get_parameter("depth_fps").value
+        self.publish_rate = self.get_parameter("publish_rate").value
+        self.align_depth_to_color = self.get_parameter("align_depth_to_color").value
+        self.status_topic = self.get_parameter("status_topic").value
+        self.frame_timeout_ms = self.get_parameter("frame_timeout_ms").value
+        self.shutdown_delay = self.get_parameter("shutdown_delay").value
 
         # Initialize
         self.bridge = CvBridge()
@@ -93,12 +94,12 @@ class RealSenseCameraNode(Node):
 
         # Start camera capture threads (only for frame capture, not publishing)
         self.camera_threads: List[threading.Thread] = []
+        # Standard library
         import threading
+
         for camera_name in self.pipelines.keys():
             thread = threading.Thread(
-                target=self._camera_capture_loop,
-                args=(camera_name,),
-                daemon=True
+                target=self._camera_capture_loop, args=(camera_name,), daemon=True
             )
             thread.start()
             self.camera_threads.append(thread)
@@ -107,8 +108,10 @@ class RealSenseCameraNode(Node):
         timer_period = 1.0 / self.publish_rate
         self.timer = self.create_timer(timer_period, self._publish_frames)
 
-        self.get_logger().info(f'RealSense Camera Node started with {len(self.pipelines)} camera(s)')
-        self.publish_status('initialized', f'Started with {len(self.pipelines)} camera(s)')
+        self.get_logger().info(
+            f"RealSense Camera Node started with {len(self.pipelines)} camera(s)"
+        )
+        self.publish_status("initialized", f"Started with {len(self.pipelines)} camera(s)")
 
     def _discover_cameras(self):
         """Discover available RealSense cameras"""
@@ -116,11 +119,11 @@ class RealSenseCameraNode(Node):
         devices = ctx.query_devices()
 
         if len(devices) == 0:
-            self.get_logger().error('No RealSense devices found!')
-            self.publish_status('error', 'No cameras detected')
+            self.get_logger().error("No RealSense devices found!")
+            self.publish_status("error", "No cameras detected")
             return
 
-        self.get_logger().info(f'Found {len(devices)} RealSense device(s)')
+        self.get_logger().info(f"Found {len(devices)} RealSense device(s)")
 
         # If serial numbers specified, use those; otherwise use all devices
         available_serials = [dev.get_info(rs.camera_info.serial_number) for dev in devices]
@@ -130,28 +133,32 @@ class RealSenseCameraNode(Node):
             target_serials = self.camera_serials
         else:
             # Use all available cameras
-            target_serials = available_serials[:len(self.camera_names)]
+            target_serials = available_serials[: len(self.camera_names)]
 
         # Initialize cameras
         for i, serial in enumerate(target_serials):
             if serial not in available_serials:
-                self.get_logger().warn(f'Camera with serial {serial} not found')
+                self.get_logger().warn(f"Camera with serial {serial} not found")
                 continue
 
             if i >= len(self.camera_names):
-                camera_name = f'camera_{i}'
+                camera_name = f"camera_{i}"
             else:
                 camera_name = self.camera_names[i]
 
             try:
-                self._initialize_camera(camera_name, serial, devices[available_serials.index(serial)])
+                self._initialize_camera(
+                    camera_name, serial, devices[available_serials.index(serial)]
+                )
             except Exception as e:
-                self.get_logger().error(f'Failed to initialize camera {camera_name} ({serial}): {e}')
-                self.publish_status('error', f'Failed to initialize {camera_name}: {e}')
+                self.get_logger().error(
+                    f"Failed to initialize camera {camera_name} ({serial}): {e}"
+                )
+                self.publish_status("error", f"Failed to initialize {camera_name}: {e}")
 
     def _initialize_camera(self, camera_name: str, serial: str, device: rs.device):
         """Initialize a single camera"""
-        self.get_logger().info(f'Initializing camera: {camera_name} (serial: {serial})')
+        self.get_logger().info(f"Initializing camera: {camera_name} (serial: {serial})")
 
         # Create pipeline and config
         pipeline = rs.pipeline()
@@ -161,20 +168,12 @@ class RealSenseCameraNode(Node):
         # Configure streams
         if self.enable_color:
             config.enable_stream(
-                rs.stream.color,
-                self.color_width,
-                self.color_height,
-                rs.format.rgb8,
-                self.color_fps
+                rs.stream.color, self.color_width, self.color_height, rs.format.rgb8, self.color_fps
             )
 
         if self.enable_depth:
             config.enable_stream(
-                rs.stream.depth,
-                self.depth_width,
-                self.depth_height,
-                rs.format.z16,
-                self.depth_fps
+                rs.stream.depth, self.depth_width, self.depth_height, rs.format.z16, self.depth_fps
             )
 
         # Start pipeline
@@ -187,15 +186,15 @@ class RealSenseCameraNode(Node):
         if self.enable_color:
             color_profile = rs.video_stream_profile(profile.get_stream(rs.stream.color))
             color_intrinsics = color_profile.get_intrinsics()
-            self.camera_infos[camera_name]['color'] = self._intrinsics_to_camera_info(
-                color_intrinsics, camera_name, 'color'
+            self.camera_infos[camera_name]["color"] = self._intrinsics_to_camera_info(
+                color_intrinsics, camera_name, "color"
             )
 
         if self.enable_depth:
             depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
             depth_intrinsics = depth_profile.get_intrinsics()
-            self.camera_infos[camera_name]['depth'] = self._intrinsics_to_camera_info(
-                depth_intrinsics, camera_name, 'depth'
+            self.camera_infos[camera_name]["depth"] = self._intrinsics_to_camera_info(
+                depth_intrinsics, camera_name, "depth"
             )
 
         # Create align object if needed
@@ -207,21 +206,29 @@ class RealSenseCameraNode(Node):
         self.configs[camera_name] = config
         self.aligns[camera_name] = align
 
-        self.get_logger().info(f'Camera {camera_name} initialized successfully')
+        self.get_logger().info(f"Camera {camera_name} initialized successfully")
 
-    def _intrinsics_to_camera_info(self, intrinsics, camera_name: str, stream_type: str) -> CameraInfo:
+    def _intrinsics_to_camera_info(
+        self, intrinsics, camera_name: str, stream_type: str
+    ) -> CameraInfo:
         """Convert RealSense intrinsics to ROS CameraInfo"""
         info = CameraInfo()
-        info.header.frame_id = f'{camera_name}_{stream_type}_optical_frame'
+        info.header.frame_id = f"{camera_name}_{stream_type}_optical_frame"
         info.width = intrinsics.width
         info.height = intrinsics.height
-        info.distortion_model = 'plumb_bob'
+        info.distortion_model = "plumb_bob"
 
         # Camera matrix (3x3 row-major)
         info.k = [
-            intrinsics.fx, 0.0, intrinsics.ppx,
-            0.0, intrinsics.fy, intrinsics.ppy,
-            0.0, 0.0, 1.0
+            intrinsics.fx,
+            0.0,
+            intrinsics.ppx,
+            0.0,
+            intrinsics.fy,
+            intrinsics.ppy,
+            0.0,
+            0.0,
+            1.0,
         ]
 
         # Distortion coefficients
@@ -232,9 +239,18 @@ class RealSenseCameraNode(Node):
 
         # Projection matrix
         info.p = [
-            intrinsics.fx, 0.0, intrinsics.ppx, 0.0,
-            0.0, intrinsics.fy, intrinsics.ppy, 0.0,
-            0.0, 0.0, 1.0, 0.0
+            intrinsics.fx,
+            0.0,
+            intrinsics.ppx,
+            0.0,
+            0.0,
+            intrinsics.fy,
+            intrinsics.ppy,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
         ]
 
         return info
@@ -247,24 +263,24 @@ class RealSenseCameraNode(Node):
             self.camera_publishers[camera_name] = {}
 
             if self.enable_color:
-                self.camera_publishers[camera_name]['color_image'] = self.create_publisher(
-                    Image, f'{camera_name}/color/image_raw', 10
+                self.camera_publishers[camera_name]["color_image"] = self.create_publisher(
+                    Image, f"{camera_name}/color/image_raw", 10
                 )
-                self.camera_publishers[camera_name]['color_info'] = self.create_publisher(
-                    CameraInfo, f'{camera_name}/color/camera_info', 10
+                self.camera_publishers[camera_name]["color_info"] = self.create_publisher(
+                    CameraInfo, f"{camera_name}/color/camera_info", 10
                 )
 
             if self.enable_depth:
-                self.camera_publishers[camera_name]['depth_image'] = self.create_publisher(
-                    Image, f'{camera_name}/depth/image_rect_raw', 10
+                self.camera_publishers[camera_name]["depth_image"] = self.create_publisher(
+                    Image, f"{camera_name}/depth/image_rect_raw", 10
                 )
-                self.camera_publishers[camera_name]['depth_info'] = self.create_publisher(
-                    CameraInfo, f'{camera_name}/depth/camera_info', 10
+                self.camera_publishers[camera_name]["depth_info"] = self.create_publisher(
+                    CameraInfo, f"{camera_name}/depth/camera_info", 10
                 )
 
             if self.enable_pointcloud and self.enable_depth:
-                self.camera_publishers[camera_name]['pointcloud'] = self.create_publisher(
-                    PointCloud2, f'{camera_name}/points', 10
+                self.camera_publishers[camera_name]["pointcloud"] = self.create_publisher(
+                    PointCloud2, f"{camera_name}/points", 10
                 )
 
     def _camera_capture_loop(self, camera_name: str):
@@ -292,15 +308,13 @@ class RealSenseCameraNode(Node):
 
                 # Store frames in queue (thread-safe)
                 if color_frame or depth_frame:
-                    self.frame_queues[camera_name].append({
-                        'color': color_frame,
-                        'depth': depth_frame,
-                        'timestamp': time.time()
-                    })
+                    self.frame_queues[camera_name].append(
+                        {"color": color_frame, "depth": depth_frame, "timestamp": time.time()}
+                    )
 
             except Exception as e:
                 if self.running:  # Only log if still running
-                    self.get_logger().error(f'Error capturing frames for {camera_name}: {e}')
+                    self.get_logger().error(f"Error capturing frames for {camera_name}: {e}")
                 time.sleep(0.1)
 
         # Cleanup
@@ -318,60 +332,59 @@ class RealSenseCameraNode(Node):
                     continue
 
                 frame_data = self.frame_queues[camera_name][-1]  # Get most recent
-                color_frame = frame_data['color']
-                depth_frame = frame_data['depth']
+                color_frame = frame_data["color"]
+                depth_frame = frame_data["depth"]
 
                 # Publish color image
                 if color_frame and self.enable_color:
                     color_image = np.asanyarray(color_frame.get_data())
                     # Convert RGB to BGR for OpenCV
                     color_image = color_image[:, :, ::-1]
-                    ros_image = self.bridge.cv2_to_imgmsg(color_image, 'bgr8')
-                    ros_image.header.frame_id = f'{camera_name}_color_optical_frame'
+                    ros_image = self.bridge.cv2_to_imgmsg(color_image, "bgr8")
+                    ros_image.header.frame_id = f"{camera_name}_color_optical_frame"
                     ros_image.header.stamp = self.get_clock().now().to_msg()
-                    self.camera_publishers[camera_name]['color_image'].publish(ros_image)
+                    self.camera_publishers[camera_name]["color_image"].publish(ros_image)
 
                     # Publish camera info
-                    if 'color' in self.camera_infos.get(camera_name, {}):
-                        info = self.camera_infos[camera_name]['color']
+                    if "color" in self.camera_infos.get(camera_name, {}):
+                        info = self.camera_infos[camera_name]["color"]
                         info.header.stamp = ros_image.header.stamp
-                        self.camera_publishers[camera_name]['color_info'].publish(info)
+                        self.camera_publishers[camera_name]["color_info"].publish(info)
 
                 # Publish depth image
                 if depth_frame and self.enable_depth:
                     depth_image = np.asanyarray(depth_frame.get_data())
-                    ros_image = self.bridge.cv2_to_imgmsg(depth_image, '16UC1')
-                    ros_image.header.frame_id = f'{camera_name}_depth_optical_frame'
+                    ros_image = self.bridge.cv2_to_imgmsg(depth_image, "16UC1")
+                    ros_image.header.frame_id = f"{camera_name}_depth_optical_frame"
                     ros_image.header.stamp = self.get_clock().now().to_msg()
-                    self.camera_publishers[camera_name]['depth_image'].publish(ros_image)
+                    self.camera_publishers[camera_name]["depth_image"].publish(ros_image)
 
                     # Publish camera info
-                    if 'depth' in self.camera_infos.get(camera_name, {}):
-                        info = self.camera_infos[camera_name]['depth']
+                    if "depth" in self.camera_infos.get(camera_name, {}):
+                        info = self.camera_infos[camera_name]["depth"]
                         info.header.stamp = ros_image.header.stamp
-                        self.camera_publishers[camera_name]['depth_info'].publish(info)
+                        self.camera_publishers[camera_name]["depth_info"].publish(info)
 
                     # Publish pointcloud if enabled
-                    if self.enable_pointcloud and 'pointcloud' in self.camera_publishers[camera_name]:
+                    if (
+                        self.enable_pointcloud
+                        and "pointcloud" in self.camera_publishers[camera_name]
+                    ):
                         pointcloud = self._depth_to_pointcloud(
                             depth_frame, color_frame, camera_name
                         )
                         if pointcloud:
-                            self.camera_publishers[camera_name]['pointcloud'].publish(pointcloud)
+                            self.camera_publishers[camera_name]["pointcloud"].publish(pointcloud)
 
             except Exception as e:
-                self.get_logger().error(f'Error publishing frames for {camera_name}: {e}')
+                self.get_logger().error(f"Error publishing frames for {camera_name}: {e}")
                 # Don't call publish_status here as it might cause recursion issues
 
-    def _depth_to_pointcloud(self, depth_frame: rs.depth_frame, color_frame: Optional[rs.video_frame],
-                            camera_name: str) -> Optional[PointCloud2]:
+    def _depth_to_pointcloud(
+        self, depth_frame: rs.depth_frame, color_frame: Optional[rs.video_frame], camera_name: str
+    ) -> Optional[PointCloud2]:
         """Convert depth frame to PointCloud2 message"""
         try:
-            # Get depth intrinsics
-            depth_intrinsics = rs.video_stream_profile(
-                depth_frame.profile
-            ).get_intrinsics()
-
             # Create pointcloud
             points = rs.pointcloud()
             if color_frame:
@@ -381,11 +394,13 @@ class RealSenseCameraNode(Node):
             vertices = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
             colors = None
             if color_frame:
-                colors = np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2)
+                colors = (
+                    np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2)
+                )
 
             # Create PointCloud2 message
             msg = PointCloud2()
-            msg.header.frame_id = f'{camera_name}_depth_optical_frame'
+            msg.header.frame_id = f"{camera_name}_depth_optical_frame"
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.height = 1
             msg.width = len(vertices)
@@ -393,14 +408,14 @@ class RealSenseCameraNode(Node):
 
             # Point fields
             msg.fields = [
-                PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
-                PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
-                PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
+                PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
+                PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
+                PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
             ]
 
             if colors is not None:
                 msg.fields.append(
-                    PointField(name='rgb', offset=12, datatype=PointField.UINT32, count=1)
+                    PointField(name="rgb", offset=12, datatype=PointField.UINT32, count=1)
                 )
 
             msg.point_step = 12 if colors is None else 16
@@ -410,18 +425,18 @@ class RealSenseCameraNode(Node):
             return msg
 
         except Exception as e:
-            self.get_logger().debug(f'Error creating pointcloud: {e}')
+            self.get_logger().debug(f"Error creating pointcloud: {e}")
             return None
 
     def publish_status(self, status: str, message: str):
         """Publish status message"""
         msg = String()
-        msg.data = f'[{status}] {message}'
+        msg.data = f"[{status}] {message}"
         self.status_pub.publish(msg)
 
     def destroy_node(self):
         """Cleanup on shutdown"""
-        self.get_logger().info('Shutting down RealSense cameras...')
+        self.get_logger().info("Shutting down RealSense cameras...")
         self.running = False
         time.sleep(self.shutdown_delay)  # Give threads time to stop
 
@@ -447,5 +462,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

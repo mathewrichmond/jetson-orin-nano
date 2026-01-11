@@ -13,15 +13,15 @@
     # Color stream parameters
     color_width: 640
     color_height: 480
-    color_fps: 30
+    color_fps: 15  # Reduced from 30 to reduce bridge load and prevent connection drops
 
     # Depth stream parameters
     depth_width: 640
     depth_height: 480
-    depth_fps: 30
+    depth_fps: 15  # Reduced from 30 to reduce bridge load and prevent connection drops
 
     # Publishing parameters
-    publish_rate: 30.0
+    publish_rate: 15.0  # Reduced from 30.0 to match frame rates and reduce bridge load
     align_depth_to_color: true
 
     # Topic names

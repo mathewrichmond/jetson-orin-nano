@@ -13,7 +13,6 @@ import sys
 # Third-party
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import yaml
 
@@ -38,7 +37,7 @@ def load_graph_config(context):
             try:
                 package_share = get_package_share_directory("isaac_robot")
                 config_path = Path(package_share) / "config" / "robot" / config_path.name
-            except:
+            except Exception:
                 pass
 
     if not config_path.exists():

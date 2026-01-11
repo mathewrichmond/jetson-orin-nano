@@ -3,11 +3,12 @@ Bench Test: Camera Visualization
 Tests camera data visualization from remote machine (MacBook)
 Requires: RealSense cameras connected, rosbridge running
 """
-import pytest
-import subprocess
-import time
+
+# Standard library
 import os
-from pathlib import Path
+
+# Third-party
+import pytest
 
 
 @pytest.mark.bench
@@ -19,7 +20,7 @@ class TestCameraVisualization:
     def setup_ros2(self):
         """Setup ROS 2 environment"""
         # Source ROS 2
-        os.environ.setdefault('ROS_DOMAIN_ID', '0')
+        os.environ.setdefault("ROS_DOMAIN_ID", "0")
         yield
         # Cleanup if needed
 

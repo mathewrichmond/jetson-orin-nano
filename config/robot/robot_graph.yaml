@@ -178,6 +178,9 @@ robot:
         - /cmd_vel
 
   # Foxglove Bridge (for remote visualization)
+  # Note: Bridge subscribes to all topics by default, which can cause connection drops
+  # with high-frequency camera topics. Consider reducing camera frame rates if experiencing
+  # disconnects, or use topic filtering via bridge command-line arguments.
   foxglove_bridge:
     enabled: true
     package: foxglove_bridge
@@ -186,6 +189,8 @@ robot:
     parameters:
       port: 8765
       address: "0.0.0.0"
+      # Note: Topic filtering not directly supported via parameters
+      # If connection drops persist, reduce camera publish_rate in realsense_camera config
     topics:
       publish: []  # Bridge publishes/subscribes to all topics automatically
       subscribe: []

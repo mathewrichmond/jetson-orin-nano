@@ -13,7 +13,7 @@ from typing import Optional
 from geometry_msgs.msg import Twist
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Imu
+from sensor_msgs.msg import Imu, MagneticField
 from std_msgs.msg import Header, String
 
 # Try to import I2C library (smbus2 is preferred, fallback to smbus)
@@ -40,7 +40,7 @@ try:
     import Jetson.GPIO as GPIO
 
     GPIO_AVAILABLE = True
-except (ImportError, Exception) as e:
+except (ImportError, Exception):
     # Try alternative GPIO libraries or continue without GPIO
     try:
         # Third-party
@@ -225,7 +225,8 @@ class PHATMotorControllerNode(Node):
             # Don't fail the node if accelerometer isn't available
 
     def _init_icm20948(self):
-        """Initialize ICM-20948 IMU (SparkFun Auto pHAT)"""
+        """Initialize ICM-20948 IMU (SparkFun Auto pHAT) with accelerometer,
+        gyroscope, and magnetometer"""
         try:
             # ICM-20948 uses a bank register system
             # CRITICAL: Must set bank register (0x7F) BEFORE accessing other registers
@@ -261,7 +262,13 @@ class PHATMotorControllerNode(Node):
             self.i2c_bus.write_byte_data(self.accel_address, 0x14, 0x06)  # ±2g, 1kHz
             time.sleep(0.01)
 
-            # Step 6: Enable accelerometer (Bank 0, Register 0x20 = ACCEL_CONFIG_2)
+            # Step 6: Configure gyroscope (Bank 2, Register 0x01 = GYRO_CONFIG_1)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x20)  # Ensure bank 2
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x01, 0x06)  # ±250dps, 1kHz
+            time.sleep(0.01)
+
+            # Step 7: Enable accelerometer and gyroscope (Bank 0, Register 0x20 = ACCEL_CONFIG_2)
             self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)  # Back to bank 0
             time.sleep(0.01)
             self.i2c_bus.write_byte_data(
@@ -269,8 +276,103 @@ class PHATMotorControllerNode(Node):
             )  # ACCEL_CONFIG_2: enable, 1kHz
             time.sleep(0.01)
 
+            # Step 8: Configure I2C master for magnetometer (AK09916 at address 0x0C)
+            # Enable I2C master mode (Bank 0, Register 0x03 = USER_CTRL)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)  # Bank 0
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x03, 0x20)  # Enable I2C master mode
+            time.sleep(0.01)
+
+            # Configure I2C master clock (Bank 3, Register 0x05 = I2C_MST_CTRL)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x60)  # Switch to bank 3
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x05, 0x0D
+            )  # I2C master clock = 400kHz
+            time.sleep(0.01)
+
+            # Configure I2C master delay (Bank 3, Register 0x67 = I2C_MST_DELAY_CTRL)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x60)  # Ensure bank 3
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x67, 0x01
+            )  # Enable delay for magnetometer
+            time.sleep(0.01)
+
+            # Reset magnetometer (AK09916) via I2C master
+            # Bank 0, Register 0x36 = I2C_SLV0_ADDR, 0x37 = I2C_SLV0_REG,
+            # 0x38 = I2C_SLV0_CTRL, 0x63 = I2C_SLV0_DO
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)  # Back to bank 0
+            time.sleep(0.01)
+
+            # Reset AK09916: Write 0x01 to CNTL2 register (0x31)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x63, 0x01
+            )  # I2C_SLV0_DO: data to write (reset bit)
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x36, 0x0C | 0x80
+            )  # SLV0: AK09916 address (0x0C) + write bit
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x37, 0x31
+            )  # SLV0_REG: AK09916 CNTL2 register
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x38, 0x81
+            )  # SLV0_CTRL: enable + 1 byte transfer
+            time.sleep(0.1)  # Wait for reset
+
+            # Clear reset: Write 0x00 to CNTL2 register
+            self.i2c_bus.write_byte_data(self.accel_address, 0x63, 0x00)  # I2C_SLV0_DO: clear reset
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x36, 0x0C | 0x80
+            )  # SLV0: AK09916 address + write
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x37, 0x31)  # SLV0_REG: CNTL2 register
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x38, 0x81
+            )  # SLV0_CTRL: enable + 1 byte transfer
+            time.sleep(0.1)
+
+            # Set magnetometer to continuous mode 2 (100Hz) via CNTL3 register (0x32)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x63, 0x02
+            )  # I2C_SLV0_DO: continuous mode 2 (100Hz)
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x36, 0x0C | 0x80
+            )  # SLV0: AK09916 address + write
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x37, 0x32)  # SLV0_REG: CNTL3 register
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x38, 0x81
+            )  # SLV0_CTRL: enable + 1 byte transfer
+            time.sleep(0.1)
+
+            # Configure I2C master to read magnetometer data (SLV0: read from AK09916)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x36, 0x0C | 0x80
+            )  # SLV0: AK09916 address + read bit
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x37, 0x10
+            )  # SLV0_REG: Start reading from ST1 register (0x10)
+            time.sleep(0.01)
+            self.i2c_bus.write_byte_data(
+                self.accel_address, 0x38, 0x87
+            )  # SLV0_CTRL: enable + read 7 bytes (ST1 + 6 bytes mag data)
+            time.sleep(0.01)
+
             self.accel_initialized = True
-            self.get_logger().info("ICM-20948 IMU initialized (SparkFun Auto pHAT)")
+            self.mag_initialized = True
+            self.get_logger().info(
+                "ICM-20948 IMU initialized (SparkFun Auto pHAT) - "
+                "Accelerometer, Gyroscope, and Magnetometer enabled"
+            )
         except Exception as e:
             self.get_logger().warn(f"Failed to initialize ICM-20948: {e}")
             self.get_logger().info(
@@ -278,6 +380,7 @@ class PHATMotorControllerNode(Node):
             )
             self.get_logger().info("Check hardware jumpers, power, and I2C connections")
             self.accel_initialized = False
+            self.mag_initialized = False
 
     def _init_lsm6ds3(self):
         """Initialize LSM6DS3 accelerometer"""
@@ -324,20 +427,30 @@ class PHATMotorControllerNode(Node):
             self.get_logger().warn(f"Failed to read MPU6050: {e}")
             return None
 
-    def _read_icm20948(self) -> Optional[tuple]:
-        """Read accelerometer data from ICM-20948 (SparkFun Auto pHAT)"""
+    def _read_icm20948(self) -> Optional[dict]:
+        """Read accelerometer, gyroscope, and magnetometer data from ICM-20948 (SparkFun Auto pHAT)
+
+        Returns:
+            Dictionary with keys: 'accel' (x, y, z in m/s^2), 'gyro' (x, y, z in rad/s),
+            'mag' (x, y, z in Tesla), or None on error
+        """
         if not self.accel_initialized or not self.i2c_bus:
             return None
 
         try:
-            # Switch to bank 0 (accelerometer data is in bank 0)
+            # Switch to bank 0 (sensor data is in bank 0)
             self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)
+            time.sleep(0.001)
 
             # Read accelerometer data (ACCEL_XOUT_H through ACCEL_ZOUT_H)
             # Register 0x2D-0x32 for accelerometer
             accel_data = self.i2c_bus.read_i2c_block_data(self.accel_address, 0x2D, 6)
 
-            # Convert to signed 16-bit values (big endian)
+            # Read gyroscope data (GYRO_XOUT_H through GYRO_ZOUT_H)
+            # Register 0x33-0x38 for gyroscope
+            gyro_data = self.i2c_bus.read_i2c_block_data(self.accel_address, 0x33, 6)
+
+            # Convert accelerometer to signed 16-bit values (big endian)
             accel_x = accel_data[0] << 8 | accel_data[1]
             accel_y = accel_data[2] << 8 | accel_data[3]
             accel_z = accel_data[4] << 8 | accel_data[5]
@@ -355,7 +468,65 @@ class PHATMotorControllerNode(Node):
             accel_y_ms2 = accel_y / 16384.0 * 9.81
             accel_z_ms2 = accel_z / 16384.0 * 9.81
 
-            return (accel_x_ms2, accel_y_ms2, accel_z_ms2)
+            # Convert gyroscope to signed 16-bit values (big endian)
+            gyro_x = gyro_data[0] << 8 | gyro_data[1]
+            gyro_y = gyro_data[2] << 8 | gyro_data[3]
+            gyro_z = gyro_data[4] << 8 | gyro_data[5]
+
+            # Convert to signed integers
+            if gyro_x > 32767:
+                gyro_x -= 65536
+            if gyro_y > 32767:
+                gyro_y -= 65536
+            if gyro_z > 32767:
+                gyro_z -= 65536
+
+            # Convert to rad/s (ICM-20948 default: ±250dps, 131 LSB/dps)
+            # 1 dps = π/180 rad/s
+            gyro_x_rads = (gyro_x / 131.0) * (3.14159265359 / 180.0)
+            gyro_y_rads = (gyro_y / 131.0) * (3.14159265359 / 180.0)
+            gyro_z_rads = (gyro_z / 131.0) * (3.14159265359 / 180.0)
+
+            # Read magnetometer data via I2C master
+            # Data is available in EXT_SLV_SENS_DATA_00-06 registers after I2C master read
+            mag_data = None
+            if self.mag_initialized:
+                try:
+                    # Trigger I2C master read by reading EXT_SLV_SENS_DATA_00
+                    # The I2C master should have already read the data into these registers
+                    ext_slv_data = self.i2c_bus.read_i2c_block_data(
+                        self.accel_address, 0x3B, 7
+                    )  # Read 7 bytes (ST1 + 6 bytes mag data)
+
+                    # Check ST1 register (first byte) - bit 0 indicates data ready
+                    if ext_slv_data[0] & 0x01:
+                        # Convert magnetometer data (little endian for AK09916)
+                        mag_x = (ext_slv_data[2] << 8) | ext_slv_data[1]
+                        mag_y = (ext_slv_data[4] << 8) | ext_slv_data[3]
+                        mag_z = (ext_slv_data[6] << 8) | ext_slv_data[5]
+
+                        # Convert to signed integers
+                        if mag_x > 32767:
+                            mag_x -= 65536
+                        if mag_y > 32767:
+                            mag_y -= 65536
+                        if mag_z > 32767:
+                            mag_z -= 65536
+
+                        # Convert to Tesla (AK09916 sensitivity: 0.15 µT/LSB = 0.15e-6 T/LSB)
+                        mag_x_tesla = mag_x * 0.15e-6
+                        mag_y_tesla = mag_y * 0.15e-6
+                        mag_z_tesla = mag_z * 0.15e-6
+
+                        mag_data = (mag_x_tesla, mag_y_tesla, mag_z_tesla)
+                except Exception as e:
+                    self.get_logger().debug(f"Failed to read magnetometer: {e}")
+
+            return {
+                "accel": (accel_x_ms2, accel_y_ms2, accel_z_ms2),
+                "gyro": (gyro_x_rads, gyro_y_rads, gyro_z_rads),
+                "mag": mag_data,
+            }
 
         except Exception as e:
             self.get_logger().warn(f"Failed to read ICM-20948: {e}")
@@ -434,37 +605,75 @@ class PHATMotorControllerNode(Node):
 
     def _publish_status_callback(self):
         """Timer callback to publish status and IMU data"""
-        # Publish accelerometer data if enabled
+        # Publish IMU data if enabled
         if self.enable_accel and self.imu_pub and self.accel_initialized:
             try:
-                # Read accelerometer based on type
+                # Read sensor data based on type
                 if self.accel_type == "MPU6050":
                     accel_data = self._read_mpu6050()
+                    sensor_data = (
+                        {"accel": accel_data, "gyro": None, "mag": None} if accel_data else None
+                    )
                 elif self.accel_type == "ICM20948":
-                    accel_data = self._read_icm20948()
+                    sensor_data = self._read_icm20948()
                 elif self.accel_type == "LSM6DS3":
                     accel_data = self._read_lsm6ds3()
+                    sensor_data = (
+                        {"accel": accel_data, "gyro": None, "mag": None} if accel_data else None
+                    )
                 else:
-                    accel_data = None
+                    sensor_data = None
 
-                if accel_data:
+                if sensor_data and sensor_data.get("accel"):
                     imu_msg = Imu()
                     imu_msg.header = Header()
                     imu_msg.header.stamp = self.get_clock().now().to_msg()
                     imu_msg.header.frame_id = self.imu_frame_id
 
                     # Set linear acceleration (m/s^2)
-                    imu_msg.linear_acceleration.x = accel_data[0]
-                    imu_msg.linear_acceleration.y = accel_data[1]
-                    imu_msg.linear_acceleration.z = accel_data[2]
+                    accel = sensor_data["accel"]
+                    imu_msg.linear_acceleration.x = accel[0]
+                    imu_msg.linear_acceleration.y = accel[1]
+                    imu_msg.linear_acceleration.z = accel[2]
 
-                    # Note: Gyroscope data would be read similarly if available
-                    # For now, we only publish accelerometer data
+                    # Set angular velocity (rad/s) - gyroscope data
+                    if sensor_data.get("gyro"):
+                        gyro = sensor_data["gyro"]
+                        imu_msg.angular_velocity.x = gyro[0]
+                        imu_msg.angular_velocity.y = gyro[1]
+                        imu_msg.angular_velocity.z = gyro[2]
+                    else:
+                        # Set to zero if not available
+                        imu_msg.angular_velocity.x = 0.0
+                        imu_msg.angular_velocity.y = 0.0
+                        imu_msg.angular_velocity.z = 0.0
+
+                    # Set covariance matrices (unknown for now)
+                    imu_msg.linear_acceleration_covariance[0] = -1.0  # Unknown
+                    imu_msg.angular_velocity_covariance[0] = -1.0  # Unknown
+                    imu_msg.orientation_covariance[0] = -1.0  # Unknown
 
                     self.imu_pub.publish(imu_msg)
 
+                    # Publish magnetometer data separately (if available)
+                    if self.mag_pub and sensor_data.get("mag"):
+                        mag_data = sensor_data["mag"]
+                        mag_msg = MagneticField()
+                        mag_msg.header = Header()
+                        mag_msg.header.stamp = self.get_clock().now().to_msg()
+                        mag_msg.header.frame_id = self.imu_frame_id
+
+                        mag_msg.magnetic_field.x = mag_data[0]
+                        mag_msg.magnetic_field.y = mag_data[1]
+                        mag_msg.magnetic_field.z = mag_data[2]
+
+                        # Set covariance (unknown for now)
+                        mag_msg.magnetic_field_covariance[0] = -1.0  # Unknown
+
+                        self.mag_pub.publish(mag_msg)
+
             except Exception as e:
-                self.get_logger().warn(f"Error reading accelerometer: {e}")
+                self.get_logger().warn(f"Error reading IMU sensors: {e}")
 
         # Publish status
         status_msg = String()
@@ -477,6 +686,12 @@ class PHATMotorControllerNode(Node):
         if self.enable_accel:
             if self.accel_initialized:
                 status_parts.append("accel:ok")
+                if self.accel_type == "ICM20948":
+                    status_parts.append("gyro:ok")
+                    if self.mag_initialized:
+                        status_parts.append("mag:ok")
+                    else:
+                        status_parts.append("mag:not_found")
             else:
                 status_parts.append("accel:not_found")
 

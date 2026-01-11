@@ -2,10 +2,12 @@
 Integration Tests: Node Launching
 Tests node launching from graph configuration with spoofed topics
 """
-import pytest
-import subprocess
-import time
+
+# Standard library
 import os
+
+# Third-party
+import pytest
 
 
 @pytest.mark.integration
@@ -18,7 +20,7 @@ class TestNodeLaunch:
         if not os.path.exists("/opt/ros/humble/setup.bash"):
             pytest.skip("ROS 2 not available")
 
-        os.environ.setdefault('ROS_DOMAIN_ID', '0')
+        os.environ.setdefault("ROS_DOMAIN_ID", "0")
         yield
 
     def test_graph_config_loads(self, isaac_root):

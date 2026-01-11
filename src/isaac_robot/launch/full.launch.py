@@ -4,27 +4,37 @@ Full Robot Launch
 Launches complete robot system with all components
 """
 
-from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
+# Standard library
 import os
+
+# Third-party
+from launch import LaunchDescription
+from launch.actions import ExecuteProcess
 
 
 def generate_launch_description():
     # System Monitor
-    script_path = os.path.expanduser('~/ros2_ws/install/system_monitor/local/lib/python3.10/dist-packages/system_monitor/system_monitor_node.py')
+    script_path = os.path.expanduser(
+        "~/ros2_ws/install/system_monitor/local/lib/python3.10/"
+        "dist-packages/system_monitor/system_monitor_node.py"
+    )
     system_monitor_node = ExecuteProcess(
         cmd=[
-            '/bin/bash', '-c',
-            f'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && python3 {script_path}'
+            "/bin/bash",
+            "-c",
+            (
+                f"source /opt/ros/humble/setup.bash && "
+                f"source ~/ros2_ws/install/setup.bash && "
+                f"python3 {script_path}"
+            ),
         ],
-        name='system_monitor',
-        output='screen',
+        name="system_monitor",
+        output="screen",
         env={
-            'HOME': os.path.expanduser('~'),
-            'ROS_DOMAIN_ID': os.environ.get('ROS_DOMAIN_ID', '0'),
+            "HOME": os.path.expanduser("~"),
+            "ROS_DOMAIN_ID": os.environ.get("ROS_DOMAIN_ID", "0"),
             **os.environ,
-        }
+        },
     )
 
     # VLA Controller (placeholder - will be enabled when package exists)
@@ -39,16 +49,21 @@ def generate_launch_description():
     # RealSense Cameras
     realsense_node = ExecuteProcess(
         cmd=[
-            '/bin/bash', '-c',
-            'source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && ros2 run realsense_camera realsense_camera_node'
+            "/bin/bash",
+            "-c",
+            (
+                "source /opt/ros/humble/setup.bash && "
+                "source ~/ros2_ws/install/setup.bash && "
+                "ros2 run realsense_camera realsense_camera_node"
+            ),
         ],
-        name='realsense_camera',
-        output='screen',
+        name="realsense_camera",
+        output="screen",
         env={
-            'HOME': os.path.expanduser('~'),
-            'ROS_DOMAIN_ID': os.environ.get('ROS_DOMAIN_ID', '0'),
+            "HOME": os.path.expanduser("~"),
+            "ROS_DOMAIN_ID": os.environ.get("ROS_DOMAIN_ID", "0"),
             **os.environ,
-        }
+        },
     )
 
     # VLA Controller (placeholder - will be enabled when package exists)
@@ -60,8 +75,10 @@ def generate_launch_description():
     #     output='screen',
     # )
 
-    return LaunchDescription([
-        system_monitor_node,
-        realsense_node,
-        # vla_controller_node,
-    ])
+    return LaunchDescription(
+        [
+            system_monitor_node,
+            realsense_node,
+            # vla_controller_node,
+        ]
+    )

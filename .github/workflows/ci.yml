@@ -152,8 +152,8 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker-compose build
+          docker compose build
 
       - name: Test Docker setup
         run: |
-          docker-compose run --rm isaac-dev ./setup.sh --dry-run || true
+          docker compose run --rm isaac-dev ./setup.sh --dry-run || true

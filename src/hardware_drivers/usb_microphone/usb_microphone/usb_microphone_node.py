@@ -5,7 +5,6 @@ Captures audio from USB microphone and publishes as ROS 2 audio messages
 """
 
 # Standard library
-import array
 import subprocess
 import threading
 import time
@@ -14,7 +13,7 @@ from typing import Optional
 # Third-party
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Header, String
+from std_msgs.msg import String
 
 
 class USBMicrophoneNode(Node):
@@ -126,7 +125,9 @@ class USBMicrophoneNode(Node):
         """Check if microphone device is available"""
         try:
             # List audio devices
-            result = subprocess.run(["arecord", "-l"], capture_output=True, text=True, timeout=self.device_check_timeout)
+            result = subprocess.run(
+                ["arecord", "-l"], capture_output=True, text=True, timeout=self.device_check_timeout
+            )
             if result.returncode == 0:
                 # Check if USB microphone is in the list
                 if "USB" in result.stdout or self.device != "default":

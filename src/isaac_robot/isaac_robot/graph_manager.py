@@ -5,16 +5,15 @@ Loads graph configuration from YAML and launches nodes accordingly
 Provides consistent node management for the Isaac robot system
 """
 
-import os
-import yaml
+# Standard library
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-import rclpy
-from rclpy.node import Node
+from typing import Any, Dict, List, Optional
+
+# Third-party
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node as LaunchNode
+import yaml
 
 
 class GraphManager:
@@ -53,35 +52,39 @@ class GraphManager:
         if not config_path.exists():
             # Try package share
             try:
+                # Third-party
                 from ament_index_python.packages import get_package_share_directory
-                package_share = get_package_share_directory('isaac_robot')
-                config_path = Path(package_share) / 'config' / 'robot' / config_path.name
-            except:
+
+                package_share = get_package_share_directory("isaac_robot")
+                config_path = Path(package_share) / "config" / "robot" / config_path.name
+            except Exception:
                 pass
 
         if not config_path.exists():
             # Try centralized config directory
-            isaac_root = Path('/home/nano/src/jetson-orin-nano')
+            isaac_root = Path("/home/nano/src/jetson-orin-nano")
             if not isaac_root.exists():
-                isaac_root = Path('/opt/isaac-robot')
+                isaac_root = Path("/opt/isaac-robot")
 
             if isaac_root.exists():
-                centralized_config = isaac_root / 'config' / 'robot' / config_path.name
+                centralized_config = isaac_root / "config" / "robot" / config_path.name
                 if centralized_config.exists():
                     config_path = centralized_config
 
         if not config_path.exists():
             # Try source space (legacy)
-            source_config = Path(__file__).parent.parent.parent / 'config' / 'robot' / config_path.name
+            source_config = (
+                Path(__file__).parent.parent.parent / "config" / "robot" / config_path.name
+            )
             if source_config.exists():
                 config_path = source_config
 
         if not config_path.exists():
             raise FileNotFoundError(f"Graph config file not found: {config_file}")
 
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             self.config = yaml.safe_load(f) or {}
-            self.nodes = self.config.get('robot', {})
+            self.nodes = self.config.get("robot", {})
 
         return self.config
 
@@ -100,7 +103,7 @@ class GraphManager:
             List of enabled node names
         """
         if group:
-            groups = self.config.get('groups', {})
+            groups = self.config.get("groups", {})
             if group not in groups:
                 return []
             node_names = groups[group]
@@ -111,7 +114,7 @@ class GraphManager:
         enabled = []
         for name in node_names:
             node_config = self.nodes.get(name, {})
-            if node_config.get('enabled', True):
+            if node_config.get("enabled", True):
                 enabled.append(name)
 
         return enabled
@@ -127,10 +130,10 @@ class GraphManager:
         Returns:
             LaunchNode action
         """
-        package = node_config.get('package')
-        executable = node_config.get('node')
-        namespace = node_config.get('namespace', '')
-        parameters = node_config.get('parameters', {})
+        package = node_config.get("package")
+        executable = node_config.get("node")
+        namespace = node_config.get("namespace", "")
+        parameters = node_config.get("parameters", {})
 
         if not package or not executable:
             raise ValueError(f"Node {node_name} missing package or node executable")
@@ -142,10 +145,10 @@ class GraphManager:
 
         # Create remappings from topics if specified
         remappings = []
-        topics = node_config.get('topics', {})
-        if 'remap' in topics:
-            for remap in topics['remap']:
-                remappings.append((remap['from'], remap['to']))
+        topics = node_config.get("topics", {})
+        if "remap" in topics:
+            for remap in topics["remap"]:
+                remappings.append((remap["from"], remap["to"]))
 
         return LaunchNode(
             package=package,
@@ -154,7 +157,7 @@ class GraphManager:
             namespace=namespace if namespace else None,
             parameters=param_list,
             remappings=remappings if remappings else None,
-            output='screen',
+            output="screen",
         )
 
     def generate_launch_description(self, group: Optional[str] = None) -> LaunchDescription:
@@ -175,17 +178,19 @@ class GraphManager:
         actions = []
 
         # Add launch arguments
-        actions.append(DeclareLaunchArgument(
-            'graph_config',
-            default_value=self.config_file or 'robot_graph.yaml',
-            description='Graph configuration file'
-        ))
+        actions.append(
+            DeclareLaunchArgument(
+                "graph_config",
+                default_value=self.config_file or "robot_graph.yaml",
+                description="Graph configuration file",
+            )
+        )
 
-        actions.append(DeclareLaunchArgument(
-            'group',
-            default_value=group or 'all',
-            description='Node group to launch'
-        ))
+        actions.append(
+            DeclareLaunchArgument(
+                "group", default_value=group or "all", description="Node group to launch"
+            )
+        )
 
         # Create node actions
         for node_name in enabled_nodes:
@@ -200,7 +205,9 @@ class GraphManager:
         return LaunchDescription(actions)
 
 
-def generate_launch_description_from_config(config_file: str, group: Optional[str] = None) -> LaunchDescription:
+def generate_launch_description_from_config(
+    config_file: str, group: Optional[str] = None
+) -> LaunchDescription:
     """
     Convenience function to generate launch description from config file
 
