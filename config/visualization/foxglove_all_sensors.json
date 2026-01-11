@@ -279,22 +279,28 @@
     "Plot!audio": {
       "paths": [
         {
-          "value": "/hardware/microphone/audio.data[0]",
+          "value": "/microphone/audio.data[0]",
           "enabled": true,
           "color": "#ff0000",
-          "label": "Audio Sample 0"
+          "label": "Audio L (byte 0)"
         },
         {
-          "value": "/hardware/microphone/audio.data[100]",
+          "value": "/microphone/audio.data[1]",
           "enabled": true,
           "color": "#00ff00",
-          "label": "Audio Sample 100"
+          "label": "Audio R (byte 1)"
         },
         {
-          "value": "/hardware/microphone/audio.data[500]",
+          "value": "/microphone/audio.data[512]",
           "enabled": true,
           "color": "#0000ff",
-          "label": "Audio Sample 500"
+          "label": "Audio L (byte 512)"
+        },
+        {
+          "value": "/microphone/audio.data[513]",
+          "enabled": true,
+          "color": "#ffff00",
+          "label": "Audio R (byte 513)"
         }
       ],
       "minYValue": 0,
@@ -324,7 +330,7 @@
       "topicPath": "/hardware/realsense/status"
     },
     "RawMessages!microphone_status": {
-      "topicPath": "/hardware/microphone/status"
+      "topicPath": "/microphone/status"
     },
     "RawMessages!irobot_status": {
       "topicPath": "/hardware/irobot/status"

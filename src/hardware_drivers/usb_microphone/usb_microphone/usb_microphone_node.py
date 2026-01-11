@@ -25,7 +25,7 @@ class USBMicrophoneNode(Node):
         # Parameters
         self.declare_parameter("device", "default")
         self.declare_parameter("sample_rate", 16000)
-        self.declare_parameter("channels", 1)
+        self.declare_parameter("channels", 2)  # Default to stereo (most USB mics require this)
         self.declare_parameter("format", "S16_LE")
         self.declare_parameter("chunk_size", 1024)
         self.declare_parameter("publish_rate", 10.0)

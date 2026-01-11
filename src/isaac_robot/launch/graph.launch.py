@@ -102,6 +102,13 @@ def load_graph_config(context):
 
         param_list = [parameters] if parameters else []
 
+        # Debug: Print parameters for microphone node
+        if node_name == "usb_microphone":
+            print(f"DEBUG: USB Microphone parameters: {parameters}", file=sys.stderr)
+            print(
+                f"DEBUG: Channels value: {parameters.get('channels', 'NOT FOUND')}", file=sys.stderr
+            )
+
         # Try to find executable - ROS 2 will handle this automatically
         # but we can add fallback for Python modules if needed
         try:
