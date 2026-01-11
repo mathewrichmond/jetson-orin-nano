@@ -1,0 +1,21 @@
+/**:
+  ros__parameters:
+    # Serial port configuration
+    serial_port: '/dev/ttyUSB1'  # iRobot serial port (check with: ls -l /dev/ttyUSB*)
+    baudrate: 115200  # iRobot Create 2 default baudrate
+    timeout: 1.0  # Serial timeout in seconds
+
+    # Robot type
+    robot_type: 'create2'  # Options: 'create2', 'roomba'
+
+    # Publishing rate
+    publish_rate: 10.0  # Hz (status update rate)
+
+    # Topic names
+    status_topic: '/irobot/status'
+    battery_topic: '/irobot/battery'
+    cmd_vel_topic: '/cmd_vel'  # Subscribe to velocity commands
+
+    # Safety settings
+    max_linear_velocity: 0.5  # m/s
+    max_angular_velocity: 1.0  # rad/s

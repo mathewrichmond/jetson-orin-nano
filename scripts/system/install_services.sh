@@ -16,9 +16,79 @@ echo "=========================================="
 echo "Installing Systemd Services and Timers"
 echo "=========================================="
 
-# Install robot service as user service (no sudo required)
+# Configure hardware permissions (serial port access)
+echo "Configuring hardware permissions..."
+ISAAC_USER="${SUDO_USER:-$USER}"
+if [ -z "$ISAAC_USER" ] || [ "$ISAAC_USER" = "root" ]; then
+    # Try to detect the actual user
+    ISAAC_USER=$(logname 2>/dev/null || echo "nano")
+fi
+
+echo "Adding user '$ISAAC_USER' to hardware access groups..."
+
+# Add to dialout group for serial port access
+if id -nG "$ISAAC_USER" | grep -qw "dialout"; then
+    echo "  ✓ User '$ISAAC_USER' is already in dialout group"
+else
+    usermod -a -G dialout "$ISAAC_USER"
+    echo "  ✓ User '$ISAAC_USER' added to dialout group"
+fi
+
+# Add to i2c group for I2C access (PHAT motor controller accelerometer)
+if id -nG "$ISAAC_USER" | grep -qw "i2c"; then
+    echo "  ✓ User '$ISAAC_USER' is already in i2c group"
+else
+    usermod -a -G i2c "$ISAAC_USER"
+    echo "  ✓ User '$ISAAC_USER' added to i2c group"
+fi
+
+# Add to gpio group for GPIO access (PHAT motor controller)
+if id -nG "$ISAAC_USER" | grep -qw "gpio"; then
+    echo "  ✓ User '$ISAAC_USER' is already in gpio group"
+else
+    usermod -a -G gpio "$ISAAC_USER"
+    echo "  ✓ User '$ISAAC_USER' added to gpio group"
+fi
+
+echo "  Note: User must logout/login or run 'newgrp <group>' for changes to take effect"
+
+# Install robot service as user service (must run as the user, not root)
 echo "Installing robot service as user service..."
-"${PROJECT_ROOT}/scripts/system/setup_boot_service.sh"
+# Enable lingering first so user services can run without login
+loginctl enable-linger "$ISAAC_USER" 2>/dev/null || echo "  Note: Could not enable lingering (may need manual setup)"
+
+# Get user's home directory
+ISAAC_HOME=$(getent passwd "$ISAAC_USER" | cut -d: -f6)
+
+# Run as the actual user to access their systemd user session
+# We need to ensure the user's systemd user manager is available
+if [ "$ISAAC_USER" != "root" ] && [ -n "$ISAAC_USER" ] && [ -n "$ISAAC_HOME" ]; then
+    # Use runuser with proper environment setup for systemd user session
+    # Set XDG_RUNTIME_DIR to the user's runtime directory
+    XDG_RUNTIME_DIR="/run/user/$(id -u "$ISAAC_USER")"
+
+    if command -v runuser >/dev/null 2>&1; then
+        # Try runuser with proper environment
+        runuser -l "$ISAAC_USER" -c "export HOME='$ISAAC_HOME'; export XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR'; cd '${PROJECT_ROOT}' && '${PROJECT_ROOT}/scripts/system/setup_boot_service.sh'" || {
+            echo "Warning: Could not install user service as $ISAAC_USER using runuser"
+            echo "  This is normal if the user's systemd session isn't initialized"
+            echo "  The service file will be installed, but you may need to run:"
+            echo "    ./scripts/system/setup_boot_service.sh"
+            echo "  Or manually enable the service after logging in:"
+            echo "    systemctl --user daemon-reload"
+            echo "    systemctl --user enable isaac-robot.service"
+        }
+    else
+        # Fallback to su if runuser not available
+        su - "$ISAAC_USER" -c "export XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR'; cd '${PROJECT_ROOT}' && '${PROJECT_ROOT}/scripts/system/setup_boot_service.sh'" || {
+            echo "Warning: Could not install user service as $ISAAC_USER"
+            echo "  Please run manually: ./scripts/system/setup_boot_service.sh"
+        }
+    fi
+else
+    echo "Warning: Could not determine user for user service installation"
+    echo "  Please run manually: ./scripts/system/setup_boot_service.sh"
+fi
 
 # Copy other service files (system services for maintenance)
 echo "Installing maintenance service files..."

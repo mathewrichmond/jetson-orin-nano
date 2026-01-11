@@ -34,6 +34,7 @@ Components:
   microphone            USB microphone
   odrive                ODrive motor controller
   irobot                iRobot Create/Roomba
+  phat                  PHAT motor controller (GPIO + accelerometer)
   all                   All components
 
 Examples:
@@ -70,11 +71,20 @@ install_component() {
             sudo apt-get install -y python3-pip python3-serial
             pip3 install pyserial
             ;;
+        phat)
+            echo -e "${GREEN}Installing PHAT motor controller support...${NC}"
+            sudo apt-get update
+            sudo apt-get install -y python3-pip i2c-tools
+            pip3 install smbus2
+            echo "  Note: User will be added to i2c group for I2C access"
+            echo "  Note: Jetson.GPIO should already be installed for GPIO access"
+            ;;
         all)
             install_component realsense
             install_component microphone
             install_component odrive
             install_component irobot
+            install_component phat
             ;;
         *)
             echo -e "${RED}Error: Unknown component '$component'${NC}"
@@ -145,6 +155,7 @@ list_components() {
     echo "  microphone - USB microphone"
     echo "  odrive     - ODrive motor controller"
     echo "  irobot     - iRobot Create/Roomba"
+    echo "  phat       - PHAT motor controller (GPIO + accelerometer)"
     echo ""
 }
 

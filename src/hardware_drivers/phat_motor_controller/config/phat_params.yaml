@@ -1,0 +1,17 @@
+/**:
+  ros__parameters:
+    # I2C configuration for accelerometer
+    i2c_bus: 1  # I2C bus number (usually 1 for Jetson)
+    accelerometer_address: 0x68  # I2C address (0x68 for MPU6050, 0x6A for LSM6DS3)
+    accelerometer_type: 'MPU6050'  # Options: MPU6050, LSM6DS3
+    enable_accelerometer: true
+
+    # Publishing rate
+    publish_rate: 50.0  # Hz
+
+    # Motor control GPIO pins (adjust for your PHAT board)
+    motor_left_pwm_pin: 18   # PWM pin for left motor
+    motor_left_dir_pin: 16   # Direction pin for left motor
+    motor_right_pwm_pin: 19  # PWM pin for right motor
+    motor_right_dir_pin: 20  # Direction pin for right motor
+    pwm_frequency: 1000  # PWM frequency in Hz

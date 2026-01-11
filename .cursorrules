@@ -47,11 +47,13 @@ This is a **robot control system** repository that:
 ## Code Style Guidelines
 
 - **Python**: Follow PEP 8, use type hints, docstrings for all functions
-  - **Imports**: ALL imports must be at the top of the file, grouped as:
+  - **Imports**: ALL imports MUST be at the top of the file, grouped as:
     1. Standard library imports
     2. Third-party imports (ROS 2, numpy, etc.)
     3. Local/package imports
+  - **CRITICAL**: Never place imports inside functions, conditionals, or anywhere other than the top of the file
   - Use `isort` with `black` profile for import sorting
+  - If an import is conditionally needed, use it at the top and handle the import error, or restructure the code
 - **Bash**: Use `set -e` for error handling, check for root when needed
 - **ROS 2**: Follow ROS 2 conventions, use proper package structure
 - **C++**: Follow ROS 2 C++ style guide if used

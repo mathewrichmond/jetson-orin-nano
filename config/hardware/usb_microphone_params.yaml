@@ -1,0 +1,19 @@
+/**:
+  ros__parameters:
+    # ALSA device name (use 'default' for default, or 'hw:0,0' for specific card/device)
+    device: 'default'  # Options: 'default', 'hw:0,0', 'hw:1,0', etc.
+
+    # Audio format parameters
+    sample_rate: 16000  # Hz (16000, 44100, 48000)
+    channels: 1  # Mono (1) or Stereo (2)
+    format: 'S16_LE'  # Signed 16-bit Little Endian
+
+    # Buffer settings
+    chunk_size: 1024  # Samples per chunk
+
+    # Publishing rate
+    publish_rate: 10.0  # Hz (how often to publish status)
+
+    # Topic names
+    status_topic: '/microphone/status'
+    audio_topic: '/microphone/audio'  # Optional: raw audio data

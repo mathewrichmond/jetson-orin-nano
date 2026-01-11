@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(odrive_controller)
+project(phat_motor_controller)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -15,13 +15,13 @@ ament_python_install_package(${PROJECT_NAME})
 # Create entry point script for symlink installs
 install(CODE "
   file(MAKE_DIRECTORY \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}\")
-  file(WRITE \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/odrive_controller_node\"
+  file(WRITE \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/phat_motor_controller_node\"
     \"#!/usr/bin/env python3\\n\"
-    \"from odrive_controller.odrive_controller_node import main\\n\"
+    \"from phat_motor_controller.phat_motor_controller_node import main\\n\"
     \"if __name__ == '__main__':\\n\"
     \"    main()\\n\"
   )
-  file(CHMOD \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/odrive_controller_node\"
+  file(CHMOD \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/phat_motor_controller_node\"
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
                 GROUP_READ GROUP_EXECUTE
                 WORLD_READ WORLD_EXECUTE

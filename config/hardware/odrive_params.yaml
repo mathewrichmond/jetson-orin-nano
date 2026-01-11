@@ -1,0 +1,26 @@
+/**:
+  ros__parameters:
+    # Serial port configuration
+    serial_port: '/dev/ttyUSB0'  # ODrive serial port (check with: ls -l /dev/ttyUSB*)
+    baudrate: 115200  # ODrive default baudrate
+    timeout: 1.0  # Serial timeout in seconds
+
+    # Communication method
+    use_can: false  # Use CAN bus instead of serial
+    can_interface: 'can0'  # CAN interface name (if use_can=true)
+    can_node_id: 0  # CAN node ID
+
+    # Publishing rate
+    publish_rate: 50.0  # Hz (motor status update rate)
+
+    # Accelerometer settings
+    enable_accelerometer: true  # Enable IMU/accelerometer data
+
+    # Topic names
+    status_topic: '/odrive/status'
+    imu_topic: '/odrive/imu'
+    cmd_vel_topic: '/cmd_vel'  # Subscribe to velocity commands
+
+    # Motor configuration (if needed)
+    # axis0_id: 0
+    # axis1_id: 1
