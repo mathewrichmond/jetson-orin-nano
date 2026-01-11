@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     # I2C configuration for accelerometer
-    i2c_bus: 1  # I2C bus number (try 0 or 1 - Jetson Nano may use bus 0)
+    i2c_bus: 7  # I2C bus number (Jetson Orin Nano uses bus 7 for ICM-20948, different from Raspberry Pi's bus 1)
     accelerometer_address: 0x69  # I2C address (0x69 for ICM-20948/SparkFun Auto pHAT, 0x68 for MPU6050, 0x6A for LSM6DS3)
     accelerometer_type: 'ICM20948'  # Options: ICM20948 (SparkFun Auto pHAT), MPU6050, LSM6DS3
     enable_accelerometer: true

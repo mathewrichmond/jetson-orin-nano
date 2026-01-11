@@ -28,25 +28,51 @@ class iRobotSerialNode(Node):
         self.declare_parameter('timeout', 1.0)
         self.declare_parameter('publish_rate', 10.0)
         self.declare_parameter('robot_type', 'create2')  # create2, roomba, etc.
+        self.declare_parameter('status_topic', '/irobot/status')
+        self.declare_parameter('battery_topic', '/irobot/battery')
+        self.declare_parameter('cmd_vel_topic', '/cmd_vel')
+        self.declare_parameter('base_frame_id', 'irobot_base')
+        self.declare_parameter('retry_delay', 2.0)  # Seconds between connection retry attempts
+        self.declare_parameter('command_delay', 0.1)  # Seconds between iRobot commands
+        self.declare_parameter('sensor_read_delay', 0.05)  # Seconds to wait for sensor response
+        self.declare_parameter('max_linear_velocity', 0.5)  # m/s
+        self.declare_parameter('max_angular_velocity', 1.0)  # rad/s
+        self.declare_parameter('max_velocity_mm_s', 500)  # mm/s (iRobot Create 2 limit)
+        self.declare_parameter('max_radius_mm', 2000)  # mm (iRobot Create 2 limit)
+        self.declare_parameter('battery_max_charge', 16000)  # Typical max charge value
+        self.declare_parameter('battery_max_voltage', 14.4)  # Volts
 
         self.serial_port = self.get_parameter('serial_port').value
         self.baudrate = self.get_parameter('baudrate').value
         self.timeout = self.get_parameter('timeout').value
         self.publish_rate = self.get_parameter('publish_rate').value
         self.robot_type = self.get_parameter('robot_type').value
+        self.status_topic = self.get_parameter('status_topic').value
+        self.battery_topic = self.get_parameter('battery_topic').value
+        self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        self.base_frame_id = self.get_parameter('base_frame_id').value
+        self.retry_delay = self.get_parameter('retry_delay').value
+        self.command_delay = self.get_parameter('command_delay').value
+        self.sensor_read_delay = self.get_parameter('sensor_read_delay').value
+        self.max_linear_velocity = self.get_parameter('max_linear_velocity').value
+        self.max_angular_velocity = self.get_parameter('max_angular_velocity').value
+        self.max_velocity_mm_s = self.get_parameter('max_velocity_mm_s').value
+        self.max_radius_mm = self.get_parameter('max_radius_mm').value
+        self.battery_max_charge = self.get_parameter('battery_max_charge').value
+        self.battery_max_voltage = self.get_parameter('battery_max_voltage').value
 
         # Serial connection
         self.serial_conn: Optional[serial.Serial] = None
         self.connected = False
 
         # Publishers
-        self.status_pub = self.create_publisher(String, '/irobot/status', 10)
-        self.battery_pub = self.create_publisher(BatteryState, '/irobot/battery', 10)
+        self.status_pub = self.create_publisher(String, self.status_topic, 10)
+        self.battery_pub = self.create_publisher(BatteryState, self.battery_topic, 10)
 
         # Subscribers
         self.cmd_vel_sub = self.create_subscription(
             Twist,
-            '/cmd_vel',
+            self.cmd_vel_topic,
             self.cmd_vel_callback,
             10
         )
@@ -77,17 +103,17 @@ class iRobotSerialNode(Node):
                 # Send start command (iRobot Create protocol)
                 if self.robot_type == 'create2':
                     self._send_command([128])  # Start command
-                    time.sleep(0.1)
+                    time.sleep(self.command_delay)
                     self._send_command([131])  # Safe mode
                     self.get_logger().info('iRobot Create 2 initialized in safe mode')
 
             except serial.SerialException as e:
                 self.get_logger().warn(f'Failed to connect to iRobot: {e}')
                 self._publish_status_message('error', f'Connection failed: {str(e)[:50]}')
-                time.sleep(2.0)
+                time.sleep(self.retry_delay)
             except Exception as e:
                 self.get_logger().error(f'Unexpected error connecting to iRobot: {e}')
-                time.sleep(2.0)
+                time.sleep(self.retry_delay)
 
     def _send_command(self, command_bytes: list):
         """Send command to iRobot"""
@@ -114,8 +140,8 @@ class iRobotSerialNode(Node):
             radius_mm = int((linear_x / angular_z) * 1000) if angular_z != 0 else 32767  # Convert to mm
 
             # Clamp values to valid range
-            velocity_mm_s = max(-500, min(500, velocity_mm_s))  # -500 to 500 mm/s
-            radius_mm = max(-2000, min(2000, radius_mm)) if radius_mm != 32767 else 32767  # -2000 to 2000 mm or straight
+            velocity_mm_s = max(-self.max_velocity_mm_s, min(self.max_velocity_mm_s, velocity_mm_s))
+            radius_mm = max(-self.max_radius_mm, min(self.max_radius_mm, radius_mm)) if radius_mm != 32767 else 32767
 
             # Create 2 drive command: [137, velocity_high, velocity_low, radius_high, radius_low]
             velocity_high = (velocity_mm_s >> 8) & 0xFF
@@ -141,7 +167,7 @@ class iRobotSerialNode(Node):
             self._send_command([142, 3])  # Request sensor packet 3 (battery charge)
 
             # Read response (2 bytes for battery charge, 0-65535)
-            time.sleep(0.05)  # Wait for response
+            time.sleep(self.sensor_read_delay)  # Wait for response
             if self.serial_conn.in_waiting >= 2:
                 data = self.serial_conn.read(2)
                 if len(data) == 2:
@@ -177,13 +203,12 @@ class iRobotSerialNode(Node):
                 battery_msg = BatteryState()
                 battery_msg.header = Header()
                 battery_msg.header.stamp = self.get_clock().now().to_msg()
-                battery_msg.header.frame_id = 'irobot_base'
+                battery_msg.header.frame_id = self.base_frame_id
 
-                # iRobot Create 2 battery is 0-65535, max charge is typically ~16000
+                # iRobot Create 2 battery is 0-65535
                 charge = sensor_data['battery_charge']
-                max_charge = 16000  # Typical max charge value
-                battery_msg.percentage = min(1.0, charge / max_charge)
-                battery_msg.voltage = 14.4 * battery_msg.percentage  # Approximate voltage
+                battery_msg.percentage = min(1.0, charge / self.battery_max_charge)
+                battery_msg.voltage = self.battery_max_voltage * battery_msg.percentage
                 battery_msg.present = True
 
                 self.battery_pub.publish(battery_msg)
@@ -202,7 +227,7 @@ class iRobotSerialNode(Node):
         if self.connected and self.serial_conn and self.serial_conn.is_open:
             # Stop iRobot
             self._send_command([173])  # Stop command
-            time.sleep(0.1)
+            time.sleep(self.command_delay)
             self.serial_conn.close()
         super().destroy_node()
 

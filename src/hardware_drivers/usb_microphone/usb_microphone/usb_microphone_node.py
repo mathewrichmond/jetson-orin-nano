@@ -30,6 +30,9 @@ class USBMicrophoneNode(Node):
         self.declare_parameter("format", "S16_LE")
         self.declare_parameter("chunk_size", 1024)
         self.declare_parameter("publish_rate", 10.0)
+        self.declare_parameter("status_topic", "/microphone/status")
+        self.declare_parameter("retry_delay", 1.0)  # Seconds between retry attempts
+        self.declare_parameter("device_check_timeout", 2.0)  # Seconds for device check timeout
 
         self.device = self.get_parameter("device").value
         self.sample_rate = self.get_parameter("sample_rate").value
@@ -37,9 +40,12 @@ class USBMicrophoneNode(Node):
         self.format = self.get_parameter("format").value
         self.chunk_size = self.get_parameter("chunk_size").value
         self.publish_rate = self.get_parameter("publish_rate").value
+        self.status_topic = self.get_parameter("status_topic").value
+        self.retry_delay = self.get_parameter("retry_delay").value
+        self.device_check_timeout = self.get_parameter("device_check_timeout").value
 
         # Publishers
-        self.status_pub = self.create_publisher(String, "/microphone/status", 10)
+        self.status_pub = self.create_publisher(String, self.status_topic, 10)
 
         # Note: Audio message type would need to be defined or use sensor_msgs/PointCloud2
         # For now, we'll publish status and log audio capture
@@ -65,7 +71,7 @@ class USBMicrophoneNode(Node):
                 # Check if device is available
                 if not self._check_device():
                     self.publish_status("error", "Microphone device not found")
-                    time.sleep(1.0)
+                    time.sleep(self.retry_delay)
                     continue
 
                 # Start arecord process
@@ -114,13 +120,13 @@ class USBMicrophoneNode(Node):
                 self.get_logger().error(f"Audio capture error: {e}")
                 self.publish_status("error", str(e))
                 self.audio_capturing = False
-                time.sleep(1.0)
+                time.sleep(self.retry_delay)
 
     def _check_device(self) -> bool:
         """Check if microphone device is available"""
         try:
             # List audio devices
-            result = subprocess.run(["arecord", "-l"], capture_output=True, text=True, timeout=2.0)
+            result = subprocess.run(["arecord", "-l"], capture_output=True, text=True, timeout=self.device_check_timeout)
             if result.returncode == 0:
                 # Check if USB microphone is in the list
                 if "USB" in result.stdout or self.device != "default":

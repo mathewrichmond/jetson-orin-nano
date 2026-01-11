@@ -40,6 +40,9 @@ class RealSenseCameraNode(Node):
         self.declare_parameter('depth_fps', 30)
         self.declare_parameter('publish_rate', 30.0)
         self.declare_parameter('align_depth_to_color', True)
+        self.declare_parameter('status_topic', 'realsense/status')
+        self.declare_parameter('frame_timeout_ms', 1000)  # Milliseconds to wait for frames
+        self.declare_parameter('shutdown_delay', 0.5)  # Seconds to wait for threads on shutdown
 
         # Get parameters (with safe fallback to defaults)
         try:
@@ -62,6 +65,9 @@ class RealSenseCameraNode(Node):
         self.depth_fps = self.get_parameter('depth_fps').value
         self.publish_rate = self.get_parameter('publish_rate').value
         self.align_depth_to_color = self.get_parameter('align_depth_to_color').value
+        self.status_topic = self.get_parameter('status_topic').value
+        self.frame_timeout_ms = self.get_parameter('frame_timeout_ms').value
+        self.shutdown_delay = self.get_parameter('shutdown_delay').value
 
         # Initialize
         self.bridge = CvBridge()
@@ -72,7 +78,7 @@ class RealSenseCameraNode(Node):
         self.running = True
 
         # Status publisher
-        self.status_pub = self.create_publisher(String, 'realsense/status', 10)
+        self.status_pub = self.create_publisher(String, self.status_topic, 10)
 
         # Discover and initialize cameras
         self._discover_cameras()
@@ -269,7 +275,7 @@ class RealSenseCameraNode(Node):
         while self.running:
             try:
                 # Wait for frames
-                frames = pipeline.wait_for_frames(timeout_ms=1000)
+                frames = pipeline.wait_for_frames(timeout_ms=self.frame_timeout_ms)
 
                 # Align depth to color if requested
                 if align:
@@ -417,7 +423,7 @@ class RealSenseCameraNode(Node):
         """Cleanup on shutdown"""
         self.get_logger().info('Shutting down RealSense cameras...')
         self.running = False
-        time.sleep(0.5)  # Give threads time to stop
+        time.sleep(self.shutdown_delay)  # Give threads time to stop
 
         for pipeline in self.pipelines.values():
             try:

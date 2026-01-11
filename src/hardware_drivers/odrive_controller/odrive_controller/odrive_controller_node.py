@@ -31,6 +31,11 @@ class ODriveControllerNode(Node):
         self.declare_parameter('can_node_id', 0)
         self.declare_parameter('publish_rate', 50.0)
         self.declare_parameter('enable_accelerometer', True)
+        self.declare_parameter('status_topic', '/odrive/status')
+        self.declare_parameter('imu_topic', '/odrive/imu')
+        self.declare_parameter('cmd_vel_topic', '/cmd_vel')
+        self.declare_parameter('imu_frame_id', 'odrive_imu')
+        self.declare_parameter('retry_delay', 2.0)  # Seconds between connection retry attempts
 
         self.serial_port = self.get_parameter('serial_port').value
         self.baudrate = self.get_parameter('baudrate').value
@@ -40,19 +45,24 @@ class ODriveControllerNode(Node):
         self.can_node_id = self.get_parameter('can_node_id').value
         self.publish_rate = self.get_parameter('publish_rate').value
         self.enable_accelerometer = self.get_parameter('enable_accelerometer').value
+        self.status_topic = self.get_parameter('status_topic').value
+        self.imu_topic = self.get_parameter('imu_topic').value
+        self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        self.imu_frame_id = self.get_parameter('imu_frame_id').value
+        self.retry_delay = self.get_parameter('retry_delay').value
 
         # Serial connection
         self.serial_conn: Optional[serial.Serial] = None
         self.connected = False
 
         # Publishers
-        self.status_pub = self.create_publisher(String, '/odrive/status', 10)
-        self.imu_pub = self.create_publisher(Imu, '/odrive/imu', 10) if self.enable_accelerometer else None
+        self.status_pub = self.create_publisher(String, self.status_topic, 10)
+        self.imu_pub = self.create_publisher(Imu, self.imu_topic, 10) if self.enable_accelerometer else None
 
         # Subscribers
         self.cmd_vel_sub = self.create_subscription(
             Twist,
-            '/cmd_vel',
+            self.cmd_vel_topic,
             self.cmd_vel_callback,
             10
         )
@@ -92,10 +102,10 @@ class ODriveControllerNode(Node):
             except serial.SerialException as e:
                 self.get_logger().warn(f'Failed to connect to ODrive: {e}')
                 self._publish_status_message('error', f'Connection failed: {str(e)[:50]}')
-                time.sleep(2.0)
+                time.sleep(self.retry_delay)
             except Exception as e:
                 self.get_logger().error(f'Unexpected error connecting to ODrive: {e}')
-                time.sleep(2.0)
+                time.sleep(self.retry_delay)
 
     def cmd_vel_callback(self, msg: Twist):
         """Handle velocity commands"""
@@ -140,7 +150,7 @@ class ODriveControllerNode(Node):
                 imu_msg = Imu()
                 imu_msg.header = Header()
                 imu_msg.header.stamp = self.get_clock().now().to_msg()
-                imu_msg.header.frame_id = 'odrive_imu'
+                imu_msg.header.frame_id = self.imu_frame_id
 
                 # Read accelerometer data from ODrive
                 # This is a placeholder - actual implementation would read from ODrive

@@ -17,3 +17,7 @@
     # Topic names
     status_topic: '/microphone/status'
     audio_topic: '/microphone/audio'  # Optional: raw audio data
+
+    # Timing parameters
+    retry_delay: 1.0  # Seconds between retry attempts
+    device_check_timeout: 2.0  # Seconds for device check timeout

@@ -21,10 +21,10 @@ check_service() {
     # Robot service is user service, others are system services
     if [ "$service" = "isaac-robot.service" ]; then
         if systemctl --user is-active --quiet "$service" 2>/dev/null; then
-            log "✓ Service $service is running"
-            return 0
-        else
-            log "✗ Service $service is not running - attempting restart"
+        log "✓ Service $service is running"
+        return 0
+    else
+        log "✗ Service $service is not running - attempting restart"
             systemctl --user restart "$service" 2>/dev/null || log "Failed to restart $service"
             return 1
         fi
@@ -35,7 +35,7 @@ check_service() {
         else
             log "✗ Service $service is not running - attempting restart"
             sudo systemctl restart "$service" 2>/dev/null || log "Failed to restart $service (may need sudo)"
-            return 1
+        return 1
         fi
     fi
 }

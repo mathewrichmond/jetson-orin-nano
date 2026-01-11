@@ -23,3 +23,10 @@
     # Publishing parameters
     publish_rate: 30.0
     align_depth_to_color: true
+
+    # Topic names
+    status_topic: 'realsense/status'
+
+    # Timing parameters
+    frame_timeout_ms: 1000  # Milliseconds to wait for frames
+    shutdown_delay: 0.5  # Seconds to wait for threads on shutdown

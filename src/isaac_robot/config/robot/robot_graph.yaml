@@ -137,30 +137,6 @@ robot:
       subscribe:
         - /cmd_vel
 
-  # PHAT Motor Controller (GPIO + Accelerometer)
-  phat_motor_controller:
-    enabled: true
-    package: phat_motor_controller
-    node: phat_motor_controller_node
-    namespace: /hardware
-    parameters:
-      i2c_bus: 1
-      accelerometer_address: 0x68
-      accelerometer_type: 'MPU6050'
-      enable_accelerometer: true
-      publish_rate: 50.0
-      motor_left_pwm_pin: 18
-      motor_left_dir_pin: 16
-      motor_right_pwm_pin: 19
-      motor_right_dir_pin: 20
-      pwm_frequency: 1000
-    topics:
-      publish:
-        - /phat/status
-        - /phat/imu
-      subscribe:
-        - /cmd_vel
-
   # Communication with sub-modules (placeholder)
   submodules:
     raspberry_pi:
@@ -191,7 +167,6 @@ groups:
     - usb_microphone
     - odrive_controller
     - irobot_serial
-    - phat_motor_controller
 
   bench_test:
     - system_monitor
@@ -199,7 +174,6 @@ groups:
     - usb_microphone
     - odrive_controller
     - irobot_serial
-    - phat_motor_controller
 
   all:
     - system_monitor

@@ -21,6 +21,12 @@
     imu_topic: '/odrive/imu'
     cmd_vel_topic: '/cmd_vel'  # Subscribe to velocity commands
 
+    # Frame IDs
+    imu_frame_id: 'odrive_imu'
+
+    # Timing parameters
+    retry_delay: 2.0  # Seconds between connection retry attempts
+
     # Motor configuration (if needed)
     # axis0_id: 0
     # axis1_id: 1
