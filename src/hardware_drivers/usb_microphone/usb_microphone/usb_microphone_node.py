@@ -101,14 +101,13 @@ class USBMicrophoneNode(Node):
                 while self.arecord_process.poll() is None:
                     chunk = self.arecord_process.stdout.read(self.chunk_size)
                     if chunk:
-                        # Check if we're getting actual audio data (not all zeros)
-                        if any(byte != 0 for byte in chunk):
-                            # Publish audio chunk
-                            audio_msg = UInt8MultiArray()
-                            audio_msg.data = list(chunk)
-                            self.audio_pub.publish(audio_msg)
-                        else:
-                            # All zeros - might indicate no audio input
+                        # Publish audio chunk (publish even if zeros to maintain data stream)
+                        audio_msg = UInt8MultiArray()
+                        audio_msg.data = list(chunk)
+                        self.audio_pub.publish(audio_msg)
+
+                        # Log warning if consistently getting zeros (might indicate no audio input)
+                        if not any(byte != 0 for byte in chunk):
                             self.get_logger().debug(
                                 "Audio chunk contains only zeros (no audio input?)"
                             )

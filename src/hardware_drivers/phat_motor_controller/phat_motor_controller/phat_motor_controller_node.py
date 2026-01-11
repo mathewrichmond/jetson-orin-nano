@@ -128,7 +128,11 @@ class PHATMotorControllerNode(Node):
         # Publishers
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
         self.imu_pub = self.create_publisher(Imu, self.imu_topic, 10) if self.enable_accel else None
-        self.mag_pub = self.create_publisher(MagneticField, self.magnetometer_topic, 10) if self.enable_accel else None
+        self.mag_pub = (
+            self.create_publisher(MagneticField, self.magnetometer_topic, 10)
+            if self.enable_accel
+            else None
+        )
 
         # Subscribers
         self.cmd_vel_sub = self.create_subscription(
@@ -619,6 +623,15 @@ class PHATMotorControllerNode(Node):
                     )
                 elif self.accel_type == "ICM20948":
                     sensor_data = self._read_icm20948()
+                    # Debug: Log if gyro data is missing
+                    if sensor_data and not sensor_data.get("gyro"):
+                        self.get_logger().warn("ICM20948: No gyroscope data returned")
+                    elif sensor_data and sensor_data.get("gyro"):
+                        gyro = sensor_data["gyro"]
+                        if all(abs(g) < 0.001 for g in gyro):
+                            self.get_logger().debug(
+                                "ICM20948: Gyroscope values are near zero (sensor may be stationary)"
+                            )
                 elif self.accel_type == "LSM6DS3":
                     accel_data = self._read_lsm6ds3()
                     sensor_data = (
