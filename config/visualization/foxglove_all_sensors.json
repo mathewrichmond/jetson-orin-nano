@@ -204,19 +204,19 @@
     "Plot!phat_accel": {
       "paths": [
         {
-          "value": "/hardware/phat/imu.linear_acceleration.x",
+          "value": "/phat/imu.linear_acceleration.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "PHAT Accel X"
         },
         {
-          "value": "/hardware/phat/imu.linear_acceleration.y",
+          "value": "/phat/imu.linear_acceleration.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "PHAT Accel Y"
         },
         {
-          "value": "/hardware/phat/imu.linear_acceleration.z",
+          "value": "/phat/imu.linear_acceleration.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "PHAT Accel Z"
@@ -229,19 +229,19 @@
     "Plot!phat_gyro": {
       "paths": [
         {
-          "value": "/hardware/phat/imu.angular_velocity.x",
+          "value": "/phat/imu.angular_velocity.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "PHAT Gyro X"
         },
         {
-          "value": "/hardware/phat/imu.angular_velocity.y",
+          "value": "/phat/imu.angular_velocity.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "PHAT Gyro Y"
         },
         {
-          "value": "/hardware/phat/imu.angular_velocity.z",
+          "value": "/phat/imu.angular_velocity.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "PHAT Gyro Z"
@@ -254,19 +254,19 @@
     "Plot!phat_mag": {
       "paths": [
         {
-          "value": "/hardware/phat/magnetometer.magnetic_field.x",
+          "value": "/phat/magnetometer.magnetic_field.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "PHAT Mag X"
         },
         {
-          "value": "/hardware/phat/magnetometer.magnetic_field.y",
+          "value": "/phat/magnetometer.magnetic_field.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "PHAT Mag Y"
         },
         {
-          "value": "/hardware/phat/magnetometer.magnetic_field.z",
+          "value": "/phat/magnetometer.magnetic_field.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "PHAT Mag Z"
@@ -310,13 +310,13 @@
     "Plot!irobot_battery": {
       "paths": [
         {
-          "value": "/hardware/irobot/battery.percentage",
+          "value": "/irobot/battery.percentage",
           "enabled": true,
           "color": "#00ff00",
           "label": "Battery %"
         },
         {
-          "value": "/hardware/irobot/battery.voltage",
+          "value": "/irobot/battery.voltage",
           "enabled": true,
           "color": "#ff8800",
           "label": "Voltage"
@@ -333,10 +333,10 @@
       "topicPath": "/microphone/status"
     },
     "RawMessages!irobot_status": {
-      "topicPath": "/hardware/irobot/status"
+      "topicPath": "/irobot/status"
     },
     "RawMessages!phat_status": {
-      "topicPath": "/hardware/phat/status"
+      "topicPath": "/phat/status"
     },
     "RawMessages!system_status": {
       "topicPath": "/system/status"
