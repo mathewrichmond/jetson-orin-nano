@@ -85,6 +85,7 @@ class PHATMotorControllerNode(Node):
         # Topic names
         self.declare_parameter("status_topic", "/phat/status")
         self.declare_parameter("imu_topic", "/phat/imu")
+        self.declare_parameter("magnetometer_topic", "/phat/magnetometer")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
 
         # Frame IDs
@@ -115,6 +116,7 @@ class PHATMotorControllerNode(Node):
 
         self.status_topic = self.get_parameter("status_topic").value
         self.imu_topic = self.get_parameter("imu_topic").value
+        self.magnetometer_topic = self.get_parameter("magnetometer_topic").value
         self.cmd_vel_topic = self.get_parameter("cmd_vel_topic").value
         self.imu_frame_id = self.get_parameter("imu_frame_id").value
 
@@ -126,6 +128,7 @@ class PHATMotorControllerNode(Node):
         # Publishers
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
         self.imu_pub = self.create_publisher(Imu, self.imu_topic, 10) if self.enable_accel else None
+        self.mag_pub = self.create_publisher(MagneticField, self.magnetometer_topic, 10) if self.enable_accel else None
 
         # Subscribers
         self.cmd_vel_sub = self.create_subscription(

@@ -57,7 +57,38 @@ install_component() {
         microphone)
             echo -e "${GREEN}Installing USB microphone support...${NC}"
             sudo apt-get update
-            sudo apt-get install -y alsa-utils pulseaudio
+            sudo apt-get install -y alsa-utils pulseaudio alsa-base
+
+            # Ensure user is in audio group
+            if ! groups $USER | grep -q "\baudio\b"; then
+                echo -e "${YELLOW}Adding user to audio group...${NC}"
+                sudo usermod -a -G audio $USER
+                echo -e "${YELLOW}Note: You may need to log out and back in for audio group changes to take effect${NC}"
+            fi
+
+            # Reload ALSA modules
+            echo -e "${BLUE}Reloading ALSA modules...${NC}"
+            sudo modprobe snd-usb-audio || true
+
+            # Test microphone if available
+            if arecord -l | grep -q "USB Audio"; then
+                echo -e "${BLUE}Testing microphone...${NC}"
+                MIC_CARD=$(arecord -l | grep "USB Audio" | head -1 | sed 's/^card \([0-9]*\):.*/\1/')
+                if [ -n "$MIC_CARD" ]; then
+                    echo -e "${BLUE}Found USB microphone on card $MIC_CARD${NC}"
+                    # Test recording (2 seconds, stereo, 16kHz)
+                    if timeout 3 arecord -D plughw:$MIC_CARD,0 -d 2 -f S16_LE -r 16000 -c 2 /tmp/mic_test.wav 2>/dev/null; then
+                        echo -e "${GREEN}Microphone test recording successful${NC}"
+                        rm -f /tmp/mic_test.wav
+                    else
+                        echo -e "${YELLOW}Microphone test recording failed - check device configuration${NC}"
+                    fi
+                fi
+            else
+                echo -e "${YELLOW}No USB microphone detected - connect microphone and run verification${NC}"
+            fi
+
+            echo -e "${GREEN}USB microphone support installed${NC}"
             ;;
         odrive)
             echo -e "${GREEN}Installing ODrive support...${NC}"

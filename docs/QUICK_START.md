@@ -61,8 +61,7 @@ The script will:
 
 ### Robot System
 - **Start robot graph**: `./scripts/system/manage_graph.sh start robot`
-- **Start monitor graph**: `./scripts/system/manage_graph.sh start monitor`
-- **Select graph**: `./scripts/system/manage_graph.sh select [robot|monitor]`
+- **Select graph**: `./scripts/system/manage_graph.sh select robot`
 - **Check status**: `./scripts/system/manage_graph.sh status`
 - **Verify streams**: `./scripts/system/manage_graph.sh verify`
 - See [Graph Management](system/GRAPH_MANAGEMENT_SYSTEMD.md) for details

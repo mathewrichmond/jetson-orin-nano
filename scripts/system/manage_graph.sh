@@ -25,11 +25,9 @@ Commands:
 
 Graph Options:
   robot                Target/production graph (all robot nodes)
-  monitor              Viewer/logger graph (monitoring and visualization tools)
 
 Examples:
   $0 start robot
-  $0 start monitor
   $0 status
   $0 select robot
   $0 verify
@@ -129,11 +127,14 @@ show_status() {
 }
 
 select_graph() {
-    local graph="${1:-}"
+    local graph="${1:-robot}"
 
     if [ -z "$graph" ]; then
-        echo "Error: Graph name required"
-        echo "Valid options: robot, monitor"
+        graph="robot"
+    fi
+
+    if [ "$graph" != "robot" ]; then
+        echo "Error: Only 'robot' graph is supported"
         exit 1
     fi
 

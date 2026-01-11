@@ -5,7 +5,7 @@
 
     # Audio format parameters
     sample_rate: 16000  # Hz (16000, 44100, 48000)
-    channels: 1  # Mono (1) or Stereo (2)
+    channels: 2  # Mono (1) or Stereo (2) - Note: Some USB mics only support stereo
     format: 'S16_LE'  # Signed 16-bit Little Endian
 
     # Buffer settings

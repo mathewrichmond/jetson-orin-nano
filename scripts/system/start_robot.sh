@@ -49,10 +49,6 @@ case "$GRAPH_SELECTION" in
         # Target/production graph - all robot nodes
         ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=all
         ;;
-    monitor)
-        # Monitor/viewer graph - visualization and logging tools
-        ros2 launch isaac_robot graph.launch.py graph_config:=monitor_graph.yaml group:=all
-        ;;
     *)
         # Default: robot graph
         echo "Warning: Unknown graph '$GRAPH_SELECTION', using robot graph"

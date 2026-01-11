@@ -87,13 +87,15 @@ robot:
     parameters:
       device: 'default'
       sample_rate: 16000
-      channels: 1
+      channels: 2  # USB mic requires stereo (2 channels)
       format: 'S16_LE'
       chunk_size: 1024
       publish_rate: 10.0
+      audio_topic: '/microphone/audio'
     topics:
       publish:
         - /microphone/status
+        - /microphone/audio
       subscribe: []
 
   # ODrive Motor Controller
@@ -160,20 +162,14 @@ robot:
       gpio_mode: 'BOARD'
       status_topic: '/phat/status'
       imu_topic: '/phat/imu'
-      cmd_vel_topic: '/cmd_vel'
-      imu_frame_id: 'phat_imu'
-      pwm_initial_duty_cycle: 0.0
-      wheelbase: 0.2
-      max_speed: 1.0
-      gpio_mode: 'BOARD'
-      status_topic: '/phat/status'
-      imu_topic: '/phat/imu'
+      magnetometer_topic: '/phat/magnetometer'
       cmd_vel_topic: '/cmd_vel'
       imu_frame_id: 'phat_imu'
     topics:
       publish:
         - /phat/status
         - /phat/imu
+        - /phat/magnetometer
       subscribe:
         - /cmd_vel
 

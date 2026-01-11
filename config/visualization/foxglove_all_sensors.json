@@ -204,19 +204,19 @@
     "Plot!phat_accel": {
       "paths": [
         {
-          "value": "/phat/imu.linear_acceleration.x",
+          "value": "/hardware/phat/imu.linear_acceleration.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "PHAT Accel X"
         },
         {
-          "value": "/phat/imu.linear_acceleration.y",
+          "value": "/hardware/phat/imu.linear_acceleration.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "PHAT Accel Y"
         },
         {
-          "value": "/phat/imu.linear_acceleration.z",
+          "value": "/hardware/phat/imu.linear_acceleration.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "PHAT Accel Z"
@@ -229,19 +229,19 @@
     "Plot!phat_gyro": {
       "paths": [
         {
-          "value": "/phat/imu.angular_velocity.x",
+          "value": "/hardware/phat/imu.angular_velocity.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "PHAT Gyro X"
         },
         {
-          "value": "/phat/imu.angular_velocity.y",
+          "value": "/hardware/phat/imu.angular_velocity.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "PHAT Gyro Y"
         },
         {
-          "value": "/phat/imu.angular_velocity.z",
+          "value": "/hardware/phat/imu.angular_velocity.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "PHAT Gyro Z"
@@ -254,19 +254,19 @@
     "Plot!phat_mag": {
       "paths": [
         {
-          "value": "/phat/magnetometer.magnetic_field.x",
+          "value": "/hardware/phat/magnetometer.magnetic_field.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "PHAT Mag X"
         },
         {
-          "value": "/phat/magnetometer.magnetic_field.y",
+          "value": "/hardware/phat/magnetometer.magnetic_field.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "PHAT Mag Y"
         },
         {
-          "value": "/phat/magnetometer.magnetic_field.z",
+          "value": "/hardware/phat/magnetometer.magnetic_field.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "PHAT Mag Z"
@@ -276,16 +276,41 @@
       "maxYValue": 0.0001,
       "showLegend": true
     },
+    "Plot!audio": {
+      "paths": [
+        {
+          "value": "/hardware/microphone/audio.data[0]",
+          "enabled": true,
+          "color": "#ff0000",
+          "label": "Audio Sample 0"
+        },
+        {
+          "value": "/hardware/microphone/audio.data[100]",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Audio Sample 100"
+        },
+        {
+          "value": "/hardware/microphone/audio.data[500]",
+          "enabled": true,
+          "color": "#0000ff",
+          "label": "Audio Sample 500"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 255,
+      "showLegend": true
+    },
     "Plot!irobot_battery": {
       "paths": [
         {
-          "value": "/irobot/battery.percentage",
+          "value": "/hardware/irobot/battery.percentage",
           "enabled": true,
           "color": "#00ff00",
           "label": "Battery %"
         },
         {
-          "value": "/irobot/battery.voltage",
+          "value": "/hardware/irobot/battery.voltage",
           "enabled": true,
           "color": "#ff8800",
           "label": "Voltage"
@@ -296,16 +321,16 @@
       "showLegend": true
     },
     "RawMessages!realsense_status": {
-      "topicPath": "/realsense/status"
+      "topicPath": "/hardware/realsense/status"
     },
     "RawMessages!microphone_status": {
-      "topicPath": "/microphone/status"
+      "topicPath": "/hardware/microphone/status"
     },
     "RawMessages!irobot_status": {
-      "topicPath": "/irobot/status"
+      "topicPath": "/hardware/irobot/status"
     },
     "RawMessages!phat_status": {
-      "topicPath": "/phat/status"
+      "topicPath": "/hardware/phat/status"
     },
     "RawMessages!system_status": {
       "topicPath": "/system/status"
@@ -345,8 +370,9 @@
       "second": "Plot!phat_accel",
       "third": "Plot!phat_gyro",
       "fourth": "Plot!phat_mag",
-      "fifth": "Plot!irobot_battery",
-      "sixth": {
+      "fifth": "Plot!audio",
+      "sixth": "Plot!irobot_battery",
+      "seventh": {
         "direction": "column",
         "first": "RawMessages!microphone_status",
         "second": "RawMessages!realsense_status",

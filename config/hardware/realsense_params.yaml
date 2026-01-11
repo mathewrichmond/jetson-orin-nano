@@ -8,7 +8,7 @@
     # Stream configuration
     enable_color: true
     enable_depth: true
-    enable_pointcloud: false
+    enable_pointcloud: true
 
     # Color stream parameters
     color_width: 640

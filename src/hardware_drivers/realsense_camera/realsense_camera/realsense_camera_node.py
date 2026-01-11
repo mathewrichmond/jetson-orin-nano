@@ -369,12 +369,18 @@ class RealSenseCameraNode(Node):
                     if (
                         self.enable_pointcloud
                         and "pointcloud" in self.camera_publishers[camera_name]
+                        and depth_frame
                     ):
                         pointcloud = self._depth_to_pointcloud(
                             depth_frame, color_frame, camera_name
                         )
                         if pointcloud:
                             self.camera_publishers[camera_name]["pointcloud"].publish(pointcloud)
+                        elif depth_frame:
+                            # Log warning if we have depth frame but couldn't create pointcloud
+                            self.get_logger().debug(
+                                f"Failed to create pointcloud for {camera_name} (depth frame available)"
+                            )
 
             except Exception as e:
                 self.get_logger().error(f"Error publishing frames for {camera_name}: {e}")
@@ -385,6 +391,11 @@ class RealSenseCameraNode(Node):
     ) -> Optional[PointCloud2]:
         """Convert depth frame to PointCloud2 message"""
         try:
+            # Validate depth frame
+            if not depth_frame:
+                self.get_logger().debug(f"No depth frame available for {camera_name}")
+                return None
+
             # Create pointcloud
             points = rs.pointcloud()
             if color_frame:
@@ -392,6 +403,12 @@ class RealSenseCameraNode(Node):
             points = points.calculate(depth_frame)
 
             vertices = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
+
+            # Check if we have valid vertices
+            if len(vertices) == 0:
+                self.get_logger().debug(f"No vertices generated for {camera_name} pointcloud")
+                return None
+
             colors = None
             if color_frame:
                 colors = (
@@ -425,7 +442,7 @@ class RealSenseCameraNode(Node):
             return msg
 
         except Exception as e:
-            self.get_logger().debug(f"Error creating pointcloud: {e}")
+            self.get_logger().warn(f"Error creating pointcloud for {camera_name}: {e}")
             return None
 
     def publish_status(self, status: str, message: str):

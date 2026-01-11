@@ -13,7 +13,7 @@ from typing import Optional
 # Third-party
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, UInt8MultiArray
 
 
 class USBMicrophoneNode(Node):
@@ -30,6 +30,7 @@ class USBMicrophoneNode(Node):
         self.declare_parameter("chunk_size", 1024)
         self.declare_parameter("publish_rate", 10.0)
         self.declare_parameter("status_topic", "/microphone/status")
+        self.declare_parameter("audio_topic", "/microphone/audio")
         self.declare_parameter("retry_delay", 1.0)  # Seconds between retry attempts
         self.declare_parameter("device_check_timeout", 2.0)  # Seconds for device check timeout
 
@@ -40,14 +41,15 @@ class USBMicrophoneNode(Node):
         self.chunk_size = self.get_parameter("chunk_size").value
         self.publish_rate = self.get_parameter("publish_rate").value
         self.status_topic = self.get_parameter("status_topic").value
+        self.audio_topic = self.get_parameter("audio_topic").value
         self.retry_delay = self.get_parameter("retry_delay").value
         self.device_check_timeout = self.get_parameter("device_check_timeout").value
 
         # Publishers
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
+        self.audio_pub = self.create_publisher(UInt8MultiArray, self.audio_topic, 10)
 
-        # Note: Audio message type would need to be defined or use sensor_msgs/PointCloud2
-        # For now, we'll publish status and log audio capture
+        # Audio capture state
         self.audio_capturing = False
         self.arecord_process: Optional[subprocess.Popen] = None
 
@@ -99,9 +101,17 @@ class USBMicrophoneNode(Node):
                 while self.arecord_process.poll() is None:
                     chunk = self.arecord_process.stdout.read(self.chunk_size)
                     if chunk:
-                        # Process audio chunk (could publish here)
-                        # For now, just verify we're getting data
-                        pass
+                        # Check if we're getting actual audio data (not all zeros)
+                        if any(byte != 0 for byte in chunk):
+                            # Publish audio chunk
+                            audio_msg = UInt8MultiArray()
+                            audio_msg.data = list(chunk)
+                            self.audio_pub.publish(audio_msg)
+                        else:
+                            # All zeros - might indicate no audio input
+                            self.get_logger().debug(
+                                "Audio chunk contains only zeros (no audio input?)"
+                            )
                     else:
                         break
 
@@ -122,7 +132,7 @@ class USBMicrophoneNode(Node):
                 time.sleep(self.retry_delay)
 
     def _check_device(self) -> bool:
-        """Check if microphone device is available"""
+        """Check if microphone device is available and validate channel support"""
         try:
             # List audio devices
             result = subprocess.run(
@@ -131,6 +141,33 @@ class USBMicrophoneNode(Node):
             if result.returncode == 0:
                 # Check if USB microphone is in the list
                 if "USB" in result.stdout or self.device != "default":
+                    # Try to detect if device supports requested channels
+                    # Some USB mics only support stereo (2 channels)
+                    if self.device.startswith("hw:"):
+                        # Test if device supports requested channel count
+                        test_cmd = [
+                            "arecord",
+                            "-D",
+                            self.device,
+                            "-r",
+                            str(self.sample_rate),
+                            "-c",
+                            str(self.channels),
+                            "-f",
+                            self.format,
+                            "-d",
+                            "1",
+                            "/dev/null",
+                        ]
+                        test_result = subprocess.run(test_cmd, capture_output=True, timeout=2)
+                        if test_result.returncode != 0:
+                            # If mono fails, try stereo
+                            if self.channels == 1:
+                                self.get_logger().warn(
+                                    f"Device {self.device} does not support mono, trying stereo..."
+                                )
+                                self.channels = 2
+                                return True
                     return True
             return False
         except Exception as e:

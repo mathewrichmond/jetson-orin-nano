@@ -22,25 +22,21 @@
 1. **Consistent Configuration** - All nodes use the same graph config
 2. **Proper Namespaces** - Nodes are configured with correct namespaces
 3. **Systemd Integration** - Works with service management for boot startup
-4. **Single Source of Truth** - Graph config (`config/robot/robot_graph.yaml` or `config/robot/monitor_graph.yaml`) defines everything
-5. **Easy Switching** - Switch between `robot` and `monitor` graphs easily
+4. **Single Source of Truth** - Graph config (`config/robot/robot_graph.yaml`) defines everything
 6. **State Management** - Service tracks state, handles restarts, provides logs
 
-## Available Graphs
+## Available Graph
 
-- **`robot`** - Target/production graph (all robot nodes: cameras, motors, sensors, etc.)
-- **`monitor`** - Viewer/logger graph (monitoring tools: system monitor, Foxglove bridge, etc.)
+- **`robot`** - Target/production graph (all robot nodes: cameras, motors, sensors, monitoring tools, etc.)
 
 ## Graph Management Commands
 
 ```bash
-# Select graph
+# Select graph (robot is default)
 ./scripts/system/manage_graph.sh select robot
-./scripts/system/manage_graph.sh select monitor
 
 # Start graph
 ./scripts/system/manage_graph.sh start robot
-./scripts/system/manage_graph.sh start monitor
 
 # Stop graph
 ./scripts/system/manage_graph.sh stop
@@ -62,7 +58,7 @@
 
 When adding a new node:
 
-1. **Add to graph config** (`config/robot/robot_graph.yaml` or `config/robot/monitor_graph.yaml`)
+1. **Add to graph config** (`config/robot/robot_graph.yaml`)
 2. **Enable the node** in the graph config
 3. **Use graph management** to start: `./scripts/system/manage_graph.sh start robot`
 
