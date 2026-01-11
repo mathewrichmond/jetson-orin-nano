@@ -177,6 +177,19 @@ robot:
       subscribe:
         - /cmd_vel
 
+  # Foxglove Bridge (for remote visualization)
+  foxglove_bridge:
+    enabled: true
+    package: foxglove_bridge
+    node: foxglove_bridge
+    namespace: ""
+    parameters:
+      port: 8765
+      address: "0.0.0.0"
+    topics:
+      publish: []  # Bridge publishes/subscribes to all topics automatically
+      subscribe: []
+
   # Communication with sub-modules (placeholder)
   submodules:
     raspberry_pi:
@@ -219,9 +232,9 @@ groups:
 
   all:
     - system_monitor
-    - vla_controller
     - realsense_camera
     - usb_microphone
     - odrive_controller
     - irobot_serial
     - phat_motor_controller
+    - foxglove_bridge

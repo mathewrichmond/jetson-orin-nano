@@ -137,6 +137,72 @@ robot:
       subscribe:
         - /cmd_vel
 
+  # PHAT Motor Controller (GPIO + Accelerometer)
+  phat_motor_controller:
+    enabled: true
+    package: phat_motor_controller
+    node: phat_motor_controller_node
+    namespace: /hardware
+    parameters:
+      i2c_bus: 7  # Jetson Orin Nano uses bus 7 (Raspberry Pi uses bus 1)
+      accelerometer_address: 0x69
+      accelerometer_type: 'ICM20948'
+      enable_accelerometer: true
+      publish_rate: 50.0
+      motor_left_pwm_pin: 18
+      motor_left_dir_pin: 16
+      motor_right_pwm_pin: 19
+      motor_right_dir_pin: 20
+      pwm_frequency: 1000
+      pwm_initial_duty_cycle: 0.0
+      wheelbase: 0.2
+      max_speed: 1.0
+      gpio_mode: 'BOARD'
+      status_topic: '/phat/status'
+      imu_topic: '/phat/imu'
+      cmd_vel_topic: '/cmd_vel'
+      imu_frame_id: 'phat_imu'
+      pwm_initial_duty_cycle: 0.0
+      wheelbase: 0.2
+      max_speed: 1.0
+      gpio_mode: 'BOARD'
+      status_topic: '/phat/status'
+      imu_topic: '/phat/imu'
+      cmd_vel_topic: '/cmd_vel'
+      imu_frame_id: 'phat_imu'
+    topics:
+      publish:
+        - /phat/status
+        - /phat/imu
+      subscribe:
+        - /cmd_vel
+
+  # Foxglove Bridge (for remote visualization)
+  foxglove_bridge:
+    enabled: true
+    package: foxglove_bridge
+    node: foxglove_bridge
+    namespace: ""
+    parameters:
+      port: 8765
+      address: "0.0.0.0"
+    topics:
+      publish: []  # Bridge publishes/subscribes to all topics automatically
+      subscribe: []
+
+  # Foxglove Bridge (for remote visualization)
+  foxglove_bridge:
+    enabled: true
+    package: foxglove_bridge
+    node: foxglove_bridge
+    namespace: ""
+    parameters:
+      port: 8765
+      address: "0.0.0.0"
+    topics:
+      publish: []  # Bridge publishes/subscribes to all topics automatically
+      subscribe: []
+
   # Communication with sub-modules (placeholder)
   submodules:
     raspberry_pi:
@@ -167,6 +233,8 @@ groups:
     - usb_microphone
     - odrive_controller
     - irobot_serial
+    - phat_motor_controller
+    - foxglove_bridge
 
   bench_test:
     - system_monitor
@@ -174,6 +242,8 @@ groups:
     - usb_microphone
     - odrive_controller
     - irobot_serial
+    - phat_motor_controller
+    - foxglove_bridge
 
   all:
     - system_monitor
@@ -183,3 +253,4 @@ groups:
     - odrive_controller
     - irobot_serial
     - phat_motor_controller
+    - foxglove_bridge
