@@ -27,11 +27,19 @@ except ImportError:
         SMBUS_AVAILABLE = False
 
 # Try to import GPIO library
+GPIO_AVAILABLE = False
+GPIO = None
 try:
     import Jetson.GPIO as GPIO
     GPIO_AVAILABLE = True
-except (ImportError, Exception):
-    GPIO_AVAILABLE = False
+except (ImportError, Exception) as e:
+    # Try alternative GPIO libraries or continue without GPIO
+    try:
+        import RPi.GPIO as GPIO
+        GPIO_AVAILABLE = True
+    except (ImportError, Exception):
+        GPIO_AVAILABLE = False
+        GPIO = None
 
 
 class PHATMotorControllerNode(Node):
@@ -42,8 +50,8 @@ class PHATMotorControllerNode(Node):
 
         # Parameters
         self.declare_parameter('i2c_bus', 1)
-        self.declare_parameter('accelerometer_address', 0x68)  # Common MPU6050 address
-        self.declare_parameter('accelerometer_type', 'MPU6050')  # MPU6050, LSM6DS3, etc.
+        self.declare_parameter('accelerometer_address', 0x69)  # Common addresses: 0x68 (MPU6050), 0x69 (ICM-20948/MPU6050 AD0 high), 0x6A (LSM6DS3)
+        self.declare_parameter('accelerometer_type', 'ICM20948')  # MPU6050, ICM20948, LSM6DS3, etc.
         self.declare_parameter('enable_accelerometer', True)
         self.declare_parameter('publish_rate', 50.0)
 
@@ -108,6 +116,8 @@ class PHATMotorControllerNode(Node):
                 # Initialize accelerometer based on type
                 if self.accel_type == 'MPU6050':
                     self._init_mpu6050()
+                elif self.accel_type == 'ICM20948':
+                    self._init_icm20948()
                 elif self.accel_type == 'LSM6DS3':
                     self._init_lsm6ds3()
                 else:
@@ -120,9 +130,10 @@ class PHATMotorControllerNode(Node):
 
         # Initialize GPIO for motors
         try:
-            if not GPIO_AVAILABLE:
-                self.get_logger().error('GPIO library not available. Jetson.GPIO should be installed.')
-                self._publish_status_message('error', 'GPIO library not available')
+            if not GPIO_AVAILABLE or GPIO is None:
+                self.get_logger().warn('GPIO library not available. Motor control will be disabled.')
+                self.get_logger().info('Install Jetson.GPIO or RPi.GPIO for motor control')
+                self.gpio_initialized = False
                 return
 
             GPIO.setmode(GPIO.BOARD)  # Use physical pin numbering
@@ -141,8 +152,9 @@ class PHATMotorControllerNode(Node):
             self.get_logger().info('GPIO initialized for motor control')
 
         except Exception as e:
-            self.get_logger().error(f'Failed to initialize GPIO: {e}')
-            self._publish_status_message('error', f'GPIO init failed: {str(e)[:50]}')
+            self.get_logger().warn(f'Failed to initialize GPIO: {e}')
+            self.get_logger().info('Motor control disabled, but node will continue')
+            self.gpio_initialized = False
 
     def _init_mpu6050(self):
         """Initialize MPU6050 accelerometer"""
@@ -153,7 +165,37 @@ class PHATMotorControllerNode(Node):
             self.accel_initialized = True
             self.get_logger().info('MPU6050 accelerometer initialized')
         except Exception as e:
-            self.get_logger().error(f'Failed to initialize MPU6050: {e}')
+            self.get_logger().warn(f'Failed to initialize MPU6050 at address 0x{self.accel_address:02X}: {e}')
+            self.get_logger().info('Accelerometer may not be connected or at different address')
+            self.accel_initialized = False
+            # Don't fail the node if accelerometer isn't available
+
+    def _init_icm20948(self):
+        """Initialize ICM-20948 IMU (SparkFun Auto pHAT)"""
+        try:
+            # ICM-20948 uses a bank register system
+            # First, wake up the device (reset and wake)
+            # Bank 0, register 0x06 (PWR_MGMT_1)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x06, 0x01)  # Reset
+            time.sleep(0.1)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x06, 0x00)  # Wake up
+            time.sleep(0.1)
+
+            # Enable accelerometer (Bank 2, register 0x14)
+            # Switch to bank 2
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x20)  # Bank select = 2
+            # Enable accelerometer (ACCEL_CONFIG)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x14, 0x06)  # ±2g, 1kHz
+            time.sleep(0.1)
+
+            # Switch back to bank 0
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)
+
+            self.accel_initialized = True
+            self.get_logger().info('ICM-20948 IMU initialized (SparkFun Auto pHAT)')
+        except Exception as e:
+            self.get_logger().warn(f'Failed to initialize ICM-20948: {e}')
+            self.get_logger().info('ICM-20948 may not be connected or at different address')
             self.accel_initialized = False
 
     def _init_lsm6ds3(self):
@@ -199,6 +241,43 @@ class PHATMotorControllerNode(Node):
 
         except Exception as e:
             self.get_logger().warn(f'Failed to read MPU6050: {e}')
+            return None
+
+    def _read_icm20948(self) -> Optional[tuple]:
+        """Read accelerometer data from ICM-20948 (SparkFun Auto pHAT)"""
+        if not self.accel_initialized or not self.i2c_bus:
+            return None
+
+        try:
+            # Switch to bank 0 (accelerometer data is in bank 0)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)
+
+            # Read accelerometer data (ACCEL_XOUT_H through ACCEL_ZOUT_H)
+            # Register 0x2D-0x32 for accelerometer
+            accel_data = self.i2c_bus.read_i2c_block_data(self.accel_address, 0x2D, 6)
+
+            # Convert to signed 16-bit values (big endian)
+            accel_x = (accel_data[0] << 8 | accel_data[1])
+            accel_y = (accel_data[2] << 8 | accel_data[3])
+            accel_z = (accel_data[4] << 8 | accel_data[5])
+
+            # Convert to signed integers
+            if accel_x > 32767:
+                accel_x -= 65536
+            if accel_y > 32767:
+                accel_y -= 65536
+            if accel_z > 32767:
+                accel_z -= 65536
+
+            # Convert to m/s^2 (ICM-20948 default: ±2g, 16384 LSB/g)
+            accel_x_ms2 = accel_x / 16384.0 * 9.81
+            accel_y_ms2 = accel_y / 16384.0 * 9.81
+            accel_z_ms2 = accel_z / 16384.0 * 9.81
+
+            return (accel_x_ms2, accel_y_ms2, accel_z_ms2)
+
+        except Exception as e:
+            self.get_logger().warn(f'Failed to read ICM-20948: {e}')
             return None
 
     def _read_lsm6ds3(self) -> Optional[tuple]:
@@ -283,6 +362,8 @@ class PHATMotorControllerNode(Node):
                 # Read accelerometer based on type
                 if self.accel_type == 'MPU6050':
                     accel_data = self._read_mpu6050()
+                elif self.accel_type == 'ICM20948':
+                    accel_data = self._read_icm20948()
                 elif self.accel_type == 'LSM6DS3':
                     accel_data = self._read_lsm6ds3()
                 else:
@@ -309,12 +390,19 @@ class PHATMotorControllerNode(Node):
 
         # Publish status
         status_msg = String()
-        if self.gpio_initialized and (not self.enable_accel or self.accel_initialized):
-            status_msg.data = 'operational'
-        elif not self.gpio_initialized:
-            status_msg.data = 'error: GPIO not initialized'
+        status_parts = []
+        if self.gpio_initialized:
+            status_parts.append('motors:ok')
         else:
-            status_msg.data = 'error: Accelerometer not initialized'
+            status_parts.append('motors:disabled')
+
+        if self.enable_accel:
+            if self.accel_initialized:
+                status_parts.append('accel:ok')
+            else:
+                status_parts.append('accel:not_found')
+
+        status_msg.data = '|'.join(status_parts) if status_parts else 'initializing'
         self.status_pub.publish(status_msg)
 
     def _publish_status_message(self, status: str, message: str = ''):
