@@ -51,6 +51,14 @@ class SystemMonitorNode(Node):
         self.power_pub = self.create_publisher(Float32, "power", 10)
         self.alerts_pub = self.create_publisher(String, "alerts", 10)
 
+        # Use QoS settings to prevent message drops
+        from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+        self.qos_profile = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE
+        )
+
         # Thermal zone paths
         self.thermal_zones = self._find_thermal_zones()
 
@@ -158,39 +166,22 @@ class SystemMonitorNode(Node):
             self.get_logger().debug(f"GPU load file read failed: {e}")
 
         # Fallback: parse tegrastats output (Jetson-specific)
-        # Use a quick timeout to avoid blocking the update loop
+        # Use a very quick timeout to avoid blocking the update loop
+        # Skip if it takes too long - better to miss one reading than block
         try:
-            # Try to read from a cached tegrastats process or spawn quickly
-            process = subprocess.Popen(
-                ["timeout", "0.5", "tegrastats", "--interval", "1000"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+            result = subprocess.run(
+                ["sh", "-c", "timeout 0.2 tegrastats --interval 1000 2>/dev/null | head -1"],
+                capture_output=True,
                 text=True,
+                timeout=0.3,  # Very short timeout
             )
-            stdout, _ = process.communicate(timeout=0.6)
-
-            if stdout:
-                # Parse GR3D_FREQ percentage from tegrastats output
-                # Format: "GR3D_FREQ 14%" or similar
-                match = re.search(r"GR3D_FREQ\s+(\d+)%", stdout)
+            if result.returncode == 0 and result.stdout:
+                match = re.search(r"GR3D_FREQ\s+(\d+)%", result.stdout)
                 if match:
                     return float(match.group(1))
         except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, AttributeError, subprocess.SubprocessError) as e:
-            # Fallback: try reading directly with a quick subprocess
-            try:
-                result = subprocess.run(
-                    ["sh", "-c", "timeout 0.5 tegrastats --interval 1000 | head -1"],
-                    capture_output=True,
-                    text=True,
-                    timeout=0.7,
-                )
-                if result.returncode == 0 and result.stdout:
-                    match = re.search(r"GR3D_FREQ\s+(\d+)%", result.stdout)
-                    if match:
-                        return float(match.group(1))
-            except Exception:
-                pass
-            self.get_logger().debug(f"tegrastats GPU usage read failed: {e}")
+            # Silently fail - don't log to avoid spam
+            pass
 
         return None
 

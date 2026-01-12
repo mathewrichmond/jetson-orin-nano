@@ -28,16 +28,16 @@
     },
     "3D!front": {
       "cameraState": {
-        "distance": 5.0,
+        "distance": 1.0,
         "perspective": true,
         "phi": 1.0471975511965976,
-        "target": [0, 0, 0],
+        "target": [0, 0, 0.5],
         "targetOffset": [0, 0, 0],
         "targetOrientation": [0, 0, 0, 1],
         "thetaOffset": 0.7853981633974483,
-        "fovy": 0.7853981633974483,
-        "near": 0.1,
-        "far": 20.0
+        "fovy": 1.0471975511965976,
+        "near": 0.01,
+        "far": 10.0
       },
       "followMode": "follow-pose",
       "followTf": "camera_front_depth_optical_frame",
@@ -105,16 +105,16 @@
     },
     "3D!rear": {
       "cameraState": {
-        "distance": 5.0,
+        "distance": 1.0,
         "perspective": true,
         "phi": 1.0471975511965976,
-        "target": [0, 0, 0],
+        "target": [0, 0, 0.5],
         "targetOffset": [0, 0, 0],
         "targetOrientation": [0, 0, 0, 1],
         "thetaOffset": 0.7853981633974483,
-        "fovy": 0.7853981633974483,
-        "near": 0.1,
-        "far": 20.0
+        "fovy": 1.0471975511965976,
+        "near": 0.01,
+        "far": 10.0
       },
       "followMode": "follow-pose",
       "followTf": "camera_rear_depth_optical_frame",
