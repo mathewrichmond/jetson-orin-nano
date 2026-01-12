@@ -220,8 +220,8 @@ robot:
     parameters:
       port: 8765
       address: "0.0.0.0"
-      # Note: Topic filtering not directly supported via parameters
-      # If connection drops persist, reduce camera publish_rate in realsense_camera config
+      # Topic whitelist to reduce bridge load - only forward essential topics
+      topic_whitelist: '["/phat/imu", "/phat/status", "/system/.*", "/nvblox/.*/points_downsampled", "/hardware/.*/color/image_raw", "/hardware/.*/color/camera_info", "/microphone/audio"]'
     topics:
       publish: []  # Bridge publishes/subscribes to all topics automatically
       subscribe: []

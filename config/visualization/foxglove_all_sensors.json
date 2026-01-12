@@ -54,22 +54,14 @@
         "smooth": true
       },
       "topics": {
-        "/nvblox/camera_front/mesh": {
-          "visible": true,
-          "frameLocked": false
-        },
         "/nvblox/camera_front/points_downsampled": {
-          "visible": false,
+          "visible": true,
           "frameLocked": false
         }
       },
       "layers": {
-        "/nvblox/camera_front/mesh": {
-          "visible": true,
-          "frameLocked": false
-        },
         "/nvblox/camera_front/points_downsampled": {
-          "visible": false,
+          "visible": true,
           "frameLocked": false
         }
       },
@@ -131,22 +123,14 @@
         "smooth": true
       },
       "topics": {
-        "/nvblox/camera_rear/mesh": {
-          "visible": true,
-          "frameLocked": false
-        },
         "/nvblox/camera_rear/points_downsampled": {
-          "visible": false,
+          "visible": true,
           "frameLocked": false
         }
       },
       "layers": {
-        "/nvblox/camera_rear/mesh": {
-          "visible": true,
-          "frameLocked": false
-        },
         "/nvblox/camera_rear/points_downsampled": {
-          "visible": false,
+          "visible": true,
           "frameLocked": false
         }
       },
