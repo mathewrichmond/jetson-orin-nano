@@ -1,0 +1,22 @@
+nvblox_processor_node:
+  ros__parameters:
+    # Camera configuration
+    camera_names: ["camera_front", "camera_rear"]
+
+    # TSDF parameters
+    voxel_size: 0.05  # 5cm voxels
+    tsdf_truncation_distance: 0.1  # 10cm truncation distance
+    max_tsdf_weight: 100.0
+
+    # Processing parameters
+    mesh_update_rate: 5.0  # Hz - how often to update mesh/TSDF
+    pointcloud_downsample_factor: 4  # Downsample factor for pointcloud visualization
+
+    # Output configuration
+    publish_tsdf_markers: true
+    publish_mesh_markers: true
+    publish_downsampled_points: true
+
+    # Topic configuration
+    status_topic: "/nvblox/status"
+    namespace: "/nvblox"

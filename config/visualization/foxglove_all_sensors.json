@@ -26,35 +26,6 @@
       "flipHorizontal": true,
       "flipVertical": false
     },
-    "Image!front_depth": {
-      "cameraState": {
-        "distance": 20,
-        "perspective": true,
-        "phi": 60,
-        "target": [0, 0, 0],
-        "targetOffset": [0, 0, 0],
-        "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 45,
-        "fovy": 45,
-        "near": 0.5,
-        "far": 5000
-      },
-      "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
-      "topics": {},
-      "layers": {},
-      "publish": {},
-      "imageMode": {
-        "imageTopic": "/hardware/camera_front/depth/image_rect_raw",
-        "calibrationTopic": "/hardware/camera_front/depth/camera_info"
-      },
-      "flipHorizontal": true,
-      "flipVertical": false,
-      "colorMode": "turbo",
-      "minValue": 0,
-      "maxValue": 5000
-    },
     "Image!rear_color": {
       "cameraState": {
         "distance": 20,
@@ -81,36 +52,7 @@
       "flipHorizontal": true,
       "flipVertical": false
     },
-    "Image!rear_depth": {
-      "cameraState": {
-        "distance": 20,
-        "perspective": true,
-        "phi": 60,
-        "target": [0, 0, 0],
-        "targetOffset": [0, 0, 0],
-        "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 45,
-        "fovy": 45,
-        "near": 0.5,
-        "far": 5000
-      },
-      "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
-      "topics": {},
-      "layers": {},
-      "publish": {},
-      "imageMode": {
-        "imageTopic": "/hardware/camera_rear/depth/image_rect_raw",
-        "calibrationTopic": "/hardware/camera_rear/depth/camera_info"
-      },
-      "flipHorizontal": true,
-      "flipVertical": false,
-      "colorMode": "turbo",
-      "minValue": 0,
-      "maxValue": 5000
-    },
-    "3D!front_points": {
+    "3D!front_tsdf": {
       "cameraState": {
         "distance": 5,
         "perspective": true,
@@ -127,20 +69,20 @@
       "scene": {},
       "transforms": {},
       "topics": {
-        "/hardware/camera_front/points": {
+        "/nvblox/camera_front/tsdf": {
           "visible": true,
           "frameLocked": false
         }
       },
       "layers": {
-        "/hardware/camera_front/points": {
+        "/nvblox/camera_front/tsdf": {
           "visible": true,
           "frameLocked": false
         }
       },
       "publish": {}
     },
-    "3D!rear_points": {
+    "3D!rear_tsdf": {
       "cameraState": {
         "distance": 5,
         "perspective": true,
@@ -157,13 +99,13 @@
       "scene": {},
       "transforms": {},
       "topics": {
-        "/hardware/camera_rear/points": {
+        "/nvblox/camera_rear/tsdf": {
           "visible": true,
           "frameLocked": false
         }
       },
       "layers": {
-        "/hardware/camera_rear/points": {
+        "/nvblox/camera_rear/tsdf": {
           "visible": true,
           "frameLocked": false
         }
@@ -251,6 +193,37 @@
       "maxYValue": 5,
       "showLegend": true
     },
+    "Plot!phat_orientation": {
+      "paths": [
+        {
+          "value": "/phat/imu.orientation.x",
+          "enabled": true,
+          "color": "#ff0000",
+          "label": "PHAT Orient X"
+        },
+        {
+          "value": "/phat/imu.orientation.y",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "PHAT Orient Y"
+        },
+        {
+          "value": "/phat/imu.orientation.z",
+          "enabled": true,
+          "color": "#0000ff",
+          "label": "PHAT Orient Z"
+        },
+        {
+          "value": "/phat/imu.orientation.w",
+          "enabled": true,
+          "color": "#ffff00",
+          "label": "PHAT Orient W"
+        }
+      ],
+      "minYValue": -1,
+      "maxYValue": 1,
+      "showLegend": true
+    },
     "Plot!phat_mag": {
       "paths": [
         {
@@ -276,36 +249,21 @@
       "maxYValue": 0.0001,
       "showLegend": true
     },
-    "Plot!audio": {
+    "Plot!audio_activity": {
       "paths": [
         {
-          "value": "/microphone/audio.data[0]",
-          "enabled": true,
-          "color": "#ff0000",
-          "label": "Audio L (byte 0)"
-        },
-        {
-          "value": "/microphone/audio.data[1]",
+          "value": "/microphone/audio.layout.dim[0].size",
           "enabled": true,
           "color": "#00ff00",
-          "label": "Audio R (byte 1)"
-        },
-        {
-          "value": "/microphone/audio.data[512]",
-          "enabled": true,
-          "color": "#0000ff",
-          "label": "Audio L (byte 512)"
-        },
-        {
-          "value": "/microphone/audio.data[513]",
-          "enabled": true,
-          "color": "#ffff00",
-          "label": "Audio R (byte 513)"
+          "label": "Chunk Size (bytes)"
         }
       ],
       "minYValue": 0,
-      "maxYValue": 255,
+      "maxYValue": 2048,
       "showLegend": true
+    },
+    "RawMessages!audio_data": {
+      "topicPath": "/microphone/audio"
     },
     "Plot!irobot_battery": {
       "paths": [
@@ -329,6 +287,9 @@
     "RawMessages!realsense_status": {
       "topicPath": "/hardware/realsense/status"
     },
+    "RawMessages!nvblox_status": {
+      "topicPath": "/nvblox/status"
+    },
     "RawMessages!microphone_status": {
       "topicPath": "/microphone/status"
     },
@@ -351,40 +312,35 @@
     "direction": "row",
     "first": {
       "direction": "column",
-      "first": {
-        "direction": "row",
         "first": {
-          "direction": "column",
+          "direction": "row",
           "first": "Image!front_color",
-          "second": "Image!front_depth"
+          "second": "Image!rear_color"
         },
         "second": {
-          "direction": "column",
-          "first": "Image!rear_color",
-          "second": "Image!rear_depth"
+          "direction": "row",
+          "first": "3D!front_tsdf",
+          "second": "3D!rear_tsdf"
         }
-      },
-      "second": {
-        "direction": "row",
-        "first": "3D!front_points",
-        "second": "3D!rear_points"
-      }
     },
     "second": {
       "direction": "column",
       "first": "Plot!system_stats",
       "second": "Plot!phat_accel",
       "third": "Plot!phat_gyro",
-      "fourth": "Plot!phat_mag",
-      "fifth": "Plot!audio",
-      "sixth": "Plot!irobot_battery",
+      "fourth": "Plot!phat_orientation",
+      "fifth": "Plot!phat_mag",
+      "sixth": "Plot!audio_activity",
+      "seventh": "Plot!irobot_battery",
       "seventh": {
         "direction": "column",
         "first": "RawMessages!microphone_status",
-        "second": "RawMessages!realsense_status",
-        "third": "RawMessages!phat_status",
-        "fourth": "RawMessages!irobot_status",
-        "fifth": "RawMessages!system_status"
+        "second": "RawMessages!audio_data",
+        "third": "RawMessages!realsense_status",
+        "fourth": "RawMessages!nvblox_status",
+        "fifth": "RawMessages!phat_status",
+        "sixth": "RawMessages!irobot_status",
+        "seventh": "RawMessages!system_status"
       }
     }
   }

@@ -78,6 +78,41 @@ robot:
         - /realsense/status
       subscribe: []
 
+  # nvblox Processor (pre-processes RealSense data for efficient visualization and VLA features)
+  nvblox_processor:
+    enabled: true
+    package: nvblox_processor
+    node: nvblox_processor_node
+    namespace: ""
+    parameters:
+      camera_names: ["camera_front", "camera_rear"]
+      voxel_size: 0.05
+      tsdf_truncation_distance: 0.1
+      max_tsdf_weight: 100.0
+      mesh_update_rate: 5.0
+      pointcloud_downsample_factor: 4
+      publish_tsdf_markers: true
+      publish_mesh_markers: true
+      publish_downsampled_points: true
+      status_topic: "/nvblox/status"
+      namespace: "/nvblox"
+    topics:
+      publish:
+        - /nvblox/status
+        - /nvblox/camera_front/points_downsampled
+        - /nvblox/camera_rear/points_downsampled
+        - /nvblox/camera_front/mesh
+        - /nvblox/camera_rear/mesh
+        - /nvblox/camera_front/tsdf
+        - /nvblox/camera_rear/tsdf
+      subscribe:
+        - /hardware/camera_front/depth/image_rect_raw
+        - /hardware/camera_front/color/image_raw
+        - /hardware/camera_front/depth/camera_info
+        - /hardware/camera_rear/depth/image_rect_raw
+        - /hardware/camera_rear/color/image_raw
+        - /hardware/camera_rear/depth/camera_info
+
   # USB Microphone
   usb_microphone:
     enabled: true
@@ -218,6 +253,7 @@ groups:
 
   hardware:
     - realsense_camera
+    - nvblox_processor
     - usb_microphone
     - odrive_controller
     - irobot_serial
@@ -226,6 +262,7 @@ groups:
   bench_test:
     - system_monitor
     - realsense_camera
+    - nvblox_processor
     - usb_microphone
     - odrive_controller
     - irobot_serial
@@ -234,6 +271,7 @@ groups:
   all:
     - system_monitor
     - realsense_camera
+    - nvblox_processor
     - usb_microphone
     - odrive_controller
     - irobot_serial
