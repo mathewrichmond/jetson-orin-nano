@@ -21,6 +21,7 @@ robot:
         - /system/temperature/cpu
         - /system/temperature/gpu
         - /system/cpu/usage
+        - /system/gpu/usage
         - /system/memory/usage
         - /system/disk/usage
         - /system/power

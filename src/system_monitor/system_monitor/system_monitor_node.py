@@ -6,6 +6,7 @@ Publishes status via ROS 2 topics
 """
 
 # Standard library
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -43,6 +44,7 @@ class SystemMonitorNode(Node):
         self.cpu_temp_pub = self.create_publisher(Temperature, "temperature/cpu", 10)
         self.gpu_temp_pub = self.create_publisher(Temperature, "temperature/gpu", 10)
         self.cpu_usage_pub = self.create_publisher(Float32, "cpu/usage", 10)
+        self.gpu_usage_pub = self.create_publisher(Float32, "gpu/usage", 10)
         self.memory_usage_pub = self.create_publisher(Float32, "memory/usage", 10)
         self.disk_usage_pub = self.create_publisher(Float32, "disk/usage", 10)
         self.power_pub = self.create_publisher(Float32, "power", 10)
@@ -126,6 +128,35 @@ class SystemMonitorNode(Node):
 
         return None
 
+    def _read_gpu_usage(self) -> Optional[float]:
+        """Read GPU usage percentage"""
+        try:
+            # Try nvidia-smi first (most reliable)
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+                capture_output=True,
+                text=True,
+                timeout=1.0,
+            )
+            if result.returncode == 0:
+                usage_str = result.stdout.strip()
+                if usage_str:
+                    return float(usage_str)
+        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError) as e:
+            self.get_logger().debug(f"nvidia-smi GPU usage read failed: {e}")
+
+        # Fallback: try reading from /sys/devices/gpu.0/load (Jetson)
+        try:
+            gpu_load_path = Path("/sys/devices/gpu.0/load")
+            if gpu_load_path.exists():
+                load_value = int(gpu_load_path.read_text().strip())
+                # Load is typically 0-1000, convert to percentage
+                return min(100.0, load_value / 10.0)
+        except (ValueError, IOError) as e:
+            self.get_logger().debug(f"GPU load file read failed: {e}")
+
+        return None
+
     def _read_power(self) -> Optional[float]:
         """Read power consumption (simplified - returns None if not available)"""
         # Power monitoring would require jetson_stats or INA3221 access
@@ -170,6 +201,13 @@ class SystemMonitorNode(Node):
             if cpu_percent >= self.cpu_warning:
                 self.publish_alert(f"WARNING: CPU usage {cpu_percent:.1f}%")
 
+            # GPU usage
+            gpu_percent = self._read_gpu_usage()
+            if gpu_percent is not None:
+                gpu_msg = Float32()
+                gpu_msg.data = float(gpu_percent)
+                self.gpu_usage_pub.publish(gpu_msg)
+
             # Memory usage
             memory = psutil.virtual_memory()
             memory_percent = memory.percent
@@ -204,6 +242,8 @@ class SystemMonitorNode(Node):
             if gpu_temp is not None:
                 status_parts.append(f"GPU: {gpu_temp:.1f}°C")
             status_parts.append(f"CPU: {cpu_percent:.1f}%")
+            if gpu_percent is not None:
+                status_parts.append(f"GPU: {gpu_percent:.1f}%")
             status_parts.append(f"Mem: {memory_percent:.1f}%")
             status_parts.append(f"Disk: {disk_percent:.1f}%")
 

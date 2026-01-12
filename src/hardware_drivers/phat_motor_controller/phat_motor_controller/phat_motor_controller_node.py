@@ -123,6 +123,7 @@ class PHATMotorControllerNode(Node):
         # I2C and GPIO connections
         self.i2c_bus: Optional[SMBus] = None
         self.accel_initialized = False
+        self.mag_initialized = False
         self.gpio_initialized = False
 
         # Publishers
@@ -361,18 +362,34 @@ class PHATMotorControllerNode(Node):
             time.sleep(0.1)
 
             # Configure I2C master to read magnetometer data (SLV0: read from AK09916)
+            # Set SLV0 address to AK09916 (0x0C) with read bit (0x80)
             self.i2c_bus.write_byte_data(
                 self.accel_address, 0x36, 0x0C | 0x80
-            )  # SLV0: AK09916 address + read bit
+            )  # SLV0: AK09916 address (0x0C) + read bit (0x80)
             time.sleep(0.01)
+            # Set SLV0 register to start reading from ST1 register (0x10)
             self.i2c_bus.write_byte_data(
                 self.accel_address, 0x37, 0x10
             )  # SLV0_REG: Start reading from ST1 register (0x10)
             time.sleep(0.01)
+            # Enable SLV0 and configure to read 7 bytes (ST1 + 6 bytes mag data)
+            # Bit 7 = enable, bits 3:0 = length (7 bytes)
             self.i2c_bus.write_byte_data(
                 self.accel_address, 0x38, 0x87
-            )  # SLV0_CTRL: enable + read 7 bytes (ST1 + 6 bytes mag data)
+            )  # SLV0_CTRL: enable (0x80) + read 7 bytes (0x07)
+            time.sleep(0.1)  # Give I2C master time to configure
+            
+            # Verify I2C master is enabled (Bank 0, Register 0x03 = USER_CTRL)
+            self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)  # Ensure bank 0
             time.sleep(0.01)
+            user_ctrl = self.i2c_bus.read_byte_data(self.accel_address, 0x03)
+            if not (user_ctrl & 0x20):
+                self.get_logger().warn(
+                    "I2C master mode not enabled, re-enabling..."
+                )
+                # Enable I2C master mode
+                self.i2c_bus.write_byte_data(self.accel_address, 0x03, 0x20)
+                time.sleep(0.01)
 
             self.accel_initialized = True
             self.mag_initialized = True
@@ -499,13 +516,28 @@ class PHATMotorControllerNode(Node):
             mag_data = None
             if self.mag_initialized:
                 try:
+                    # Ensure we're on bank 0 (EXT_SLV_SENS_DATA registers are in bank 0)
+                    self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)
+                    time.sleep(0.001)
+                    
                     # Trigger I2C master read by reading EXT_SLV_SENS_DATA_00
-                    # The I2C master should have already read the data into these registers
+                    # Reading from this register triggers the I2C master to execute the configured read
                     ext_slv_data = self.i2c_bus.read_i2c_block_data(
                         self.accel_address, 0x3B, 7
                     )  # Read 7 bytes (ST1 + 6 bytes mag data)
 
                     # Check ST1 register (first byte) - bit 0 indicates data ready
+                    # If data ready bit is not set, try reading again after a short delay
+                    if not (ext_slv_data[0] & 0x01):
+                        # Data not ready, wait a bit and try once more
+                        time.sleep(0.01)
+                        self.i2c_bus.write_byte_data(self.accel_address, 0x7F, 0x00)
+                        time.sleep(0.001)
+                        ext_slv_data = self.i2c_bus.read_i2c_block_data(
+                            self.accel_address, 0x3B, 7
+                        )
+                    
+                    # Check ST1 register again - bit 0 indicates data ready
                     if ext_slv_data[0] & 0x01:
                         # Convert magnetometer data (little endian for AK09916)
                         mag_x = (ext_slv_data[2] << 8) | ext_slv_data[1]
@@ -526,8 +558,13 @@ class PHATMotorControllerNode(Node):
                         mag_z_tesla = mag_z * 0.15e-6
 
                         mag_data = (mag_x_tesla, mag_y_tesla, mag_z_tesla)
+                    else:
+                        # Data ready bit not set - log as debug for troubleshooting
+                        self.get_logger().debug(
+                            f"Magnetometer data not ready (ST1=0x{ext_slv_data[0]:02X})"
+                        )
                 except Exception as e:
-                    self.get_logger().debug(f"Failed to read magnetometer: {e}")
+                    self.get_logger().warn(f"Failed to read magnetometer: {e}")
 
             return {
                 "accel": (accel_x_ms2, accel_y_ms2, accel_z_ms2),

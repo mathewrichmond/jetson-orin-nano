@@ -1,6 +1,6 @@
 {
   "configById": {
-    "Image!front": {
+    "3D!front": {
       "cameraState": {
         "distance": 5,
         "perspective": true,
@@ -32,11 +32,9 @@
       "imageMode": {
         "imageTopic": "/hardware/camera_front/color/image_raw",
         "calibrationTopic": "/hardware/camera_front/color/camera_info"
-      },
-      "flipHorizontal": true,
-      "flipVertical": false
+      }
     },
-    "Image!rear": {
+    "3D!rear": {
       "cameraState": {
         "distance": 5,
         "perspective": true,
@@ -68,9 +66,7 @@
       "imageMode": {
         "imageTopic": "/hardware/camera_rear/color/image_raw",
         "calibrationTopic": "/hardware/camera_rear/color/camera_info"
-      },
-      "flipHorizontal": true,
-      "flipVertical": false
+      }
     },
     "Plot!system_stats": {
       "paths": [
@@ -91,6 +87,12 @@
           "enabled": true,
           "color": "#0000ff",
           "label": "CPU Usage"
+        },
+        {
+          "value": "/system/gpu/usage.data",
+          "enabled": true,
+          "color": "#00ffff",
+          "label": "GPU Usage"
         },
         {
           "value": "/system/memory/usage.data",
@@ -164,24 +166,6 @@
           "enabled": true,
           "color": "#ffffff",
           "label": "Orient W"
-        },
-        {
-          "value": "/phat/magnetometer.magnetic_field.x",
-          "enabled": true,
-          "color": "#ff8888",
-          "label": "Mag X"
-        },
-        {
-          "value": "/phat/magnetometer.magnetic_field.y",
-          "enabled": true,
-          "color": "#88ff88",
-          "label": "Mag Y"
-        },
-        {
-          "value": "/phat/magnetometer.magnetic_field.z",
-          "enabled": true,
-          "color": "#8888ff",
-          "label": "Mag Z"
         }
       ],
       "minYValue": -5,
@@ -211,8 +195,8 @@
     "direction": "row",
     "first": {
       "direction": "column",
-      "first": "Image!front",
-      "second": "Image!rear"
+      "first": "3D!front",
+      "second": "3D!rear"
     },
     "second": {
       "direction": "column",
