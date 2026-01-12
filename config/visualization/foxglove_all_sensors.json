@@ -1,5 +1,31 @@
 {
   "configById": {
+    "Image!front": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/hardware/camera_front/color/image_raw",
+        "calibrationTopic": "/hardware/camera_front/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
+    },
     "3D!front": {
       "cameraState": {
         "distance": 5,
@@ -28,11 +54,33 @@
           "frameLocked": false
         }
       },
+      "publish": {}
+    },
+    "Image!rear": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
       "publish": {},
       "imageMode": {
-        "imageTopic": "/hardware/camera_front/color/image_raw",
-        "calibrationTopic": "/hardware/camera_front/color/camera_info"
-      }
+        "imageTopic": "/hardware/camera_rear/color/image_raw",
+        "calibrationTopic": "/hardware/camera_rear/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
     },
     "3D!rear": {
       "cameraState": {
@@ -62,11 +110,7 @@
           "frameLocked": false
         }
       },
-      "publish": {},
-      "imageMode": {
-        "imageTopic": "/hardware/camera_rear/color/image_raw",
-        "calibrationTopic": "/hardware/camera_rear/color/camera_info"
-      }
+      "publish": {}
     },
     "Plot!system_stats": {
       "paths": [
@@ -91,7 +135,7 @@
         {
           "value": "/system/gpu/usage.data",
           "enabled": true,
-          "color": "#00ffff",
+          "color": "#ff8800",
           "label": "GPU Usage"
         },
         {
@@ -195,8 +239,16 @@
     "direction": "row",
     "first": {
       "direction": "column",
-      "first": "3D!front",
-      "second": "3D!rear"
+      "first": {
+        "direction": "row",
+        "first": "Image!front",
+        "second": "3D!front"
+      },
+      "second": {
+        "direction": "row",
+        "first": "Image!rear",
+        "second": "3D!rear"
+      }
     },
     "second": {
       "direction": "column",

@@ -6,6 +6,7 @@ Publishes status via ROS 2 topics
 """
 
 # Standard library
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -130,8 +131,8 @@ class SystemMonitorNode(Node):
 
     def _read_gpu_usage(self) -> Optional[float]:
         """Read GPU usage percentage"""
+        # Try nvidia-smi first (works on discrete GPUs)
         try:
-            # Try nvidia-smi first (most reliable)
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
                 capture_output=True,
@@ -140,7 +141,8 @@ class SystemMonitorNode(Node):
             )
             if result.returncode == 0:
                 usage_str = result.stdout.strip()
-                if usage_str:
+                # Check if it's a valid number (not "[N/A]")
+                if usage_str and usage_str != "[N/A]" and usage_str.replace(".", "").isdigit():
                     return float(usage_str)
         except (subprocess.TimeoutExpired, FileNotFoundError, ValueError) as e:
             self.get_logger().debug(f"nvidia-smi GPU usage read failed: {e}")
@@ -154,6 +156,23 @@ class SystemMonitorNode(Node):
                 return min(100.0, load_value / 10.0)
         except (ValueError, IOError) as e:
             self.get_logger().debug(f"GPU load file read failed: {e}")
+
+        # Fallback: parse tegrastats output (Jetson-specific)
+        try:
+            result = subprocess.run(
+                ["tegrastats", "--interval", "1000"],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+            )
+            if result.returncode == 0:
+                # Parse GR3D_FREQ percentage from tegrastats output
+                # Format: "GR3D_FREQ 14%" or similar
+                match = re.search(r"GR3D_FREQ\s+(\d+)%", result.stdout)
+                if match:
+                    return float(match.group(1))
+        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, AttributeError) as e:
+            self.get_logger().debug(f"tegrastats GPU usage read failed: {e}")
 
         return None
 
