@@ -158,26 +158,38 @@ class SystemMonitorNode(Node):
             self.get_logger().debug(f"GPU load file read failed: {e}")
 
         # Fallback: parse tegrastats output (Jetson-specific)
-        # tegrastats runs continuously, so we need to read one line and kill it
+        # Use a quick timeout to avoid blocking the update loop
         try:
+            # Try to read from a cached tegrastats process or spawn quickly
             process = subprocess.Popen(
-                ["tegrastats", "--interval", "1000"],
+                ["timeout", "0.5", "tegrastats", "--interval", "1000"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            # Read first line of output (contains GPU frequency)
-            line = process.stdout.readline()
-            process.terminate()
-            process.wait(timeout=1.0)
+            stdout, _ = process.communicate(timeout=0.6)
 
-            if line:
+            if stdout:
                 # Parse GR3D_FREQ percentage from tegrastats output
                 # Format: "GR3D_FREQ 14%" or similar
-                match = re.search(r"GR3D_FREQ\s+(\d+)%", line)
+                match = re.search(r"GR3D_FREQ\s+(\d+)%", stdout)
                 if match:
                     return float(match.group(1))
         except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, AttributeError, subprocess.SubprocessError) as e:
+            # Fallback: try reading directly with a quick subprocess
+            try:
+                result = subprocess.run(
+                    ["sh", "-c", "timeout 0.5 tegrastats --interval 1000 | head -1"],
+                    capture_output=True,
+                    text=True,
+                    timeout=0.7,
+                )
+                if result.returncode == 0 and result.stdout:
+                    match = re.search(r"GR3D_FREQ\s+(\d+)%", result.stdout)
+                    if match:
+                        return float(match.group(1))
+            except Exception:
+                pass
             self.get_logger().debug(f"tegrastats GPU usage read failed: {e}")
 
         return None
