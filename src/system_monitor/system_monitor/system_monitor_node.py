@@ -158,20 +158,26 @@ class SystemMonitorNode(Node):
             self.get_logger().debug(f"GPU load file read failed: {e}")
 
         # Fallback: parse tegrastats output (Jetson-specific)
+        # tegrastats runs continuously, so we need to read one line and kill it
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 ["tegrastats", "--interval", "1000"],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=2.0,
             )
-            if result.returncode == 0:
+            # Read first line of output (contains GPU frequency)
+            line = process.stdout.readline()
+            process.terminate()
+            process.wait(timeout=1.0)
+
+            if line:
                 # Parse GR3D_FREQ percentage from tegrastats output
                 # Format: "GR3D_FREQ 14%" or similar
-                match = re.search(r"GR3D_FREQ\s+(\d+)%", result.stdout)
+                match = re.search(r"GR3D_FREQ\s+(\d+)%", line)
                 if match:
                     return float(match.group(1))
-        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, AttributeError) as e:
+        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, AttributeError, subprocess.SubprocessError) as e:
             self.get_logger().debug(f"tegrastats GPU usage read failed: {e}")
 
         return None

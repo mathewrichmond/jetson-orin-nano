@@ -28,20 +28,30 @@
     },
     "3D!front": {
       "cameraState": {
-        "distance": 5,
+        "distance": 3,
         "perspective": true,
-        "phi": 60,
+        "phi": 1.1,
         "target": [0, 0, 0],
         "targetOffset": [0, 0, 0],
         "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 45,
-        "fovy": 45,
-        "near": 0.5,
+        "thetaOffset": 0,
+        "fovy": 0.7853981633974483,
+        "near": 0.01,
         "far": 5000
       },
-      "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
+      "followMode": "follow-none",
+      "scene": {
+        "enableStats": false
+      },
+      "transforms": {
+        "edges": {
+          "color": "#248eff",
+          "show": false
+        },
+        "showLabel": false,
+        "showValue": false,
+        "smooth": true
+      },
       "topics": {
         "/nvblox/camera_front/points_downsampled": {
           "visible": true,
@@ -54,7 +64,9 @@
           "frameLocked": false
         }
       },
-      "publish": {}
+      "publish": {},
+      "customBackgroundColor": "#000000",
+      "customSceneBackgroundColor": "#000000"
     },
     "Image!rear": {
       "cameraState": {
@@ -84,20 +96,30 @@
     },
     "3D!rear": {
       "cameraState": {
-        "distance": 5,
+        "distance": 3,
         "perspective": true,
-        "phi": 60,
+        "phi": 1.1,
         "target": [0, 0, 0],
         "targetOffset": [0, 0, 0],
         "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 45,
-        "fovy": 45,
-        "near": 0.5,
+        "thetaOffset": 0,
+        "fovy": 0.7853981633974483,
+        "near": 0.01,
         "far": 5000
       },
-      "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
+      "followMode": "follow-none",
+      "scene": {
+        "enableStats": false
+      },
+      "transforms": {
+        "edges": {
+          "color": "#248eff",
+          "show": false
+        },
+        "showLabel": false,
+        "showValue": false,
+        "smooth": true
+      },
       "topics": {
         "/nvblox/camera_rear/points_downsampled": {
           "visible": true,
@@ -110,7 +132,9 @@
           "frameLocked": false
         }
       },
-      "publish": {}
+      "publish": {},
+      "customBackgroundColor": "#000000",
+      "customSceneBackgroundColor": "#000000"
     },
     "Plot!system_stats": {
       "paths": [
