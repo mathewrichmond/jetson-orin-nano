@@ -300,13 +300,63 @@ class NvbloxProcessorNode(Node):
             self.get_logger().error(f"Error publishing TSDF markers for {camera_name}: {e}")
 
     def _publish_mesh_markers(self, camera_name: str):
-        """Publish mesh visualization markers"""
+        """Publish mesh visualization markers generated from depth data"""
         depth_msg = self.latest_depth_images[camera_name]
         if depth_msg is None:
             return
 
+        if camera_name not in self.camera_infos:
+            return
+
         try:
-            # Create a simplified mesh representation
+            # Convert depth image to numpy array
+            depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
+            depth_array = np.array(depth_image, dtype=np.float32) / 1000.0  # Convert mm to meters
+
+            # Get camera info
+            cam_info = self.camera_infos[camera_name]
+            fx = cam_info.k[0]
+            fy = cam_info.k[4]
+            cx = cam_info.k[2]
+            cy = cam_info.k[5]
+
+            # Generate mesh triangles from depth image
+            height, width = depth_array.shape
+            step = self.downsample_factor * 2  # Use larger step for mesh to reduce size
+            triangles = []
+
+            # Generate triangles from depth image (simple approach)
+            for v in range(0, height - step, step):
+                for u in range(0, width - step, step):
+                    # Get depth values for 4 corners of a quad
+                    z00 = depth_array[v, u]
+                    z01 = depth_array[v, u + step] if u + step < width else 0
+                    z10 = depth_array[v + step, u] if v + step < height else 0
+                    z11 = depth_array[v + step, u + step] if (v + step < height and u + step < width) else 0
+
+                    # Check if all depths are valid
+                    if all(z > 0 and z < 10.0 for z in [z00, z01, z10, z11] if z > 0):
+                        # Convert pixel coordinates to 3D points
+                        def pixel_to_3d(u_pix, v_pix, z_val):
+                            x = (u_pix - cx) * z_val / fx
+                            y = (v_pix - cy) * z_val / fy
+                            return [x, y, z_val]
+
+                        p00 = pixel_to_3d(u, v, z00)
+                        p01 = pixel_to_3d(u + step, v, z01)
+                        p10 = pixel_to_3d(u, v + step, z10)
+                        p11 = pixel_to_3d(u + step, v + step, z11)
+
+                        # Create two triangles from the quad
+                        # Triangle 1: p00 -> p01 -> p10
+                        triangles.extend([p00, p01, p10])
+                        # Triangle 2: p01 -> p11 -> p10
+                        triangles.extend([p01, p11, p10])
+
+            if len(triangles) == 0:
+                return
+
+            # Create mesh marker
             markers = MarkerArray()
             marker = Marker()
             marker.header = depth_msg.header
@@ -322,8 +372,14 @@ class NvbloxProcessorNode(Node):
             marker.color.g = 0.5
             marker.color.b = 1.0
 
-            # For now, publish empty mesh (can be extended with actual mesh generation)
-            # This is a placeholder for future nvblox integration
+            # Add triangle vertices as points
+            for triangle in triangles:
+                point = Point()
+                point.x = float(triangle[0])
+                point.y = float(triangle[1])
+                point.z = float(triangle[2])
+                marker.points.append(point)
+
             markers.markers.append(marker)
             self.mesh_publishers[camera_name].publish(markers)
 

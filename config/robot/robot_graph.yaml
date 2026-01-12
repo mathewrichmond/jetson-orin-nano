@@ -59,11 +59,11 @@ robot:
       enable_pointcloud: false  # Disabled - using nvblox downsampled point clouds instead
       color_width: 640
       color_height: 480
-      color_fps: 30
+      color_fps: 15  # Reduced from 30 to improve bridge stability
       depth_width: 640
       depth_height: 480
-      depth_fps: 30
-      publish_rate: 30.0
+      depth_fps: 15  # Reduced from 30 to improve bridge stability
+      publish_rate: 15.0  # Reduced from 30.0 to improve bridge stability
     topics:
       publish:
         - /camera_front/color/image_raw
@@ -89,10 +89,10 @@ robot:
       tsdf_truncation_distance: 0.1
       max_tsdf_weight: 100.0
       mesh_update_rate: 5.0
-      pointcloud_downsample_factor: 4
-      publish_tsdf_markers: true
-      publish_mesh_markers: true
-      publish_downsampled_points: true
+      pointcloud_downsample_factor: 8  # Increased from 4 to reduce point cloud size
+      publish_tsdf_markers: false  # Disable large TSDF markers to reduce bridge load
+      publish_mesh_markers: true  # Enable mesh markers (may be more efficient than point clouds)
+      publish_downsampled_points: true  # Keep point clouds as fallback
       status_topic: "/nvblox/status"
       namespace: "/nvblox"
     topics:
@@ -100,10 +100,11 @@ robot:
         - /nvblox/status
         - /nvblox/camera_front/points_downsampled
         - /nvblox/camera_rear/points_downsampled
-        - /nvblox/camera_front/mesh
+        - /nvblox/camera_front/mesh  # Mesh markers (may be more efficient than point clouds)
         - /nvblox/camera_rear/mesh
-        - /nvblox/camera_front/tsdf
-        - /nvblox/camera_rear/tsdf
+        # TSDF markers disabled to reduce bridge load
+        # - /nvblox/camera_front/tsdf
+        # - /nvblox/camera_rear/tsdf
       subscribe:
         - /hardware/camera_front/depth/image_rect_raw
         - /hardware/camera_front/color/image_raw

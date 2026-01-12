@@ -39,7 +39,7 @@
         "near": 0.1,
         "far": 20.0
       },
-      "followMode": "follow-none",
+      "followMode": "follow-pose",
       "followTf": "camera_front_depth_optical_frame",
       "scene": {
         "enableStats": false
@@ -54,14 +54,22 @@
         "smooth": true
       },
       "topics": {
-        "/nvblox/camera_front/points_downsampled": {
+        "/nvblox/camera_front/mesh": {
           "visible": true,
+          "frameLocked": false
+        },
+        "/nvblox/camera_front/points_downsampled": {
+          "visible": false,
           "frameLocked": false
         }
       },
       "layers": {
-        "/nvblox/camera_front/points_downsampled": {
+        "/nvblox/camera_front/mesh": {
           "visible": true,
+          "frameLocked": false
+        },
+        "/nvblox/camera_front/points_downsampled": {
+          "visible": false,
           "frameLocked": false
         }
       },
@@ -108,7 +116,7 @@
         "near": 0.1,
         "far": 20.0
       },
-      "followMode": "follow-none",
+      "followMode": "follow-pose",
       "followTf": "camera_rear_depth_optical_frame",
       "scene": {
         "enableStats": false
@@ -123,14 +131,22 @@
         "smooth": true
       },
       "topics": {
-        "/nvblox/camera_rear/points_downsampled": {
+        "/nvblox/camera_rear/mesh": {
           "visible": true,
+          "frameLocked": false
+        },
+        "/nvblox/camera_rear/points_downsampled": {
+          "visible": false,
           "frameLocked": false
         }
       },
       "layers": {
-        "/nvblox/camera_rear/points_downsampled": {
+        "/nvblox/camera_rear/mesh": {
           "visible": true,
+          "frameLocked": false
+        },
+        "/nvblox/camera_rear/points_downsampled": {
+          "visible": false,
           "frameLocked": false
         }
       },
