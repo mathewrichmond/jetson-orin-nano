@@ -26,49 +26,6 @@
       "flipHorizontal": true,
       "flipVertical": false
     },
-    "3D!front": {
-      "cameraState": {
-        "distance": 1.0,
-        "perspective": true,
-        "phi": 1.0471975511965976,
-        "target": [0, 0, 0.5],
-        "targetOffset": [0, 0, 0],
-        "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 0.7853981633974483,
-        "fovy": 1.0471975511965976,
-        "near": 0.01,
-        "far": 10.0
-      },
-      "followMode": "follow-pose",
-      "followTf": "camera_front_depth_optical_frame",
-      "scene": {
-        "enableStats": false
-      },
-      "transforms": {
-        "edges": {
-          "color": "#248eff",
-          "show": false
-        },
-        "showLabel": false,
-        "showValue": false,
-        "smooth": true
-      },
-      "topics": {
-        "/nvblox/camera_front/points_downsampled": {
-          "visible": true,
-          "frameLocked": false
-        }
-      },
-      "layers": {
-        "/nvblox/camera_front/points_downsampled": {
-          "visible": true,
-          "frameLocked": false
-        }
-      },
-      "publish": {},
-      "customBackgroundColor": "#000000",
-      "customSceneBackgroundColor": "#000000"
-    },
     "Image!rear": {
       "cameraState": {
         "distance": 20,
@@ -94,49 +51,6 @@
       },
       "flipHorizontal": true,
       "flipVertical": false
-    },
-    "3D!rear": {
-      "cameraState": {
-        "distance": 1.0,
-        "perspective": true,
-        "phi": 1.0471975511965976,
-        "target": [0, 0, 0.5],
-        "targetOffset": [0, 0, 0],
-        "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 0.7853981633974483,
-        "fovy": 1.0471975511965976,
-        "near": 0.01,
-        "far": 10.0
-      },
-      "followMode": "follow-pose",
-      "followTf": "camera_rear_depth_optical_frame",
-      "scene": {
-        "enableStats": false
-      },
-      "transforms": {
-        "edges": {
-          "color": "#248eff",
-          "show": false
-        },
-        "showLabel": false,
-        "showValue": false,
-        "smooth": true
-      },
-      "topics": {
-        "/nvblox/camera_rear/points_downsampled": {
-          "visible": true,
-          "frameLocked": false
-        }
-      },
-      "layers": {
-        "/nvblox/camera_rear/points_downsampled": {
-          "visible": true,
-          "frameLocked": false
-        }
-      },
-      "publish": {},
-      "customBackgroundColor": "#000000",
-      "customSceneBackgroundColor": "#000000"
     },
     "Plot!system_stats": {
       "paths": [
@@ -175,7 +89,7 @@
       "maxYValue": 100,
       "showLegend": true
     },
-    "Plot!imu_all": {
+    "Plot!imu_filtered": {
       "paths": [
         {
           "value": "/sensor_sync/imu/filtered.linear_acceleration.x",
@@ -212,47 +126,10 @@
           "enabled": true,
           "color": "#0088ff",
           "label": "Gyro Z (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.x",
-          "enabled": true,
-          "color": "#ff00ff",
-          "label": "Orient X (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.y",
-          "enabled": true,
-          "color": "#00ffff",
-          "label": "Orient Y (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.z",
-          "enabled": true,
-          "color": "#ffff00",
-          "label": "Orient Z (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.w",
-          "enabled": true,
-          "color": "#ffffff",
-          "label": "Orient W (filtered)"
         }
       ],
       "minYValue": -5,
       "maxYValue": 5,
-      "showLegend": true
-    },
-    "Plot!audio": {
-      "paths": [
-        {
-          "value": "/microphone/audio.data.length",
-          "enabled": true,
-          "color": "#00ff00",
-          "label": "Audio Chunk Size"
-        }
-      ],
-      "minYValue": 0,
-      "maxYValue": 2048,
       "showLegend": true
     },
     "Plot!chassis_signals": {
@@ -301,10 +178,9 @@
     "second": {
       "direction": "column",
       "first": "Plot!system_stats",
-      "second": "Plot!imu_all",
-      "third": "Plot!audio",
-      "fourth": "Plot!chassis_signals",
-      "fifth": "RawMessages!chassis_status"
+      "second": "Plot!imu_filtered",
+      "third": "Plot!chassis_signals",
+      "fourth": "RawMessages!chassis_status"
     }
   }
 }
