@@ -33,14 +33,10 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "keyfile", default_value="", description="Path to key file (if TLS enabled)"
             ),
-            DeclareLaunchArgument(
-                "topic_whitelist",
-                default_value='["/phat/imu", "/phat/status", "/system/.*", "/nvblox/.*/points_downsampled", "/hardware/.*/color/image_raw", "/hardware/.*/color/camera_info", "/microphone/audio"]',
-                description="List of topic patterns to whitelist (regex)",
-            ),
             # Foxglove Bridge Node
             # Note: Port needs to be integer, use default value directly
             # Address can be string from LaunchConfiguration
+            # Topic whitelist: Only forward essential topics to reduce bridge load
             Node(
                 package="foxglove_bridge",
                 executable="foxglove_bridge",
@@ -50,7 +46,16 @@ def generate_launch_description():
                         # Default port (can be changed via command line args if needed)
                         "port": 8765,
                         "address": LaunchConfiguration("address"),
-                        "topic_whitelist": LaunchConfiguration("topic_whitelist"),
+                        # Topic whitelist as YAML list format
+                        "topic_whitelist": [
+                            "/phat/imu",
+                            "/phat/status",
+                            "/system/.*",
+                            "/nvblox/.*/points_downsampled",
+                            "/hardware/.*/color/image_raw",
+                            "/hardware/.*/color/camera_info",
+                            "/microphone/audio",
+                        ],
                     }
                 ],
                 output="screen",

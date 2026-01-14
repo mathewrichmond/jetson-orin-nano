@@ -221,7 +221,14 @@ robot:
       port: 8765
       address: "0.0.0.0"
       # Topic whitelist to reduce bridge load - only forward essential topics
-      topic_whitelist: '["/phat/imu", "/phat/status", "/system/.*", "/nvblox/.*/points_downsampled", "/hardware/.*/color/image_raw", "/hardware/.*/color/camera_info", "/microphone/audio"]'
+      topic_whitelist:
+        - "/phat/imu"
+        - "/phat/status"
+        - "/system/.*"
+        - "/nvblox/.*/points_downsampled"
+        - "/hardware/.*/color/image_raw"
+        - "/hardware/.*/color/camera_info"
+        - "/microphone/audio"
     topics:
       publish: []  # Bridge publishes/subscribes to all topics automatically
       subscribe: []
