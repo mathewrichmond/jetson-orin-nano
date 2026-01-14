@@ -125,8 +125,11 @@ robot:
     parameters:
       port: 8765
       address: "0.0.0.0"
+      # Topic whitelist: ONLY bridged visualization topics
+      topic_whitelist:
+        - "/viz/remote/.*"  # All remote visualization topics (aggressively downsampled)
     topics:
-      publish: []  # Bridge publishes/subscribes to all topics
+      publish: []  # Bridge publishes/subscribes to whitelisted topics only
       subscribe: []
 
 # Node groups

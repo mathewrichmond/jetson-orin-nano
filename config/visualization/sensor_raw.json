@@ -26,6 +26,32 @@
       "flipHorizontal": true,
       "flipVertical": false
     },
+    "Image!rear": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/hardware/camera_rear/color/image_raw",
+        "calibrationTopic": "/hardware/camera_rear/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
+    },
     "3D!front": {
       "cameraState": {
         "distance": 1.0,
@@ -54,13 +80,13 @@
         "smooth": true
       },
       "topics": {
-        "/nvblox/camera_front/points_downsampled": {
+        "/nvblox/full/camera_front/pointcloud": {
           "visible": true,
           "frameLocked": false
         }
       },
       "layers": {
-        "/nvblox/camera_front/points_downsampled": {
+        "/nvblox/full/camera_front/pointcloud": {
           "visible": true,
           "frameLocked": false
         }
@@ -68,32 +94,6 @@
       "publish": {},
       "customBackgroundColor": "#000000",
       "customSceneBackgroundColor": "#000000"
-    },
-    "Image!rear": {
-      "cameraState": {
-        "distance": 20,
-        "perspective": true,
-        "phi": 60,
-        "target": [0, 0, 0],
-        "targetOffset": [0, 0, 0],
-        "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 45,
-        "fovy": 45,
-        "near": 0.5,
-        "far": 5000
-      },
-      "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
-      "topics": {},
-      "layers": {},
-      "publish": {},
-      "imageMode": {
-        "imageTopic": "/hardware/camera_rear/color/image_raw",
-        "calibrationTopic": "/hardware/camera_rear/color/camera_info"
-      },
-      "flipHorizontal": true,
-      "flipVertical": false
     },
     "3D!rear": {
       "cameraState": {
@@ -123,13 +123,63 @@
         "smooth": true
       },
       "topics": {
-        "/nvblox/camera_rear/points_downsampled": {
+        "/nvblox/full/camera_rear/pointcloud": {
           "visible": true,
           "frameLocked": false
         }
       },
       "layers": {
-        "/nvblox/camera_rear/points_downsampled": {
+        "/nvblox/full/camera_rear/pointcloud": {
+          "visible": true,
+          "frameLocked": false
+        }
+      },
+      "publish": {},
+      "customBackgroundColor": "#000000",
+      "customSceneBackgroundColor": "#000000"
+    },
+    "3D!fused": {
+      "cameraState": {
+        "distance": 2.0,
+        "perspective": true,
+        "phi": 1.0471975511965976,
+        "target": [0, 0, 0.5],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 0.7853981633974483,
+        "fovy": 1.0471975511965976,
+        "near": 0.01,
+        "far": 10.0
+      },
+      "followMode": "follow-pose",
+      "scene": {
+        "enableStats": false
+      },
+      "transforms": {
+        "edges": {
+          "color": "#248eff",
+          "show": false
+        },
+        "showLabel": false,
+        "showValue": false,
+        "smooth": true
+      },
+      "topics": {
+        "/nvblox/full/mesh": {
+          "visible": true,
+          "frameLocked": false
+        },
+        "/nvblox/full/tsdf": {
+          "visible": true,
+          "frameLocked": false
+        }
+      },
+      "layers": {
+        "/nvblox/full/mesh": {
+          "visible": true,
+          "frameLocked": false
+        },
+        "/nvblox/full/tsdf": {
           "visible": true,
           "frameLocked": false
         }
@@ -212,30 +262,6 @@
           "enabled": true,
           "color": "#0088ff",
           "label": "Gyro Z (raw)"
-        },
-        {
-          "value": "/phat/imu.orientation.x",
-          "enabled": true,
-          "color": "#ff00ff",
-          "label": "Orient X (raw)"
-        },
-        {
-          "value": "/phat/imu.orientation.y",
-          "enabled": true,
-          "color": "#00ffff",
-          "label": "Orient Y (raw)"
-        },
-        {
-          "value": "/phat/imu.orientation.z",
-          "enabled": true,
-          "color": "#ffff00",
-          "label": "Orient Z (raw)"
-        },
-        {
-          "value": "/phat/imu.orientation.w",
-          "enabled": true,
-          "color": "#ffffff",
-          "label": "Orient W (raw)"
         }
       ],
       "minYValue": -5,
@@ -245,64 +271,40 @@
     "Plot!imu_filtered": {
       "paths": [
         {
-          "value": "/sensor_sync/imu/filtered.linear_acceleration.x",
+          "value": "/sensor_fusion/imu/filtered.linear_acceleration.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "Accel X (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.linear_acceleration.y",
+          "value": "/sensor_fusion/imu/filtered.linear_acceleration.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "Accel Y (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.linear_acceleration.z",
+          "value": "/sensor_fusion/imu/filtered.linear_acceleration.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "Accel Z (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.angular_velocity.x",
+          "value": "/sensor_fusion/imu/filtered.angular_velocity.x",
           "enabled": true,
           "color": "#ff8800",
           "label": "Gyro X (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.angular_velocity.y",
+          "value": "/sensor_fusion/imu/filtered.angular_velocity.y",
           "enabled": true,
           "color": "#88ff00",
           "label": "Gyro Y (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.angular_velocity.z",
+          "value": "/sensor_fusion/imu/filtered.angular_velocity.z",
           "enabled": true,
           "color": "#0088ff",
           "label": "Gyro Z (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.x",
-          "enabled": true,
-          "color": "#ff00ff",
-          "label": "Orient X (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.y",
-          "enabled": true,
-          "color": "#00ffff",
-          "label": "Orient Y (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.z",
-          "enabled": true,
-          "color": "#ffff00",
-          "label": "Orient Z (filtered)"
-        },
-        {
-          "value": "/sensor_sync/imu/filtered.orientation.w",
-          "enabled": true,
-          "color": "#ffffff",
-          "label": "Orient W (filtered)"
         }
       ],
       "minYValue": -5,
@@ -337,19 +339,19 @@
     "Plot!chassis_synced": {
       "paths": [
         {
-          "value": "/sensor_sync/chassis/battery.voltage",
+          "value": "/sensor_fusion/chassis/battery.voltage",
           "enabled": true,
           "color": "#00ff00",
           "label": "Battery Voltage (synced)"
         },
         {
-          "value": "/sensor_sync/chassis/battery.percentage",
+          "value": "/sensor_fusion/chassis/battery.percentage",
           "enabled": true,
           "color": "#ffff00",
           "label": "Battery Percentage (synced)"
         },
         {
-          "value": "/sensor_sync/chassis/battery.current",
+          "value": "/sensor_fusion/chassis/battery.current",
           "enabled": true,
           "color": "#ff8800",
           "label": "Battery Current (synced)"
@@ -365,7 +367,7 @@
       "diffMethod": "char"
     },
     "RawMessages!chassis_status_synced": {
-      "topicName": "/sensor_sync/chassis/status",
+      "topicName": "/sensor_fusion/chassis/status",
       "diffEnabled": false,
       "diffMethod": "char"
     },
@@ -409,7 +411,8 @@
     "third": {
       "direction": "column",
       "first": "3D!front",
-      "second": "3D!rear"
+      "second": "3D!rear",
+      "third": "3D!fused"
     }
   }
 }

@@ -46,15 +46,11 @@ def generate_launch_description():
                         # Default port (can be changed via command line args if needed)
                         "port": 8765,
                         "address": LaunchConfiguration("address"),
-                        # Topic whitelist as YAML list format
+                        # Topic whitelist: ONLY bridged visualization topics
+                        # Feature topics (/sensor_fusion/*) are NOT bridged
+                        # Raw topics (/hardware/*, /nvblox/full/*) are NOT bridged
                         "topic_whitelist": [
-                            "/phat/imu",
-                            "/phat/status",
-                            "/system/.*",
-                            "/nvblox/.*/points_downsampled",
-                            "/hardware/.*/color/image_raw",
-                            "/hardware/.*/color/camera_info",
-                            "/microphone/audio",
+                            "/viz/remote/.*",  # All remote visualization topics (aggressively downsampled)
                         ],
                     }
                 ],

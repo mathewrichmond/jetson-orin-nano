@@ -20,37 +20,61 @@
       "layers": {},
       "publish": {},
       "imageMode": {
-        "imageTopic": "/hardware/camera_front/color/image_raw",
+        "imageTopic": "/viz/remote/camera_front/color/image_raw",
         "calibrationTopic": "/hardware/camera_front/color/camera_info"
       },
       "flipHorizontal": true,
       "flipVertical": false
     },
-    "Image!rear": {
+    "3D!fused": {
       "cameraState": {
-        "distance": 20,
+        "distance": 2.0,
         "perspective": true,
-        "phi": 60,
-        "target": [0, 0, 0],
+        "phi": 1.0471975511965976,
+        "target": [0, 0, 0.5],
         "targetOffset": [0, 0, 0],
         "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 45,
-        "fovy": 45,
-        "near": 0.5,
-        "far": 5000
+        "thetaOffset": 0.7853981633974483,
+        "fovy": 1.0471975511965976,
+        "near": 0.01,
+        "far": 10.0
       },
       "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
-      "topics": {},
-      "layers": {},
-      "publish": {},
-      "imageMode": {
-        "imageTopic": "/hardware/camera_rear/color/image_raw",
-        "calibrationTopic": "/hardware/camera_rear/color/camera_info"
+      "scene": {
+        "enableStats": false
       },
-      "flipHorizontal": true,
-      "flipVertical": false
+      "transforms": {
+        "edges": {
+          "color": "#248eff",
+          "show": false
+        },
+        "showLabel": false,
+        "showValue": false,
+        "smooth": true
+      },
+      "topics": {
+        "/viz/remote/3d/pointcloud": {
+          "visible": true,
+          "frameLocked": false
+        },
+        "/viz/remote/3d/mesh": {
+          "visible": true,
+          "frameLocked": false
+        }
+      },
+      "layers": {
+        "/viz/remote/3d/pointcloud": {
+          "visible": true,
+          "frameLocked": false
+        },
+        "/viz/remote/3d/mesh": {
+          "visible": true,
+          "frameLocked": false
+        }
+      },
+      "publish": {},
+      "customBackgroundColor": "#000000",
+      "customSceneBackgroundColor": "#000000"
     },
     "Plot!system_stats": {
       "paths": [
@@ -92,37 +116,37 @@
     "Plot!imu_filtered": {
       "paths": [
         {
-          "value": "/sensor_sync/imu/filtered.linear_acceleration.x",
+          "value": "/viz/remote/imu/filtered.linear_acceleration.x",
           "enabled": true,
           "color": "#ff0000",
           "label": "Accel X (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.linear_acceleration.y",
+          "value": "/viz/remote/imu/filtered.linear_acceleration.y",
           "enabled": true,
           "color": "#00ff00",
           "label": "Accel Y (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.linear_acceleration.z",
+          "value": "/viz/remote/imu/filtered.linear_acceleration.z",
           "enabled": true,
           "color": "#0000ff",
           "label": "Accel Z (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.angular_velocity.x",
+          "value": "/viz/remote/imu/filtered.angular_velocity.x",
           "enabled": true,
           "color": "#ff8800",
           "label": "Gyro X (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.angular_velocity.y",
+          "value": "/viz/remote/imu/filtered.angular_velocity.y",
           "enabled": true,
           "color": "#88ff00",
           "label": "Gyro Y (filtered)"
         },
         {
-          "value": "/sensor_sync/imu/filtered.angular_velocity.z",
+          "value": "/viz/remote/imu/filtered.angular_velocity.z",
           "enabled": true,
           "color": "#0088ff",
           "label": "Gyro Z (filtered)"
@@ -135,32 +159,27 @@
     "Plot!chassis_signals": {
       "paths": [
         {
-          "value": "/sensor_sync/chassis/battery.voltage",
+          "value": "/viz/remote/chassis/battery.voltage",
           "enabled": true,
           "color": "#00ff00",
-          "label": "Battery Voltage (V) - Synced"
+          "label": "Battery Voltage (V)"
         },
         {
-          "value": "/sensor_sync/chassis/battery.percentage",
+          "value": "/viz/remote/chassis/battery.percentage",
           "enabled": true,
           "color": "#ffff00",
-          "label": "Battery Percentage - Synced"
+          "label": "Battery Percentage"
         },
         {
-          "value": "/sensor_sync/chassis/battery.current",
+          "value": "/viz/remote/chassis/battery.current",
           "enabled": true,
           "color": "#ff8800",
-          "label": "Battery Current (A) - Synced"
+          "label": "Battery Current (A)"
         }
       ],
       "minYValue": 0,
       "maxYValue": 15,
       "showLegend": true
-    },
-    "RawMessages!chassis_status": {
-      "topicName": "/sensor_sync/chassis/status",
-      "diffEnabled": false,
-      "diffMethod": "char"
     }
   },
   "globalVariables": {},
@@ -173,14 +192,13 @@
     "first": {
       "direction": "column",
       "first": "Image!front",
-      "second": "Image!rear"
+      "second": "3D!fused"
     },
     "second": {
       "direction": "column",
       "first": "Plot!system_stats",
       "second": "Plot!imu_filtered",
-      "third": "Plot!chassis_signals",
-      "fourth": "RawMessages!chassis_status"
+      "third": "Plot!chassis_signals"
     }
   }
 }

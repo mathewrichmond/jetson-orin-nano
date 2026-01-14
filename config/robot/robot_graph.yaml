@@ -57,13 +57,13 @@ robot:
       enable_color: true
       enable_depth: true
       enable_pointcloud: false  # Disabled - using nvblox downsampled point clouds instead
-      color_width: 640
-      color_height: 480
-      color_fps: 15  # Reduced from 30 to improve bridge stability
-      depth_width: 640
-      depth_height: 480
-      depth_fps: 15  # Reduced from 30 to improve bridge stability
-      publish_rate: 15.0  # Reduced from 30.0 to improve bridge stability
+      color_width: 320  # Reduced from 640 for bridge bandwidth (83% reduction)
+      color_height: 240  # Reduced from 480 for bridge bandwidth
+      color_fps: 10  # Reduced from 15 for bridge stability
+      depth_width: 320  # Reduced from 640 for bridge bandwidth
+      depth_height: 240  # Reduced from 480 for bridge bandwidth
+      depth_fps: 10  # Reduced from 15 for bridge stability
+      publish_rate: 10.0  # Reduced from 15.0 for bridge stability
       enable_inter_cam_sync: false  # Enable firmware-based inter-camera sync (requires sync cables)
       inter_cam_sync_mode: 0  # 0=None, 1=Master, 2=Slave (auto-assigned: first=master, others=slaves)
     topics:
@@ -91,22 +91,25 @@ robot:
       tsdf_truncation_distance: 0.1
       max_tsdf_weight: 100.0
       mesh_update_rate: 5.0
-      pointcloud_downsample_factor: 8  # Increased from 4 to reduce point cloud size
-      publish_tsdf_markers: false  # Disable large TSDF markers to reduce bridge load
-      publish_mesh_markers: true  # Enable mesh markers (may be more efficient than point clouds)
-      publish_downsampled_points: true  # Keep point clouds as fallback
+      # Full quality outputs (fusion node handles downsampling for consumers)
+      pointcloud_downsample_factor: 1  # Full resolution (fusion node downsamples)
+      publish_tsdf_markers: true  # Full TSDF (fusion node extracts/coarsens)
+      publish_mesh_markers: true  # Full quality mesh (fusion node decimates)
+      publish_downsampled_points: true  # Full pointclouds (fusion node downsamples)
+      # Multi-camera fusion
+      fuse_cameras: true  # Fuse front + rear into unified TSDF/mesh
       status_topic: "/nvblox/status"
-      namespace: "/nvblox"
+      namespace: "/nvblox/full"  # Full quality namespace
     topics:
       publish:
         - /nvblox/status
-        - /nvblox/camera_front/points_downsampled
-        - /nvblox/camera_rear/points_downsampled
-        - /nvblox/camera_front/mesh  # Mesh markers (may be more efficient than point clouds)
-        - /nvblox/camera_rear/mesh
-        # TSDF markers disabled to reduce bridge load
-        # - /nvblox/camera_front/tsdf
-        # - /nvblox/camera_rear/tsdf
+        # Full quality outputs (fusion node will downsample for consumers)
+        - /nvblox/full/camera_front/pointcloud  # Full resolution
+        - /nvblox/full/camera_rear/pointcloud  # Full resolution
+        - /nvblox/full/mesh  # Full quality fused mesh
+        - /nvblox/full/tsdf  # Complete TSDF voxel grid
+        - /nvblox/full/camera_front/image  # Full resolution images
+        - /nvblox/full/camera_rear/image  # Full resolution images
       subscribe:
         - /hardware/camera_front/depth/image_rect_raw
         - /hardware/camera_front/color/image_raw
@@ -194,17 +197,18 @@ robot:
         - /hardware_sync/status
       subscribe: []
 
-  # Sensor Synchronization and Filtering (Kalman filter + camera sync)
-  sensor_sync:
+  # Sensor Fusion Node (synchronizes, filters, and fuses sensors)
+  # Outputs: Feature topics (for VLM) and Visualization topics (for monitoring)
+  sensor_fusion:
     enabled: true
-    package: sensor_sync
-    node: sensor_sync_node
+    package: sensor_sync  # TODO: Rename package to sensor_fusion
+    node: sensor_sync_node  # TODO: Rename node to sensor_fusion_node
     namespace: ""
     parameters:
       sync_to_camera: true
       sync_camera_frames: true  # Sync multiple cameras together (software sync)
       camera_frame_sync_tolerance: 0.05  # Max time diff between cameras (50ms)
-      target_frequency: 15.0  # Match camera FPS
+      target_frequency: 15.0  # Match camera FPS for features
       imu_filter_enabled: true
       imu_process_noise: 0.01
       imu_measurement_noise: 0.1
@@ -216,21 +220,60 @@ robot:
       imu_topic: "/phat/imu"
       battery_topic: "/irobot/battery"
       status_topic: "/irobot/status"
-      output_namespace: "/sensor_sync"
+      output_namespace: "/sensor_fusion"
       publish_vlm_features: true
+      # Visualization topics (downsampled for bridge)
+      publish_viz_topics: true
+      viz_frequency: 10.0  # Lower frequency for visualization
+      viz_resolution_width: 320  # Lower resolution for bridge
+      viz_resolution_height: 240
+      # Feature topic downsampling (moderate)
+      feature_image_width: 480  # Downsampled from 640
+      feature_image_height: 360  # Downsampled from 480
+      feature_pointcloud_factor: 2  # Every 2nd point
+      feature_mesh_decimation: 0.5  # 50% triangle reduction
+      feature_tsdf_voxel_size: 0.1  # Coarser voxels (from 0.05m)
+      # Viz topic downsampling (aggressive)
+      viz_pointcloud_factor: 16  # Every 16th point
+      viz_mesh_decimation: 0.75  # 75% triangle reduction
+      viz_tsdf_extract_mesh: true  # Extract mesh from TSDF instead of voxel grid
+      viz_tsdf_fps: 2  # Lower frequency for TSDF mesh
     topics:
       publish:
-        - /sensor_sync/imu/filtered
-        - /sensor_sync/chassis/battery
-        - /sensor_sync/chassis/status
-        - /sensor_sync/vlm_features
-        - /sensor_sync/status
+        # Feature topics (for VLM/feature builder) - 15 Hz, moderate downsampling
+        - /sensor_fusion/imu/filtered
+        - /sensor_fusion/chassis/battery
+        - /sensor_fusion/chassis/status
+        - /sensor_fusion/vlm_features
+        - /sensor_fusion/camera_front/color/image_raw  # 480×360, downsampled from 640×480
+        - /sensor_fusion/camera_rear/color/image_raw  # 480×360, downsampled from 640×480
+        # 3D data for features (moderate downsampling)
+        - /sensor_fusion/3d/camera_front/pointcloud  # Factor 2 downsampling
+        - /sensor_fusion/3d/camera_rear/pointcloud  # Factor 2 downsampling
+        - /sensor_fusion/3d/mesh  # 50% decimation, fused cameras
+        - /sensor_fusion/3d/tsdf  # Coarser voxel grid (0.1m)
+        # Visualization topics (for bridge) - Aggressive downsampling
+        - /viz/remote/imu/filtered
+        - /viz/remote/chassis/battery
+        - /viz/remote/camera_front/color/image_raw  # 320×240 @ 10 Hz
+        # 3D data topics (aggressively downsampled)
+        - /viz/remote/3d/pointcloud  # Factor 16 downsampling @ 5 Hz
+        - /viz/remote/3d/mesh  # 75% decimation @ 5 Hz
+        - /viz/remote/3d/tsdf_mesh  # TSDF mesh extraction @ 2 Hz
+        - /sensor_fusion/status
       subscribe:
         - /phat/imu
         - /irobot/battery
         - /irobot/status
         - /hardware/camera_front/color/image_raw
         - /hardware/camera_rear/color/image_raw
+        # Full quality 3D data from nvblox (for downsampling)
+        - /nvblox/full/camera_front/pointcloud  # Full resolution pointclouds
+        - /nvblox/full/camera_rear/pointcloud
+        - /nvblox/full/mesh  # Full quality fused mesh
+        - /nvblox/full/tsdf  # Complete TSDF voxel grid
+        - /nvblox/full/camera_front/image  # Full resolution images
+        - /nvblox/full/camera_rear/image
 
   # PHAT Motor Controller (GPIO + Accelerometer)
   phat_motor_controller:
@@ -278,19 +321,11 @@ robot:
     parameters:
       port: 8765
       address: "0.0.0.0"
-      # Topic whitelist to reduce bridge load - only forward essential topics
-      # Excluded 3D data (pointclouds/mesh) to reduce bandwidth
+      # Topic whitelist: ONLY bridged visualization topics (within 5 MB/s budget)
+      # Feature topics (/sensor_fusion/*) are NOT bridged (consumed directly by VLA controller)
+      # Raw topics (/hardware/*, /nvblox/full/*) are NOT bridged (use direct connection)
       topic_whitelist:
-        - "/sensor_sync/.*"  # All synchronized sensor data (IMU, chassis)
-        - "/phat/status"
-        - "/system/.*"
-        - "/hardware/.*/color/image_raw"
-        - "/hardware/.*/color/camera_info"
-        - "/microphone/audio"
-        # Excluded raw high-frequency topics (now synced):
-        # - /phat/imu (use /sensor_sync/imu/filtered)
-        # - /irobot/battery (use /sensor_sync/chassis/battery)
-        # - /irobot/status (use /sensor_sync/chassis/status)
+        - "/viz/remote/.*"  # All remote visualization topics (aggressively downsampled)
     topics:
       publish: []  # Bridge publishes/subscribes to all topics automatically
       subscribe: []
@@ -327,7 +362,7 @@ groups:
     - irobot_serial
     - phat_motor_controller
     - hardware_sync_generator
-    - sensor_sync
+    - sensor_fusion
 
   bench_test:
     - system_monitor
@@ -344,4 +379,5 @@ groups:
     - usb_microphone
     - irobot_serial
     - phat_motor_controller
+    - sensor_fusion
     - foxglove_bridge

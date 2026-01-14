@@ -1,133 +1,92 @@
 # Foxglove Studio Layouts
 
-This document describes the available Foxglove Studio layouts for visualizing robot data.
+This document describes the available Foxglove Studio visualization layouts for the Isaac robot system.
 
 ## Available Layouts
 
-### 1. `foxglove_bridged.json` - Optimized for Remote/Bridged Connection
+### 1. `sensor_bridged.json` - Optimized for Remote/Bridged Connection
 
-**Purpose:** Low-bandwidth layout for remote visualization via Foxglove Bridge.
+**Purpose**: Low-bandwidth visualization for remote monitoring via Foxglove Bridge
 
-**Features:**
-- ✅ Camera images (front and rear)
-- ✅ System stats (CPU, GPU, memory)
-- ✅ Filtered/synced IMU data only
-- ✅ Synced chassis data (battery, status)
-- ❌ No 3D pointclouds (reduces bandwidth)
-- ❌ No raw sensor data (use synced topics only)
+**Topics Used**:
+- `/viz/remote/camera_front/color/image_raw` - Downsampled camera (320×240 @ 10 Hz)
+- `/viz/remote/imu/filtered` - Filtered IMU data
+- `/viz/remote/chassis/battery` - Synced battery data
+- `/viz/remote/3d/mesh` - Decimated fused mesh (75% reduction @ 5 Hz)
+- `/viz/remote/3d/pointcloud` - Downsampled pointcloud (factor 16 @ 5 Hz)
+- `/system/*` - System monitoring
 
-**Topics Used:**
-- `/hardware/camera_front/color/image_raw`
-- `/hardware/camera_rear/color/image_raw`
-- `/sensor_sync/imu/filtered` (all IMU data)
-- `/sensor_sync/chassis/battery`
-- `/sensor_sync/chassis/status`
-- `/system/.*` (system stats)
+**Features**:
+- Front camera only (reduces bandwidth)
+- Aggressively downsampled 3D data
+- Essential sensors only
+- Optimized for 5 MB/s bridge budget
 
-**When to Use:**
-- Remote visualization via Foxglove Bridge
-- Limited bandwidth connections
-- Production monitoring
-- When you only need synced sensor data
+**Use Case**: Remote monitoring, debugging over network
 
-### 2. `foxglove_raw.json` - Full Data for Direct Connection
+### 2. `sensor_raw.json` - Full Data for Direct Connection
 
-**Purpose:** Complete layout with all topics for direct ROS 2 connection.
+**Purpose**: Full-quality visualization for direct ROS 2 connection
 
-**Features:**
-- ✅ Camera images (front and rear)
-- ✅ 3D pointclouds (nvblox downsampled)
-- ✅ System stats
-- ✅ Raw IMU data (`/phat/imu`)
-- ✅ Filtered/synced IMU data (`/sensor_sync/imu/filtered`)
-- ✅ Raw chassis data (`/irobot/battery`, `/irobot/status`)
-- ✅ Synced chassis data (`/sensor_sync/chassis/.*`)
-- ✅ Audio data
+**Topics Used**:
+- `/hardware/camera_*/color/image_raw` - Raw camera images (640×480 @ 30 Hz)
+- `/phat/imu` - Raw IMU data
+- `/sensor_fusion/imu/filtered` - Filtered IMU data (for comparison)
+- `/irobot/battery` - Raw battery data
+- `/sensor_fusion/chassis/battery` - Synced battery data (for comparison)
+- `/nvblox/full/camera_*/pointcloud` - Full quality pointclouds
+- `/nvblox/full/mesh` - Full quality fused mesh
+- `/nvblox/full/tsdf` - Full quality TSDF
+- `/microphone/audio` - Audio data
 
-**Topics Used:**
-- All camera topics (color, depth, camera_info)
-- `/nvblox/.*/points_downsampled` (3D pointclouds)
-- `/phat/imu` (raw IMU)
-- `/sensor_sync/imu/filtered` (filtered IMU)
-- `/irobot/battery` (raw battery)
-- `/irobot/status` (raw status)
-- `/sensor_sync/chassis/.*` (synced chassis)
-- `/system/.*` (system stats)
-- `/microphone/audio`
+**Features**:
+- Both cameras (front + rear)
+- Raw and filtered/synced sensor comparison
+- Full quality 3D data (per-camera and fused)
+- All sensor data
 
-**When to Use:**
-- Direct ROS 2 connection (no bridge)
-- Local development/debugging
-- When you need raw sensor data
-- When you need 3D visualization
-- High-bandwidth connections
+**Use Case**: Local development, debugging, sensor comparison
 
-### 3. `foxglove_all_sensors.json` - Legacy Layout
+## Usage
 
-**Purpose:** Original layout (being phased out in favor of bridged/raw).
-
-**Status:** Updated to use synced topics, but consider using `foxglove_bridged.json` or `foxglove_raw.json` instead.
-
-## Loading Layouts in Foxglove Studio
-
-### Method 1: Import Layout File
+### Loading a Layout in Foxglove Studio
 
 1. Open Foxglove Studio
-2. Go to **Layouts** → **Import layout**
-3. Select the JSON file:
-   - `config/visualization/foxglove_bridged.json` (for bridge)
-   - `config/visualization/foxglove_raw.json` (for direct connection)
+2. Connect to your data source (Bridge or direct ROS 2 connection)
+3. Go to **Layouts** → **Import**
+4. Select the appropriate layout file:
+   - `config/visualization/sensor_bridged.json` (for bridge)
+   - `config/visualization/sensor_raw.json` (for direct connection)
 
-### Method 2: Copy Layout Content
+### Choosing the Right Layout
 
-1. Open the layout JSON file
-2. Copy the entire contents
-3. In Foxglove Studio: **Layouts** → **Import layout** → Paste JSON
+1. **For Remote Monitoring:** Use `sensor_bridged.json` with Foxglove Bridge
+2. **For Local Development:** Use `sensor_raw.json` with direct ROS 2 connection
+3. **For Debugging:** Use `sensor_raw.json` to compare raw vs synced data
 
-## Bridge Configuration
+## Topic Structure
 
-The bridge is configured to only forward synced topics to reduce bandwidth:
+### Bridged Topics (`/viz/remote/*`)
+- Aggressively downsampled for low bandwidth
+- Single camera (front only)
+- Fused 3D data only
+- Essential sensors
 
-```yaml
-foxglove_bridge:
-  parameters:
-    topic_whitelist:
-      - "/sensor_sync/.*"  # All synchronized sensor data
-      - "/phat/status"
-      - "/system/.*"
-      - "/hardware/.*/color/image_raw"
-      - "/hardware/.*/color/camera_info"
-      - "/microphone/audio"
-```
+### Raw Topics (`/hardware/*`, `/nvblox/full/*`)
+- Full quality, no downsampling
+- All cameras
+- Per-camera and fused 3D data
+- All sensors
 
-**Note:** Raw high-frequency topics (`/phat/imu`, `/irobot/battery`, `/irobot/status`) are **not** bridged. Use synced topics instead.
+### Feature Topics (`/sensor_fusion/*`)
+- Moderate downsampling for VLM features
+- Used by feature builder, not visualization layouts
 
-## Recommendations
+## Bandwidth Considerations
 
-1. **For Remote Monitoring:** Use `foxglove_bridged.json` with Foxglove Bridge
-2. **For Local Development:** Use `foxglove_raw.json` with direct ROS 2 connection
-3. **For Debugging:** Use `foxglove_raw.json` to compare raw vs synced data
+- **Bridged Layout**: ~3.2 MB/s (within 5 MB/s bridge budget)
+- **Raw Layout**: ~30 MB/s (requires direct connection)
 
-## Troubleshooting
+## Updating Layouts
 
-### No IMU Data in Bridged Layout
-
-- **Problem:** IMU plot shows no data
-- **Solution:** Ensure you're using `/sensor_sync/imu/filtered` topics (not `/phat/imu`)
-- **Check:** Bridge whitelist includes `/sensor_sync/.*`
-
-### Camera Images Slow
-
-- **Problem:** Camera images update slowly
-- **Solution:**
-  - Use `foxglove_bridged.json` (optimized for bridge)
-  - Check camera FPS is set to 15 Hz
-  - Verify bridge is not dropping connections
-
-### Missing 3D Visualization
-
-- **Problem:** No 3D pointclouds visible
-- **Solution:**
-  - Use `foxglove_raw.json` (includes 3D panels)
-  - Ensure nvblox processor is running
-  - Check `/nvblox/.*/points_downsampled` topics are publishing
+Layouts are JSON files that can be edited directly or modified through Foxglove Studio's UI. After making changes, export the layout and save it to `config/visualization/`.
