@@ -45,6 +45,11 @@ class RealSenseCameraNode(Node):
         self.declare_parameter("frame_timeout_ms", 1000)  # Milliseconds to wait for frames
         self.declare_parameter("shutdown_delay", 0.5)  # Seconds to wait for threads on shutdown
 
+        # Inter-camera sync configuration (firmware-based)
+        self.declare_parameter("enable_inter_cam_sync", False)  # Enable firmware-based inter-camera sync
+        self.declare_parameter("inter_cam_sync_mode", 0)  # 0=None, 1=Master, 2=Slave
+        # If multiple cameras, first is master, others are slaves
+
         # Get parameters (with safe fallback to defaults)
         try:
             self.camera_serials = self.get_parameter("camera_serial_numbers").value
@@ -69,6 +74,8 @@ class RealSenseCameraNode(Node):
         self.status_topic = self.get_parameter("status_topic").value
         self.frame_timeout_ms = self.get_parameter("frame_timeout_ms").value
         self.shutdown_delay = self.get_parameter("shutdown_delay").value
+        self.enable_inter_cam_sync = self.get_parameter("enable_inter_cam_sync").value
+        self.inter_cam_sync_mode = self.get_parameter("inter_cam_sync_mode").value
 
         # Initialize
         self.bridge = CvBridge()
@@ -94,8 +101,6 @@ class RealSenseCameraNode(Node):
 
         # Start camera capture threads (only for frame capture, not publishing)
         self.camera_threads: List[threading.Thread] = []
-        # Standard library
-        import threading
 
         for camera_name in self.pipelines.keys():
             thread = threading.Thread(
@@ -146,9 +151,15 @@ class RealSenseCameraNode(Node):
             else:
                 camera_name = self.camera_names[i]
 
+            # Determine sync mode: first camera is master (1), others are slaves (2)
+            if self.enable_inter_cam_sync:
+                sync_mode = 1 if i == 0 else 2  # First camera = master, others = slaves
+            else:
+                sync_mode = 0  # No sync
+
             try:
                 self._initialize_camera(
-                    camera_name, serial, devices[available_serials.index(serial)]
+                    camera_name, serial, devices[available_serials.index(serial)], sync_mode
                 )
             except Exception as e:
                 self.get_logger().error(
@@ -156,9 +167,38 @@ class RealSenseCameraNode(Node):
                 )
                 self.publish_status("error", f"Failed to initialize {camera_name}: {e}")
 
-    def _initialize_camera(self, camera_name: str, serial: str, device: rs.device):
-        """Initialize a single camera"""
+    def _initialize_camera(self, camera_name: str, serial: str, device: rs.device, sync_mode: int = 0):
+        """Initialize a single camera
+
+        Args:
+            camera_name: Name for the camera
+            serial: Camera serial number
+            device: RealSense device object
+            sync_mode: Inter-camera sync mode (0=None, 1=Master, 2=Slave)
+        """
         self.get_logger().info(f"Initializing camera: {camera_name} (serial: {serial})")
+
+        # Configure inter-camera sync (firmware-based, requires physical sync cables)
+        if sync_mode > 0:
+            try:
+                sensor = device.first_depth_sensor()
+                if sensor.supports(rs.option.inter_cam_sync_mode):
+                    sensor.set_option(rs.option.inter_cam_sync_mode, sync_mode)
+                    sync_mode_name = "Master" if sync_mode == 1 else "Slave"
+                    self.get_logger().info(
+                        f"Configured {camera_name} for inter-camera sync: {sync_mode_name}"
+                    )
+                else:
+                    self.get_logger().warn(
+                        f"Camera {camera_name} does not support inter-camera sync"
+                    )
+            except Exception as e:
+                self.get_logger().warn(
+                    f"Failed to configure inter-camera sync for {camera_name}: {e}"
+                )
+                self.get_logger().info(
+                    "Note: Inter-camera sync requires physical sync cables between cameras"
+                )
 
         # Create pipeline and config
         pipeline = rs.pipeline()

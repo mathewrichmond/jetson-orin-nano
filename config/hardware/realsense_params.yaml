@@ -30,3 +30,9 @@
     # Timing parameters
     frame_timeout_ms: 1000  # Milliseconds to wait for frames
     shutdown_delay: 0.5  # Seconds to wait for threads on shutdown
+
+    # Inter-camera synchronization (firmware-based)
+    enable_inter_cam_sync: false  # Enable firmware-based inter-camera sync
+    # Note: Requires physical sync cables between cameras
+    # First camera becomes master (generates sync), others become slaves (receive sync)
+    inter_cam_sync_mode: 0  # 0=None, 1=Master, 2=Slave (auto-assigned if enable_inter_cam_sync=true)

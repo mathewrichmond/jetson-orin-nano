@@ -178,40 +178,40 @@
     "Plot!imu_all": {
       "paths": [
         {
-          "value": "/phat/imu.linear_acceleration.x",
+          "value": "/sensor_sync/imu/filtered.linear_acceleration.x",
           "enabled": true,
           "color": "#ff0000",
-          "label": "Accel X"
+          "label": "Accel X (filtered)"
         },
         {
-          "value": "/phat/imu.linear_acceleration.y",
+          "value": "/sensor_sync/imu/filtered.linear_acceleration.y",
           "enabled": true,
           "color": "#00ff00",
-          "label": "Accel Y"
+          "label": "Accel Y (filtered)"
         },
         {
-          "value": "/phat/imu.linear_acceleration.z",
+          "value": "/sensor_sync/imu/filtered.linear_acceleration.z",
           "enabled": true,
           "color": "#0000ff",
-          "label": "Accel Z"
+          "label": "Accel Z (filtered)"
         },
         {
-          "value": "/phat/imu.angular_velocity.x",
+          "value": "/sensor_sync/imu/filtered.angular_velocity.x",
           "enabled": true,
           "color": "#ff8800",
-          "label": "Gyro X"
+          "label": "Gyro X (filtered)"
         },
         {
-          "value": "/phat/imu.angular_velocity.y",
+          "value": "/sensor_sync/imu/filtered.angular_velocity.y",
           "enabled": true,
           "color": "#88ff00",
-          "label": "Gyro Y"
+          "label": "Gyro Y (filtered)"
         },
         {
-          "value": "/phat/imu.angular_velocity.z",
+          "value": "/sensor_sync/imu/filtered.angular_velocity.z",
           "enabled": true,
           "color": "#0088ff",
-          "label": "Gyro Z"
+          "label": "Gyro Z (filtered)"
         },
         {
           "value": "/phat/imu.orientation.x",
@@ -258,22 +258,22 @@
     "Plot!chassis_signals": {
       "paths": [
         {
-          "value": "/irobot/battery.voltage",
+          "value": "/sensor_sync/chassis/battery.voltage",
           "enabled": true,
           "color": "#00ff00",
-          "label": "Battery Voltage (V)"
+          "label": "Battery Voltage (V) - Synced"
         },
         {
-          "value": "/irobot/battery.percentage",
+          "value": "/sensor_sync/chassis/battery.percentage",
           "enabled": true,
           "color": "#ffff00",
-          "label": "Battery Percentage"
+          "label": "Battery Percentage - Synced"
         },
         {
-          "value": "/irobot/battery.current",
+          "value": "/sensor_sync/chassis/battery.current",
           "enabled": true,
           "color": "#ff8800",
-          "label": "Battery Current (A)"
+          "label": "Battery Current (A) - Synced"
         }
       ],
       "minYValue": 0,
@@ -281,7 +281,7 @@
       "showLegend": true
     },
     "RawMessages!chassis_status": {
-      "topicName": "/irobot/status",
+      "topicName": "/sensor_sync/chassis/status",
       "diffEnabled": false,
       "diffMethod": "char"
     }

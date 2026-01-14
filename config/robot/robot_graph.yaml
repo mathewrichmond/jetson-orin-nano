@@ -9,7 +9,7 @@ robot:
     node: system_monitor_node
     namespace: /system
     parameters:
-      update_rate: 1.0
+      update_rate: 5.0  # Increased from 1.0 to reduce sparsity
       temp_warning_threshold: 70.0
       temp_critical_threshold: 85.0
       cpu_warning_threshold: 80.0
@@ -64,6 +64,8 @@ robot:
       depth_height: 480
       depth_fps: 15  # Reduced from 30 to improve bridge stability
       publish_rate: 15.0  # Reduced from 30.0 to improve bridge stability
+      enable_inter_cam_sync: false  # Enable firmware-based inter-camera sync (requires sync cables)
+      inter_cam_sync_mode: 0  # 0=None, 1=Master, 2=Slave (auto-assigned: first=master, others=slaves)
     topics:
       publish:
         - /camera_front/color/image_raw
@@ -174,6 +176,62 @@ robot:
       subscribe:
         - /cmd_vel
 
+  # Hardware Sync Signal Generator (GPIO-based sync pulses for cameras)
+  hardware_sync_generator:
+    enabled: false  # Enable when hardware sync is connected
+    package: sensor_sync
+    node: hardware_sync_generator_node
+    namespace: ""
+    parameters:
+      sync_gpio_pin: 21  # GPIO pin for sync signal (PHAT board, unused pin)
+      sync_frequency: 15.0  # Match camera FPS
+      pulse_width_ms: 1.0  # Pulse width in milliseconds
+      gpio_mode: 'BOARD'  # GPIO numbering mode
+      enable_sync: true
+      status_topic: '/hardware_sync/status'
+    topics:
+      publish:
+        - /hardware_sync/status
+      subscribe: []
+
+  # Sensor Synchronization and Filtering (Kalman filter + camera sync)
+  sensor_sync:
+    enabled: true
+    package: sensor_sync
+    node: sensor_sync_node
+    namespace: ""
+    parameters:
+      sync_to_camera: true
+      sync_camera_frames: true  # Sync multiple cameras together (software sync)
+      camera_frame_sync_tolerance: 0.05  # Max time diff between cameras (50ms)
+      target_frequency: 15.0  # Match camera FPS
+      imu_filter_enabled: true
+      imu_process_noise: 0.01
+      imu_measurement_noise: 0.1
+      max_buffer_size: 100
+      time_sync_tolerance: 0.1
+      camera_topics:
+        - "/hardware/camera_front/color/image_raw"
+        - "/hardware/camera_rear/color/image_raw"
+      imu_topic: "/phat/imu"
+      battery_topic: "/irobot/battery"
+      status_topic: "/irobot/status"
+      output_namespace: "/sensor_sync"
+      publish_vlm_features: true
+    topics:
+      publish:
+        - /sensor_sync/imu/filtered
+        - /sensor_sync/chassis/battery
+        - /sensor_sync/chassis/status
+        - /sensor_sync/vlm_features
+        - /sensor_sync/status
+      subscribe:
+        - /phat/imu
+        - /irobot/battery
+        - /irobot/status
+        - /hardware/camera_front/color/image_raw
+        - /hardware/camera_rear/color/image_raw
+
   # PHAT Motor Controller (GPIO + Accelerometer)
   phat_motor_controller:
     enabled: true
@@ -223,13 +281,16 @@ robot:
       # Topic whitelist to reduce bridge load - only forward essential topics
       # Excluded 3D data (pointclouds/mesh) to reduce bandwidth
       topic_whitelist:
-        - "/phat/imu"
+        - "/sensor_sync/.*"  # All synchronized sensor data (IMU, chassis)
         - "/phat/status"
         - "/system/.*"
         - "/hardware/.*/color/image_raw"
         - "/hardware/.*/color/camera_info"
         - "/microphone/audio"
-        - "/irobot/.*"
+        # Excluded raw high-frequency topics (now synced):
+        # - /phat/imu (use /sensor_sync/imu/filtered)
+        # - /irobot/battery (use /sensor_sync/chassis/battery)
+        # - /irobot/status (use /sensor_sync/chassis/status)
     topics:
       publish: []  # Bridge publishes/subscribes to all topics automatically
       subscribe: []
@@ -265,6 +326,8 @@ groups:
     - usb_microphone
     - irobot_serial
     - phat_motor_controller
+    - hardware_sync_generator
+    - sensor_sync
 
   bench_test:
     - system_monitor
