@@ -254,6 +254,36 @@
       "minYValue": 0,
       "maxYValue": 2048,
       "showLegend": true
+    },
+    "Plot!chassis_signals": {
+      "paths": [
+        {
+          "value": "/irobot/battery.voltage",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Battery Voltage (V)"
+        },
+        {
+          "value": "/irobot/battery.percentage",
+          "enabled": true,
+          "color": "#ffff00",
+          "label": "Battery Percentage"
+        },
+        {
+          "value": "/irobot/battery.current",
+          "enabled": true,
+          "color": "#ff8800",
+          "label": "Battery Current (A)"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 15,
+      "showLegend": true
+    },
+    "RawMessages!chassis_status": {
+      "topicName": "/irobot/status",
+      "diffEnabled": false,
+      "diffMethod": "char"
     }
   },
   "globalVariables": {},
@@ -265,22 +295,16 @@
     "direction": "row",
     "first": {
       "direction": "column",
-      "first": {
-        "direction": "row",
-        "first": "Image!front",
-        "second": "3D!front"
-      },
-      "second": {
-        "direction": "row",
-        "first": "Image!rear",
-        "second": "3D!rear"
-      }
+      "first": "Image!front",
+      "second": "Image!rear"
     },
     "second": {
       "direction": "column",
       "first": "Plot!system_stats",
       "second": "Plot!imu_all",
-      "third": "Plot!audio"
+      "third": "Plot!audio",
+      "fourth": "Plot!chassis_signals",
+      "fifth": "RawMessages!chassis_status"
     }
   }
 }

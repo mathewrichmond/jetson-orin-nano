@@ -135,7 +135,7 @@ robot:
 
   # ODrive Motor Controller
   odrive_controller:
-    enabled: true
+    enabled: false
     package: odrive_controller
     node: odrive_controller_node
     namespace: /hardware
@@ -162,7 +162,7 @@ robot:
     node: irobot_serial_node
     namespace: /hardware
     parameters:
-      serial_port: '/dev/ttyUSB1'
+      serial_port: '/dev/ttyUSB0'
       baudrate: 115200
       timeout: 1.0
       publish_rate: 10.0
@@ -221,14 +221,15 @@ robot:
       port: 8765
       address: "0.0.0.0"
       # Topic whitelist to reduce bridge load - only forward essential topics
+      # Excluded 3D data (pointclouds/mesh) to reduce bandwidth
       topic_whitelist:
         - "/phat/imu"
         - "/phat/status"
         - "/system/.*"
-        - "/nvblox/.*/points_downsampled"
         - "/hardware/.*/color/image_raw"
         - "/hardware/.*/color/camera_info"
         - "/microphone/audio"
+        - "/irobot/.*"
     topics:
       publish: []  # Bridge publishes/subscribes to all topics automatically
       subscribe: []
@@ -262,7 +263,6 @@ groups:
     - realsense_camera
     - nvblox_processor
     - usb_microphone
-    - odrive_controller
     - irobot_serial
     - phat_motor_controller
 
@@ -271,7 +271,6 @@ groups:
     - realsense_camera
     - nvblox_processor
     - usb_microphone
-    - odrive_controller
     - irobot_serial
     - phat_motor_controller
 
@@ -280,7 +279,6 @@ groups:
     - realsense_camera
     - nvblox_processor
     - usb_microphone
-    - odrive_controller
     - irobot_serial
     - phat_motor_controller
     - foxglove_bridge

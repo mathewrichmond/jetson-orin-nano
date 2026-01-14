@@ -15,8 +15,8 @@ Foxglove Studio layout files for visualizing robot data.
 - **System Monitoring**: CPU/GPU temperature, CPU/memory usage
 - **ODrive IMU**: Accelerometer and gyroscope data (X, Y, Z)
 - **PHAT IMU**: Accelerometer and gyroscope data (X, Y, Z)
-- **iRobot Battery**: Battery percentage and voltage
-- **Status Messages**: All sensor status topics
+- **Chassis Signals**: iRobot Create battery voltage, percentage, and current
+- **Chassis Status**: iRobot Create status messages (connection state, battery level)
 - Uses the correct Foxglove Studio `configById` format (should import without errors)
 
 ### Usage

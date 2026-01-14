@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     # Serial port configuration
-    serial_port: '/dev/ttyUSB1'  # iRobot serial port (check with: ls -l /dev/ttyUSB*)
+    serial_port: '/dev/ttyUSB0'  # iRobot serial port (check with: ls -l /dev/ttyUSB*)
     baudrate: 115200  # iRobot Create 2 default baudrate
     timeout: 1.0  # Serial timeout in seconds
 

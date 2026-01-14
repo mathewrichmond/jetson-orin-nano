@@ -77,7 +77,7 @@ robot:
 
   # ODrive Motor Controller
   odrive_controller:
-    enabled: true
+    enabled: false
     package: odrive_controller
     node: odrive_controller_node
     namespace: /hardware
@@ -104,7 +104,7 @@ robot:
     node: irobot_serial_node
     namespace: /hardware
     parameters:
-      serial_port: '/dev/ttyUSB1'
+      serial_port: '/dev/ttyUSB0'
       baudrate: 115200
       timeout: 1.0
       robot_type: 'create2'
@@ -135,7 +135,6 @@ groups:
     - system_monitor
     - realsense_camera
     - usb_microphone
-    - odrive_controller
     - irobot_serial
     - foxglove_bridge
 
@@ -146,7 +145,6 @@ groups:
     - usb_microphone
 
   motors:
-    - odrive_controller
     - irobot_serial
 
   visualization:
@@ -156,6 +154,5 @@ groups:
     - system_monitor
     - realsense_camera
     - usb_microphone
-    - odrive_controller
     - irobot_serial
     - foxglove_bridge
