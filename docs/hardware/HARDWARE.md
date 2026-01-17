@@ -2,20 +2,30 @@
 
 This document provides an overview of hardware components integrated with the Isaac robot system.
 
-## Supported Hardware
+## Final Hardware Setup (Electronics Complete)
+
+The Isaac robot system uses the following hardware configuration:
+
+### Main Computer
+- **Jetson Orin Nano**: Primary compute platform
+  - Ubuntu 22.04 (JetPack 5.x)
+  - ROS 2 Humble framework
 
 ### Cameras
-- **Intel Realsense**: D435/D455 series (integrated)
+- **Two Intel RealSense Cameras**: D435/D455 series (USB ports)
+  - Hardware frame synchronization via ground and sync pin connections
   - Setup: Via unified setup or `scripts/utils/hardware_manager.py`
-  - Drivers: Intel Realsense SDK 2.0 + ROS 2 wrapper
-  - Documentation: [RealSense Setup](realsense.md) | [Hardware Setup Guide](HARDWARE_SETUP.md)
+  - Drivers: Intel RealSense SDK 2.0 + ROS 2 wrapper
+  - Documentation: [RealSense Setup](realsense.md) | [Hardware Setup Guide](HARDWARE_SETUP.md) | [Camera Frame Sync](CAMERA_FRAME_SYNC.md)
 
-### Motor Controllers
-- **ODrive**: ODrive motor controller with accelerometer
-  - Setup: See [ODrive Setup](odrive.md)
-  - Communication: Serial (USB) or CAN bus
-  - Features: Motor control, IMU/accelerometer data
-  - Documentation: [ODrive Setup](odrive.md)
+### Motor Control & IMU
+- **SparkFun Auto pHAT**: Connected via 40-pin GPIO header
+  - Setup: See [SparkFun Auto pHAT Setup](sparkfun_auto_phat.md)
+  - Communication: I2C (GPIO header)
+  - Features:
+    - Four servo motor outputs (for camera actuation)
+    - ICM-20948 9DOF IMU (accelerometer, gyroscope, magnetometer)
+  - Documentation: [SparkFun Auto pHAT Setup](sparkfun_auto_phat.md)
 
 ### Audio Input
 - **USB Microphone**: USB audio input device
@@ -25,16 +35,11 @@ This document provides an overview of hardware components integrated with the Is
   - Documentation: [USB Microphone Setup](usb_microphone.md)
 
 ### Robot Base
-- **iRobot Developer Kit**: iRobot Create/Roomba base
+- **iRobot Create**: Mobile base chassis
   - Setup: See [iRobot Setup](irobot.md)
-  - Communication: Serial (USB)
+  - Communication: Serial (USB port)
   - Features: Mobile base control, battery monitoring
   - Documentation: [iRobot Setup](irobot.md)
-
-### Sub-module Controllers
-- **Raspberry Pi**: For distributed control (planned)
-  - Setup: See `hardware/raspberry_pi_modules/` directory
-  - Communication: Network-based (ROS 2 over network)
 
 ## Hardware Setup Process
 
@@ -53,12 +58,11 @@ See [Hardware Setup Guide](HARDWARE_SETUP.md) for detailed instructions.
 ## Hardware-Specific Documentation
 
 - [Hardware Setup Guide](HARDWARE_SETUP.md) - Unified hardware installation guide
-- [Realsense Setup](realsense.md) - Camera installation and configuration
-- [ODrive Setup](odrive.md) - ODrive motor controller setup
+- [RealSense Setup](realsense.md) - Camera installation and configuration
+- [Camera Frame Sync](CAMERA_FRAME_SYNC.md) - Hardware frame synchronization setup
+- [SparkFun Auto pHAT Setup](sparkfun_auto_phat.md) - Servo control and IMU setup
 - [USB Microphone Setup](usb_microphone.md) - USB microphone setup
-- [iRobot Setup](irobot.md) - iRobot Create/Roomba setup
-- [Motor Controllers](motor_controllers.md) - General motor controller information
-- [Raspberry Pi Modules](raspberry_pi_modules.md) - Sub-module integration
+- [iRobot Setup](irobot.md) - iRobot Create setup
 
 ## Power Considerations
 
@@ -86,8 +90,9 @@ See [Hardware Setup Guide](HARDWARE_SETUP.md) for detailed instructions.
 - **Driver issues**: Check kernel modules and driver installation
 - **Performance issues**: Check USB bandwidth, power supply, thermal throttling
 
-## Future Hardware
+## Hardware Connection Summary
 
-- Additional sensors (IMU, LiDAR, etc.)
-- Actuators (grippers, manipulators, etc.)
-- Communication modules (WiFi, Bluetooth, etc.)
+- **Jetson Orin Nano** (main computer)
+  - **USB Ports**: Two RealSense cameras, USB microphone, iRobot Create
+  - **40-pin GPIO**: SparkFun Auto pHAT (servos and IMU)
+  - **Camera Sync**: Ground and sync pins connected between cameras for hardware frame synchronization

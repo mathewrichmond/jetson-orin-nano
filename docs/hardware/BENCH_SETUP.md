@@ -6,10 +6,10 @@ This document provides a quick reference for verifying and using all hardware co
 
 ## Hardware Components
 
-1. **Two RealSense Cameras (USB)** - Vision sensors
-2. **USB Microphone** - Audio input
-3. **ODrive Motor Controller and Accelerometer** - Motor control and IMU
-4. **iRobot Developer Kit Serial Connection (USB)** - Mobile base
+1. **Two RealSense Cameras (USB ports)** - Vision sensors with hardware frame sync
+2. **USB Microphone (USB port)** - Audio input
+3. **SparkFun Auto pHAT (40-pin GPIO)** - Four servo motors for camera actuation and ICM-20948 IMU
+4. **iRobot Create (USB port)** - Mobile base chassis
 
 ## Quick Verification
 
@@ -55,19 +55,16 @@ ros2 launch usb_microphone usb_microphone.launch.py
 ros2 topic echo /microphone/status
 ```
 
-### ODrive Motor Controller
+### SparkFun Auto pHAT
 
 ```bash
-# Check serial devices
-ls -l /dev/ttyUSB* /dev/ttyACM*
+# Check I2C devices
+i2cdetect -y 7
 
-# Check USB devices (if USB-connected)
-lsusb | grep -i "odrive\|1209:0d32"
-
-# Test ROS 2 node
-ros2 launch odrive_controller odrive_controller.launch.py
-ros2 topic echo /odrive/status
-ros2 topic echo /odrive/imu
+# Check ROS 2 node
+ros2 launch phat_motor_controller phat_motor_controller.launch.py
+ros2 topic echo /phat/status
+ros2 topic echo /phat/imu
 ```
 
 ### iRobot Developer Kit
@@ -108,8 +105,8 @@ ros2 launch realsense_camera realsense_camera.launch.py
 # Terminal 3: USB microphone
 ros2 launch usb_microphone usb_microphone.launch.py
 
-# Terminal 4: ODrive controller
-ros2 launch odrive_controller odrive_controller.launch.py
+# Terminal 4: SparkFun Auto pHAT
+ros2 launch phat_motor_controller phat_motor_controller.launch.py
 
 # Terminal 5: iRobot serial
 ros2 launch irobot_serial irobot_serial.launch.py
@@ -125,11 +122,11 @@ ros2 topic list
 ros2 topic echo /system/status
 ros2 topic echo /realsense/status
 ros2 topic echo /microphone/status
-ros2 topic echo /odrive/status
+ros2 topic echo /phat/status
 ros2 topic echo /irobot/status
 
 # Monitor sensor data
-ros2 topic echo /odrive/imu
+ros2 topic echo /phat/imu
 ros2 topic echo /irobot/battery
 ros2 topic echo /camera_front/color/image_raw
 ```
@@ -151,7 +148,7 @@ ls -l /dev/ttyUSB*
 ```
 
 Update configuration files accordingly:
-- ODrive: `config/hardware/odrive_params.yaml` - `serial_port`
+- SparkFun Auto pHAT: `config/hardware/phat_params.yaml` - I2C bus and IMU address
 - iRobot: `config/hardware/irobot_params.yaml` - `serial_port`
 
 ### USB Power Issues
@@ -193,8 +190,8 @@ All hardware configuration files are in `config/hardware/`:
 
 - `realsense_params.yaml` - RealSense camera configuration
 - `microphone_params.yaml` - USB microphone configuration
-- `odrive_params.yaml` - ODrive motor controller configuration
-- `irobot_params.yaml` - iRobot serial configuration
+- `phat_params.yaml` - SparkFun Auto pHAT configuration (servos and IMU)
+- `irobot_params.yaml` - iRobot Create serial configuration
 
 ## Graph Configuration
 
@@ -202,10 +199,10 @@ Bench test graph configuration: `config/robot/bench_test_graph.yaml`
 
 This includes:
 - System monitor
-- RealSense cameras
+- RealSense cameras (hardware frame sync)
 - USB microphone
-- ODrive controller
-- iRobot serial
+- SparkFun Auto pHAT (servos and IMU)
+- iRobot Create serial
 - Foxglove bridge (for visualization)
 
 ## Next Steps
@@ -220,6 +217,7 @@ This includes:
 
 - [Hardware Setup Guide](HARDWARE_SETUP.md) - Detailed setup instructions
 - [RealSense Setup](realsense.md) - Camera configuration
-- [ODrive Setup](odrive.md) - Motor controller configuration
+- [Camera Frame Sync](CAMERA_FRAME_SYNC.md) - Hardware frame synchronization
+- [SparkFun Auto pHAT Setup](sparkfun_auto_phat.md) - Servo and IMU configuration
 - [USB Microphone Setup](usb_microphone.md) - Microphone configuration
 - [iRobot Setup](irobot.md) - Robot base configuration

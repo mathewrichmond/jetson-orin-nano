@@ -262,7 +262,7 @@ This checks that all expected topics are publishing data.
 
 1. **Check if packages are built**:
    ```bash
-   ros2 pkg list | grep -E "(realsense|microphone|odrive|irobot)"
+   ros2 pkg list | grep -E "(realsense|microphone|phat|irobot)"
    ```
 
 2. **Rebuild packages**:

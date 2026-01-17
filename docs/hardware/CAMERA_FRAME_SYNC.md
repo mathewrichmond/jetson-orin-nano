@@ -4,10 +4,10 @@ This document describes camera frame synchronization options for the Isaac robot
 
 ## Overview
 
-For VLM feature extraction and accurate sensor fusion, camera frames should be synchronized. There are two approaches:
+For VLM feature extraction and accurate sensor fusion, camera frames should be synchronized. The Isaac robot system uses:
 
-1. **Hardware Synchronization** (Recommended for production)
-2. **Software Synchronization** (Current implementation)
+1. **Hardware Synchronization** (Implemented) - Ground and sync pins connected between cameras
+2. **Software Synchronization** (Available as fallback) - Software-based frame synchronization
 
 ## Software Frame Synchronization
 
@@ -30,14 +30,16 @@ sensor_sync:
 - May drop frames if cameras drift apart
 - Not as precise as hardware sync
 
-## Hardware Synchronization (RealSense)
+## Hardware Synchronization (RealSense) - IMPLEMENTED
 
-RealSense cameras support firmware-based inter-camera synchronization via:
-- **Inter-camera sync** - One camera (master) generates sync signal, others (slaves) receive it
-- **Firmware-controlled** - Configured via pyrealsense2, no external GPIO needed
-- **Physical sync cables** - Requires sync cables between cameras (camera-to-camera, not GPIO)
+The Isaac robot system uses hardware frame synchronization between the two RealSense cameras:
 
-**This is the recommended approach** - it uses the cameras' built-in sync mechanism and is more reliable than external GPIO triggers.
+- **Physical Connection**: Ground and sync pins are connected between the two cameras
+- **Inter-camera sync** - One camera (master) generates sync signal, the other (slave) receives it
+- **Firmware-controlled** - Configured via pyrealsense2
+- **Hardware-level precision** - Provides precise frame synchronization at the hardware level
+
+**This is the production approach** - it uses the cameras' built-in sync mechanism and provides reliable, precise synchronization.
 
 ### Firmware-Based Inter-Camera Sync (Recommended)
 
@@ -47,11 +49,11 @@ RealSense cameras support inter-camera synchronization via firmware configuratio
 - Cameras handle timing internally
 - More reliable than software-only sync
 
-**Hardware Setup:**
-1. **Connect sync cables** between cameras (camera-to-camera, not to GPIO)
+**Hardware Setup (Completed):**
+1. **Sync cables connected** between cameras (camera-to-camera)
    - Master camera's sync out → Slave camera's sync in
-   - Check RealSense documentation for sync pin locations
-2. **No GPIO connections needed** - sync is handled internally by cameras
+   - Ground pins connected for common reference
+2. **No GPIO connections needed** - sync is handled internally by cameras via firmware
 
 **Software Configuration:**
 ```yaml
@@ -128,23 +130,24 @@ nvblox_processor:
 
 ## Recommendations
 
-1. **For Development:** Use software sync (current implementation)
-2. **For Production:** Use firmware-based inter-camera sync (preferred) - requires sync cables between cameras
-3. **Alternative:** Use external GPIO sync if firmware sync not available
-4. **For VLM Features:** Use nvblox fusion for robust temporal alignment
+1. **For Production:** Hardware frame sync is implemented and active (ground and sync pins connected)
+2. **For Development/Fallback:** Software sync available if hardware sync fails
+3. **For VLM Features:** Hardware sync provides precise frame alignment for feature extraction
+4. **Alternative:** External GPIO sync available if firmware sync not available (not needed with current setup)
 
 ## Current Implementation
 
-**Software Sync:**
-- ✅ Syncs IMU and chassis data to camera frames
-- ✅ Software-based multi-camera frame sync
-- ✅ Configurable sync tolerance
-
-**Hardware Sync:**
-- ✅ Firmware-based inter-camera sync: Implemented (requires sync cables between cameras)
+**Hardware Sync (Production):**
+- ✅ Physical sync cables connected between cameras
+- ✅ Ground pins connected for common reference
+- ✅ Firmware-based inter-camera sync: Implemented and active
 - ✅ Automatic master/slave assignment
-- ✅ GPIO sync signal generator: Available as alternative
-- ⏳ Physical sync cable connections: Required for firmware sync
+- ✅ Hardware-level frame synchronization
+
+**Software Sync (Fallback):**
+- ✅ Syncs IMU and chassis data to camera frames
+- ✅ Software-based multi-camera frame sync (available if hardware sync fails)
+- ✅ Configurable sync tolerance
 
 **Future Enhancements:**
 - ⏳ nvblox-based fusion (can be added)

@@ -1,17 +1,16 @@
 # Isaac - Jetson Orin Nano Robot System
 
-This repository contains the complete software stack for the Isaac robot system running on a Jetson Orin Nano. The system integrates Realsense cameras, motor controllers, and a custom Vision-Language-Action (VLA) model as the primary controller.
+This repository contains the complete software stack for the Isaac robot system running on a Jetson Orin Nano. The system integrates two RealSense cameras with hardware frame sync, a SparkFun Auto pHAT for servo control and IMU, an iRobot Create chassis, and a custom Vision-Language-Action (VLA) model as the primary controller.
 
 ## 🎯 Purpose
 
 This repository implements and manages:
 - **System Setup**: Automated installation of packages, drivers, and dependencies
-- **Hardware Integration**: Drivers and configuration for Realsense cameras, motor controllers, and other peripherals
+- **Hardware Integration**: Drivers and configuration for RealSense cameras, SparkFun Auto pHAT (servos and IMU), iRobot Create chassis, and USB microphone
 - **VLA Controller**: Custom Vision-Language-Action model for robot control
 - **System Monitoring**: Health checks, performance monitoring, and diagnostics
 - **Logging Infrastructure**: Centralized logging with future NFS support for shared storage
 - **Control Mode Switching**: Safe mode transitions and state management
-- **Sub-module Controllers**: Support for Raspberry Pi and other auxiliary controllers
 
 ## 🎯 Configuration-Driven Approach
 
@@ -144,15 +143,22 @@ ros2 --help
 
 ## 🔌 Hardware Support
 
-### Currently Supported
-- Jetson Orin Nano base system
-- ROS 2 Humble framework
+### Final Hardware Setup (Electronics Complete)
 
-### Planned Support
-- Intel Realsense cameras (D435/D455)
-- Motor controllers (TBD)
-- Raspberry Pi sub-modules
-- Additional sensors and actuators
+The Isaac robot system uses the following hardware configuration:
+
+- **Main Computer**: Jetson Orin Nano
+- **Cameras**: Two Intel RealSense cameras (USB ports)
+  - Hardware frame sync via ground and sync pin connections
+- **Audio Input**: USB microphone (USB port)
+- **Chassis**: iRobot Create (USB port)
+- **Motor Control & IMU**: SparkFun Auto pHAT (40-pin GPIO)
+  - Four servo motors for camera actuation
+  - ICM-20948 9DOF IMU (accelerometer, gyroscope, magnetometer)
+
+### Software Framework
+- ROS 2 Humble
+- Ubuntu 22.04 (JetPack 5.x)
 
 ## 🛡️ System Stability Features
 

@@ -193,37 +193,53 @@ rm .hardware_state
    sudo udevadm trigger
    ```
 
-## ODrive Motor Controller
+## SparkFun Auto pHAT
+
+### Overview
+
+The SparkFun Auto pHAT provides:
+- Four servo motor outputs (for camera actuation)
+- ICM-20948 9DOF IMU (accelerometer, gyroscope, magnetometer)
+- Connected via 40-pin GPIO header
 
 ### Installation
 
-ODrive controllers are integrated via ROS 2:
+The Auto pHAT is integrated via ROS 2:
 
 ```bash
 cd ~/ros2_ws
 source /opt/ros/humble/setup.bash
-colcon build --packages-select odrive_controller
+colcon build --packages-select phat_motor_controller
 source install/setup.bash
 ```
 
+### Physical Connection
+
+1. **GPIO Header**: Connect Auto pHAT to Jetson's 40-pin GPIO header
+2. **Orientation**: Auto pHAT should overhang the right-hand side of the Jetson
+3. **Power**: Board receives power from GPIO header (3.3V/5V)
+
 ### Configuration
 
-Configure ODrive in `config/hardware/odrive_params.yaml`:
-- Set serial port (e.g., `/dev/ttyUSB0`)
-- Configure baudrate (typically 115200)
-- Enable accelerometer if available
+Configure Auto pHAT in `config/hardware/phat_params.yaml`:
+- Set I2C bus (Jetson uses bus 7 for GPIO header I2C)
+- Configure IMU address (0x69 for ICM-20948)
+- Set servo parameters
 
 ### Verification
 
 ```bash
-# Launch ODrive node
-ros2 launch odrive_controller odrive_controller.launch.py
+# Launch pHAT node
+ros2 launch phat_motor_controller phat_motor_controller.launch.py
 
 # Check status
-ros2 topic echo /odrive/status
+ros2 topic echo /phat/status
+
+# Check IMU data
+ros2 topic echo /phat/imu
 ```
 
-See [ODrive Setup](odrive.md) for detailed configuration.
+See [SparkFun Auto pHAT Setup](sparkfun_auto_phat.md) for detailed configuration.
 
 ## USB Microphone
 
@@ -299,11 +315,11 @@ This section covers verification of the complete bench setup with all hardware c
 
 ### Hardware Components
 
-The bench setup includes:
-1. **Two RealSense cameras** (USB) - Front and rear cameras
-2. **USB microphone** - Audio input for voice commands
-3. **ODrive motor controller** - Motor control with accelerometer (motors not yet connected)
-4. **iRobot Developer Kit** - Serial connection (USB) for robot base
+The final hardware setup includes:
+1. **Two RealSense cameras** (USB ports) - With hardware frame sync via ground and sync pin connections
+2. **USB microphone** (USB port) - Audio input for voice commands
+3. **SparkFun Auto pHAT** (40-pin GPIO) - Four servo motors for camera actuation and ICM-20948 IMU
+4. **iRobot Create** (USB port) - Mobile base chassis
 
 ### Step 1: Physical Hardware Verification
 
@@ -323,7 +339,8 @@ This script checks:
 **Expected Output:**
 - ✓ 2 RealSense cameras detected
 - ✓ USB microphone detected
-- ✓ Serial devices found (for ODrive and iRobot)
+- ✓ SparkFun Auto pHAT detected (I2C devices)
+- ✓ Serial devices found (for iRobot Create)
 - ✓ ROS 2 packages built
 
 ### Step 2: Build ROS 2 Packages
@@ -333,7 +350,7 @@ Ensure all hardware driver packages are built:
 ```bash
 cd ~/ros2_ws
 source /opt/ros/humble/setup.bash
-colcon build --packages-select realsense_camera usb_microphone odrive_controller irobot_serial
+colcon build --packages-select realsense_camera usb_microphone phat_motor_controller irobot_serial
 source install/setup.bash
 ```
 
@@ -353,10 +370,11 @@ ros2 run usb_microphone usb_microphone_node
 # In another terminal:
 ros2 topic echo /microphone/status
 
-# Test ODrive controller
-ros2 run odrive_controller odrive_controller_node
+# Test SparkFun Auto pHAT
+ros2 run phat_motor_controller phat_motor_controller_node
 # In another terminal:
-ros2 topic echo /odrive/status
+ros2 topic echo /phat/status
+ros2 topic echo /phat/imu
 
 # Test iRobot serial
 ros2 run irobot_serial irobot_serial_node
@@ -391,10 +409,10 @@ ros2 launch isaac_robot graph.launch.py graph_config:=robot_graph.yaml group:=be
 
 This launches:
 - System monitor
-- RealSense cameras (front and rear)
+- RealSense cameras (with hardware frame sync)
 - USB microphone
-- ODrive controller
-- iRobot serial connection
+- SparkFun Auto pHAT (servos and IMU)
+- iRobot Create serial connection
 
 ### Step 6: Verify Topics and Data
 
@@ -414,9 +432,9 @@ ros2 topic echo /realsense/status
 # Check microphone
 ros2 topic echo /microphone/status
 
-# Check ODrive
-ros2 topic echo /odrive/status
-ros2 topic echo /odrive/imu
+# Check SparkFun Auto pHAT
+ros2 topic echo /phat/status
+ros2 topic echo /phat/imu
 
 # Check iRobot
 ros2 topic echo /irobot/status
@@ -457,7 +475,7 @@ ros2 topic echo /irobot/battery
 After successful bench verification:
 1. **Configure serial ports** - Update `/dev/ttyUSB*` assignments in config files if needed
 2. **Calibrate cameras** - Run camera calibration if needed
-3. **Test motor control** - Once motors are connected, test ODrive motor commands
+3. **Test servo control** - Test servo motor commands for camera actuation
 4. **Integrate with control system** - Connect hardware to VLA controller when ready
 
 See [Graph Configuration](../robot/GRAPH_CONFIG.md) for details on node configuration and topic mappings.
@@ -471,16 +489,17 @@ Run the comprehensive hardware verification script:
 ```
 
 This script checks:
-- Two RealSense cameras (USB)
+- Two RealSense cameras (USB ports, hardware frame sync)
 - USB microphone
-- ODrive motor controller and accelerometer
-- iRobot developer kit serial connection
+- SparkFun Auto pHAT (servos and IMU via GPIO)
+- iRobot Create serial connection
 
 ## Next Steps
 
 - See [RealSense Setup](realsense.md) for detailed camera configuration
-- See [ODrive Setup](odrive.md) for motor controller configuration
+- See [Camera Frame Sync](CAMERA_FRAME_SYNC.md) for hardware frame synchronization setup
+- See [SparkFun Auto pHAT Setup](sparkfun_auto_phat.md) for servo and IMU configuration
 - See [USB Microphone Setup](usb_microphone.md) for microphone configuration
 - See [iRobot Setup](irobot.md) for robot base configuration
-- See [Hardware Integration](../hardware/HARDWARE.md) for hardware overview
+- See [Hardware Integration](HARDWARE.md) for hardware overview
 - See [System Setup](../setup/SETUP.md) for full system setup

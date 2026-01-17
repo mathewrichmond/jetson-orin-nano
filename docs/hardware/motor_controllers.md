@@ -6,7 +6,11 @@ This guide covers the integration of motor controllers with the Isaac robot syst
 
 ## Supported Controllers
 
-*To be determined based on hardware selection*
+### SparkFun Auto pHAT
+- **Type**: Servo motor controller with IMU
+- **Connection**: 40-pin GPIO header (I2C)
+- **Features**: Four servo motor outputs for camera actuation, ICM-20948 9DOF IMU
+- **Documentation**: See [SparkFun Auto pHAT Setup](sparkfun_auto_phat.md)
 
 ## General Setup Process
 
@@ -64,4 +68,3 @@ Motor controller configurations are stored in:
 - Select motor controller hardware
 - Create driver package in `src/hardware_drivers/`
 - Implement safety checks and interlocks
-

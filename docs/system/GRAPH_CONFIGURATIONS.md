@@ -8,11 +8,10 @@ The Isaac robot system uses a single graph configuration that includes all robot
 
 The main robot operation graph with all robot nodes:
 - System monitor
-- RealSense cameras (front and rear)
+- RealSense cameras (front and rear, hardware frame sync)
 - USB microphone
-- ODrive motor controller
-- iRobot serial connection
-- PHAT motor controller
+- SparkFun Auto pHAT (servos and IMU)
+- iRobot Create serial connection
 - Foxglove Bridge (for remote visualization)
 - VLA controller (when enabled)
 
