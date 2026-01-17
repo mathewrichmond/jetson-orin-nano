@@ -77,6 +77,39 @@ The PHAT motor controller node is configured for SparkFun Auto pHAT:
 - **I2C Address**: 0x69
 - **I2C Bus**: 7 (Jetson Orin Nano) - **Note**: Raspberry Pi uses bus 1, Jetson uses bus 7
 
+### Servo Control (Camera Actuation)
+
+The Auto pHAT exposes 4 servo outputs via a PCA9685 controller at I2C address `0x40`.
+Camera pan/tilt servos are controlled by the PHAT node using degree commands.
+
+**Config parameters** (in `config/hardware/phat_params.yaml`):
+- `enable_servos`: Enable PCA9685 servo control
+- `servo_i2c_bus`: I2C bus for PCA9685 (Jetson uses bus 7 on GPIO header)
+- `servo_pan_channel` / `servo_tilt_channel`: PCA9685 channel numbers (0-15)
+- `servo_min_angle_deg` / `servo_max_angle_deg`: Commanded angle range
+- `servo_min_pulse_us` / `servo_max_pulse_us`: PWM pulse limits (servo-specific)
+- `servo_pan_topic` / `servo_tilt_topic`: Command topics
+- `servo_initialize_on_start`: If true, move to startup angles on boot
+
+**Command topics** (degrees):
+- `/phat/camera_pan` (std_msgs/Float32)
+- `/phat/camera_tilt` (std_msgs/Float32)
+
+**Start the hardware graph** (required):
+```bash
+./scripts/system/manage_graph.sh start robot
+```
+
+**Send a test command**:
+```bash
+ros2 topic pub --once /phat/camera_pan std_msgs/Float32 "{data: 45.0}"
+ros2 topic pub --once /phat/camera_tilt std_msgs/Float32 "{data: 120.0}"
+```
+
+**Safety notes**:
+- Start with conservative `servo_min_pulse_us`/`servo_max_pulse_us` to avoid binding.
+- Leave `servo_initialize_on_start` disabled until the mechanical limits are verified.
+
 ### Configuration File
 
 Edit `config/hardware/phat_params.yaml`:

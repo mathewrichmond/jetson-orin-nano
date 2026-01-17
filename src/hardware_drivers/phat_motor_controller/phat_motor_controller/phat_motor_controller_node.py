@@ -14,7 +14,7 @@ from geometry_msgs.msg import Twist
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, MagneticField
-from std_msgs.msg import Header, String
+from std_msgs.msg import Float32, Header, String
 
 # Try to import I2C library (smbus2 is preferred, fallback to smbus)
 try:
@@ -75,6 +75,23 @@ class PHATMotorControllerNode(Node):
         self.declare_parameter("pwm_frequency", 1000)  # Hz
         self.declare_parameter("pwm_initial_duty_cycle", 0.0)  # Initial PWM duty cycle (0-100)
 
+        # Servo control parameters (PCA9685 via I2C)
+        self.declare_parameter("enable_servos", False)
+        self.declare_parameter("servo_i2c_bus", 7)
+        self.declare_parameter("servo_i2c_address", 0x40)
+        self.declare_parameter("servo_pwm_frequency", 50)  # Hz
+        self.declare_parameter("servo_pan_channel", 0)
+        self.declare_parameter("servo_tilt_channel", 1)
+        self.declare_parameter("servo_pan_inverted", False)
+        self.declare_parameter("servo_tilt_inverted", False)
+        self.declare_parameter("servo_min_angle_deg", 0.0)
+        self.declare_parameter("servo_max_angle_deg", 180.0)
+        self.declare_parameter("servo_min_pulse_us", 1000.0)
+        self.declare_parameter("servo_max_pulse_us", 2000.0)
+        self.declare_parameter("servo_startup_pan_deg", 90.0)
+        self.declare_parameter("servo_startup_tilt_deg", 90.0)
+        self.declare_parameter("servo_initialize_on_start", False)
+
         # Robot kinematics parameters
         self.declare_parameter("wheelbase", 0.2)  # Distance between wheels in meters
         self.declare_parameter("max_speed", 1.0)  # Maximum speed in m/s
@@ -87,6 +104,8 @@ class PHATMotorControllerNode(Node):
         self.declare_parameter("imu_topic", "/phat/imu")
         self.declare_parameter("magnetometer_topic", "/phat/magnetometer")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
+        self.declare_parameter("servo_pan_topic", "/phat/camera_pan")
+        self.declare_parameter("servo_tilt_topic", "/phat/camera_tilt")
 
         # Frame IDs
         self.declare_parameter("imu_frame_id", "phat_imu")
@@ -104,6 +123,24 @@ class PHATMotorControllerNode(Node):
         self.pwm_freq = self.get_parameter("pwm_frequency").value
         self.pwm_initial_duty = self.get_parameter("pwm_initial_duty_cycle").value
 
+        self.enable_servos = self.get_parameter("enable_servos").value
+        self.servo_bus_num = self.get_parameter("servo_i2c_bus").value
+        self.servo_address = self.get_parameter("servo_i2c_address").value
+        self.servo_pwm_frequency = self.get_parameter("servo_pwm_frequency").value
+        self.servo_pan_channel = self.get_parameter("servo_pan_channel").value
+        self.servo_tilt_channel = self.get_parameter("servo_tilt_channel").value
+        self.servo_pan_inverted = self.get_parameter("servo_pan_inverted").value
+        self.servo_tilt_inverted = self.get_parameter("servo_tilt_inverted").value
+        self.servo_min_angle = self.get_parameter("servo_min_angle_deg").value
+        self.servo_max_angle = self.get_parameter("servo_max_angle_deg").value
+        self.servo_min_pulse_us = self.get_parameter("servo_min_pulse_us").value
+        self.servo_max_pulse_us = self.get_parameter("servo_max_pulse_us").value
+        self.servo_startup_pan = self.get_parameter("servo_startup_pan_deg").value
+        self.servo_startup_tilt = self.get_parameter("servo_startup_tilt_deg").value
+        self.servo_initialize_on_start = self.get_parameter(
+            "servo_initialize_on_start"
+        ).value
+
         self.wheelbase = self.get_parameter("wheelbase").value
         self.max_speed = self.get_parameter("max_speed").value
 
@@ -118,6 +155,8 @@ class PHATMotorControllerNode(Node):
         self.imu_topic = self.get_parameter("imu_topic").value
         self.magnetometer_topic = self.get_parameter("magnetometer_topic").value
         self.cmd_vel_topic = self.get_parameter("cmd_vel_topic").value
+        self.servo_pan_topic = self.get_parameter("servo_pan_topic").value
+        self.servo_tilt_topic = self.get_parameter("servo_tilt_topic").value
         self.imu_frame_id = self.get_parameter("imu_frame_id").value
 
         # I2C and GPIO connections
@@ -125,6 +164,9 @@ class PHATMotorControllerNode(Node):
         self.accel_initialized = False
         self.mag_initialized = False
         self.gpio_initialized = False
+        self.servo_initialized = False
+        self.servo_bus: Optional[SMBus] = None
+        self.servo_bus_shared = False
 
         # Publishers
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
@@ -139,6 +181,15 @@ class PHATMotorControllerNode(Node):
         self.cmd_vel_sub = self.create_subscription(
             Twist, self.cmd_vel_topic, self.cmd_vel_callback, 10
         )
+        self.servo_pan_sub = None
+        self.servo_tilt_sub = None
+        if self.enable_servos:
+            self.servo_pan_sub = self.create_subscription(
+                Float32, self.servo_pan_topic, self.servo_pan_callback, 10
+            )
+            self.servo_tilt_sub = self.create_subscription(
+                Float32, self.servo_tilt_topic, self.servo_tilt_callback, 10
+            )
 
         # Timer for status updates
         self.status_timer = self.create_timer(
@@ -191,30 +242,68 @@ class PHATMotorControllerNode(Node):
                 )
                 self.get_logger().info("Install Jetson.GPIO or RPi.GPIO for motor control")
                 self.gpio_initialized = False
-                return
+            else:
+                # Set GPIO mode based on configuration
+                gpio_mode_str = self.get_parameter("gpio_mode").value
+                gpio_mode = GPIO.BOARD if gpio_mode_str == "BOARD" else GPIO.BCM
+                GPIO.setmode(gpio_mode)  # Use configured GPIO numbering mode
+                GPIO.setup(self.motor_left_pwm, GPIO.OUT)
+                GPIO.setup(self.motor_left_dir, GPIO.OUT)
+                GPIO.setup(self.motor_right_pwm, GPIO.OUT)
+                GPIO.setup(self.motor_right_dir, GPIO.OUT)
 
-            # Set GPIO mode based on configuration
-            gpio_mode_str = self.get_parameter("gpio_mode").value
-            gpio_mode = GPIO.BOARD if gpio_mode_str == "BOARD" else GPIO.BCM
-            GPIO.setmode(gpio_mode)  # Use configured GPIO numbering mode
-            GPIO.setup(self.motor_left_pwm, GPIO.OUT)
-            GPIO.setup(self.motor_left_dir, GPIO.OUT)
-            GPIO.setup(self.motor_right_pwm, GPIO.OUT)
-            GPIO.setup(self.motor_right_dir, GPIO.OUT)
+                # Initialize PWM
+                self.pwm_left = GPIO.PWM(self.motor_left_pwm, self.pwm_freq)
+                self.pwm_right = GPIO.PWM(self.motor_right_pwm, self.pwm_freq)
+                self.pwm_left.start(self.pwm_initial_duty)
+                self.pwm_right.start(self.pwm_initial_duty)
 
-            # Initialize PWM
-            self.pwm_left = GPIO.PWM(self.motor_left_pwm, self.pwm_freq)
-            self.pwm_right = GPIO.PWM(self.motor_right_pwm, self.pwm_freq)
-            self.pwm_left.start(self.pwm_initial_duty)
-            self.pwm_right.start(self.pwm_initial_duty)
-
-            self.gpio_initialized = True
-            self.get_logger().info("GPIO initialized for motor control")
+                self.gpio_initialized = True
+                self.get_logger().info("GPIO initialized for motor control")
 
         except Exception as e:
             self.get_logger().warn(f"Failed to initialize GPIO: {e}")
             self.get_logger().info("Motor control disabled, but node will continue")
             self.gpio_initialized = False
+
+        # Initialize servo controller (PCA9685 over I2C)
+        if self.enable_servos:
+            if not SMBUS_AVAILABLE:
+                self.get_logger().error(
+                    "I2C library (smbus/smbus2) not available. Servo control disabled."
+                )
+                self.servo_initialized = False
+                return
+
+            try:
+                if self.i2c_bus and self.servo_bus_num == self.i2c_bus_num:
+                    self.servo_bus = self.i2c_bus
+                    self.servo_bus_shared = True
+                else:
+                    self.servo_bus = SMBus(self.servo_bus_num)
+                    self.servo_bus_shared = False
+
+                self._init_pca9685()
+                self.servo_initialized = True
+                self.get_logger().info(
+                    "Servo controller initialized (PCA9685 on I2C)"
+                )
+
+                if self.servo_initialize_on_start:
+                    self._set_servo_angle(
+                        self.servo_pan_channel,
+                        self.servo_startup_pan,
+                        inverted=self.servo_pan_inverted,
+                    )
+                    self._set_servo_angle(
+                        self.servo_tilt_channel,
+                        self.servo_startup_tilt,
+                        inverted=self.servo_tilt_inverted,
+                    )
+
+            except Exception as e:
+                self.get_logger().warn(f"Failed to initialize servo controller: {e}")
+                self.servo_initialized = False
 
     def _init_mpu6050(self):
         """Initialize MPU6050 accelerometer"""
@@ -681,7 +770,7 @@ class PHATMotorControllerNode(Node):
                     sensor_data = (
                         {"accel": accel_data, "gyro": None, "mag": None} if accel_data else None
                     )
-                el                    if self.accel_type == "ICM20948":
+                elif self.accel_type == "ICM20948":
                     sensor_data = self._read_icm20948()
                     # Debug: Log if gyro data is missing
                     if sensor_data and not sensor_data.get("gyro"):
@@ -762,6 +851,12 @@ class PHATMotorControllerNode(Node):
         else:
             status_parts.append("motors:disabled")
 
+        if self.enable_servos:
+            if self.servo_initialized:
+                status_parts.append("servos:ok")
+            else:
+                status_parts.append("servos:disabled")
+
         if self.enable_accel:
             if self.accel_initialized:
                 status_parts.append("accel:ok")
@@ -783,6 +878,86 @@ class PHATMotorControllerNode(Node):
         status_msg.data = f"{status}: {message}" if message else status
         self.status_pub.publish(status_msg)
 
+    def _init_pca9685(self):
+        """Initialize PCA9685 servo controller"""
+        if not self.servo_bus:
+            raise RuntimeError("Servo I2C bus not initialized")
+
+        # MODE1 and MODE2 registers
+        mode1 = self.servo_bus.read_byte_data(self.servo_address, 0x00)
+        mode2 = self.servo_bus.read_byte_data(self.servo_address, 0x01)
+
+        # Set to sleep to configure prescale
+        sleep_mode = (mode1 & 0x7F) | 0x10
+        self.servo_bus.write_byte_data(self.servo_address, 0x00, sleep_mode)
+        time.sleep(0.005)
+
+        prescale = int(round(25_000_000 / (4096 * self.servo_pwm_frequency)) - 1)
+        prescale = max(3, min(255, prescale))
+        self.servo_bus.write_byte_data(self.servo_address, 0xFE, prescale)
+
+        # Wake up and enable auto-increment
+        self.servo_bus.write_byte_data(self.servo_address, 0x00, mode1)
+        time.sleep(0.005)
+        self.servo_bus.write_byte_data(self.servo_address, 0x00, mode1 | 0xA1)
+
+        # Configure output driver (totem pole)
+        self.servo_bus.write_byte_data(self.servo_address, 0x01, mode2 | 0x04)
+
+    def _set_pwm(self, channel: int, on: int, off: int):
+        """Set raw PWM values for a PCA9685 channel"""
+        if not self.servo_bus:
+            raise RuntimeError("Servo I2C bus not initialized")
+        if channel < 0 or channel > 15:
+            raise ValueError("Servo channel must be between 0 and 15")
+
+        reg_base = 0x06 + 4 * channel
+        self.servo_bus.write_byte_data(self.servo_address, reg_base, on & 0xFF)
+        self.servo_bus.write_byte_data(self.servo_address, reg_base + 1, (on >> 8) & 0xFF)
+        self.servo_bus.write_byte_data(self.servo_address, reg_base + 2, off & 0xFF)
+        self.servo_bus.write_byte_data(self.servo_address, reg_base + 3, (off >> 8) & 0xFF)
+
+    def _angle_to_pulse_us(self, angle_deg: float, inverted: bool = False) -> float:
+        """Convert angle in degrees to pulse width in microseconds"""
+        angle = max(self.servo_min_angle, min(self.servo_max_angle, angle_deg))
+        if inverted:
+            angle = self.servo_max_angle - (angle - self.servo_min_angle)
+
+        span_angle = self.servo_max_angle - self.servo_min_angle
+        if span_angle <= 0:
+            raise ValueError("Servo angle range must be positive")
+
+        span_pulse = self.servo_max_pulse_us - self.servo_min_pulse_us
+        return self.servo_min_pulse_us + (angle - self.servo_min_angle) * (span_pulse / span_angle)
+
+    def _set_servo_angle(self, channel: int, angle_deg: float, inverted: bool = False):
+        """Set servo angle in degrees for a PCA9685 channel"""
+        pulse_us = self._angle_to_pulse_us(angle_deg, inverted=inverted)
+        period_us = 1_000_000.0 / float(self.servo_pwm_frequency)
+        duty_cycle = max(0.0, min(1.0, pulse_us / period_us))
+        off_count = int(duty_cycle * 4095)
+        self._set_pwm(channel, 0, off_count)
+
+    def _handle_servo_command(self, channel: int, angle_deg: float, inverted: bool):
+        if not self.servo_initialized:
+            return
+        try:
+            self._set_servo_angle(channel, angle_deg, inverted=inverted)
+        except Exception as e:
+            self.get_logger().warn(f"Failed to set servo angle: {e}")
+
+    def servo_pan_callback(self, msg: Float32):
+        """Handle pan servo commands (degrees)"""
+        self._handle_servo_command(
+            self.servo_pan_channel, msg.data, inverted=self.servo_pan_inverted
+        )
+
+    def servo_tilt_callback(self, msg: Float32):
+        """Handle tilt servo commands (degrees)"""
+        self._handle_servo_command(
+            self.servo_tilt_channel, msg.data, inverted=self.servo_tilt_inverted
+        )
+
     def destroy_node(self):
         """Cleanup on shutdown"""
         if self.gpio_initialized:
@@ -796,6 +971,11 @@ class PHATMotorControllerNode(Node):
         if self.i2c_bus:
             try:
                 self.i2c_bus.close()
+            except Exception:
+                pass
+        if self.servo_bus and not self.servo_bus_shared:
+            try:
+                self.servo_bus.close()
             except Exception:
                 pass
 
