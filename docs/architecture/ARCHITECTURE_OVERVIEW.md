@@ -17,61 +17,53 @@ The system computes everything at full quality, then downsamples/decimates to fi
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Raw Sensors (High Frequency)              │
-│  - IMU (50 Hz)  - Battery (10 Hz)  - Cameras (30 Hz)        │
+│  - IMU  - Chassis  - Cameras  - System Health               │
 └───────────────────────┬─────────────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              nvblox Processor (Full Quality)                 │
-│  - Full Resolution Pointclouds                              │
-│  - Full Quality Mesh                                         │
-│  - Complete TSDF Voxel Grid                                 │
-│  - Full Resolution Images                                    │
+│        Sensor Fusion Node (Sync + Resample + Align)          │
+│  - Time-align all streams                                   │
+│  - Resample to uniform rates                                │
+│  - Publish fused sense vector                               │
 └───────────────────────┬─────────────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│         Fusion Node (Synchronization + Downsampling)         │
-│                                                              │
-│  ┌──────────────────────┐  ┌──────────────────────┐        │
-│  │  Feature Topics      │  │  Viz Topics          │        │
-│  │  (20 MB/s budget)    │  │  (5 MB/s budget)      │        │
-│  │                      │  │                      │        │
-│  │  - Images: 480×360   │  │  - Image: 320×240    │        │
-│  │  - Pointclouds: ×2   │  │  - Pointcloud: ×16   │        │
-│  │  - Mesh: 50% decim   │  │  - Mesh: 75% decim   │        │
-│  │  - TSDF: 0.1m voxels │  │  - TSDF: Mesh extr   │        │
-│  └──────────┬───────────┘  └──────────┬───────────┘        │
-└─────────────┼──────────────────────────┼───────────────────┘
-              │                          │
-              ▼                          ▼
-    ┌─────────────────┐        ┌─────────────────┐
-    │  Feature Builder│        │  Bridge (Remote)│
-    │  (VLA Controller)│        │  (Visualization) │
-    └─────────────────┘        └─────────────────┘
+│     Fused Sense Vector (Stable Interface)                    │
+│  - Used by planner, logging, visualization                  │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│       Control Planner (Stable Interface, TBD)                │
+│  - Consumes fused sense vector                              │
+│  - Emits time-stamped control plans                         │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│          Control Execution (Real-Time)                       │
+│  - Motion, audio, mode switches, rate changes               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Data Flow
 
-### 1. Raw Sensors → nvblox
-- High-frequency sensor data flows to nvblox processor
-- nvblox computes full-quality 3D representations
-- All processing done at maximum quality/resolution
+### 1. Raw Sensors → Sensor Fusion
+- Hardware and system nodes publish raw sensor streams
+- Fusion node time-aligns, resamples, and synchronizes all inputs
 
-### 2. nvblox → Fusion Node
-- Full-quality outputs published to `/nvblox/full/*` topics
-- Fusion node subscribes to all full-quality data
-- Synchronizes all sensor data to camera frames
+### 2. Sensor Fusion → Fused Sense Vector
+- Unified, stable interface for all downstream consumers
+- Includes system health, temps, and state alongside sensor data
 
-### 3. Fusion Node → Feature Topics
-- Moderate downsampling for feature builder
-- Preserves quality while fitting 20 MB/s budget
-- Topics: `/sensor_fusion/*`
+### 3. Fused Sense Vector → Control Planner
+- Planner consumes the sense vector
+- Planner outputs time-stamped control plans
 
-### 4. Fusion Node → Viz Topics
-- Aggressive downsampling for visualization
-- Fits within 5 MB/s bridge budget
-- Topics: `/viz/remote/*`
+### 4. Control Planner → Control Execution
+- System executes control plans as close to real time as possible
 
 ## Bandwidth Management
 
@@ -102,10 +94,10 @@ The system computes everything at full quality, then downsamples/decimates to fi
 
 ## Key Components
 
-1. **nvblox Processor**: Computes full-quality 3D data
-2. **Fusion Node**: Synchronizes and downsamples for consumers
-3. **Feature Builder**: Consumes feature topics for VLM
-4. **Bridge**: Streams visualization topics for remote monitoring
+1. **Sensor Fusion Node**: Synchronizes and resamples all data
+2. **Control Planner Node**: Stable control interface (not implemented yet)
+3. **System Nodes**: Per-device drivers for hardware and system state
+4. **Consumers**: Logging, visualization, and planning
 
 ## Benefits
 

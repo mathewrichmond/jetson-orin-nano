@@ -1,31 +1,157 @@
 # Graph Configurations
 
-This document describes the available graph configurations and their use cases.
+This document describes the sub-graph architecture and available graph configurations for the Isaac robot system.
 
-## Overview
+## Sub-Graph Architecture
 
-The Isaac robot system supports multiple graph configurations for different operational modes:
+The Isaac robot system is organized into four sub-graphs that communicate through well-defined interfaces:
 
-1. **`robot`** - Full system with visualization (development/testing)
-2. **`minimal`** - Production mode without visualization (autonomous operation)
+### 1. System Sub-Graph (Core Interface)
+
+**Purpose:** Gather all sensor data, time-align and resample it, publish synchronized fused sensor data, and execute control plans.
+
+**Key Components:**
+- Hardware driver nodes (cameras, IMU, chassis, microphones, servos)
+- Sensor fusion node (synchronization, filtering, time-alignment)
+- Control planner node (executes control plans - not yet implemented)
+- System monitor (health, temperatures, system state)
+
+**Publishes (Stable Interface):**
+- `/sensor_fusion/*` - Fused, synchronized sensor data
+  - Camera images (time-aligned, resampled)
+  - IMU data (filtered, synchronized)
+  - Chassis state (battery, status, synchronized)
+  - 3D data (pointclouds, mesh, TSDF - downsampled for consumers)
+  - System state (temperatures, CPU, memory, disk, power)
+  - System health and alerts
+
+**Consumes:**
+- `/control/plan` - Timestamped control plan from planner sub-graph
+  - Motion commands (chassis, servos)
+  - Sound/audio commands
+  - Mode switches
+  - Frame rate/frequency changes
+  - Other control actions
+
+**Interface Stability:**
+⚠️ **CRITICAL**: The `/sensor_fusion/*` topics form the **stable sense vector** that models train on. Once model training begins, these topics must remain unchanged. Internal system graph implementation can change, but the interface must remain stable.
+
+### 2. Planner Sub-Graph
+
+**Purpose:** Generate control plans from fused sensor data.
+
+**Key Components:**
+- Control planner node (not yet implemented)
+- VLA controller (future)
+- Other planning/control nodes
+
+**Consumes:**
+- `/sensor_fusion/*` - Fused sensor data from system sub-graph
+
+**Publishes:**
+- `/control/plan` - Timestamped control plan
+  - Motion commands
+  - Sound/audio commands
+  - Mode switches
+  - Frame rate/frequency changes
+  - Other control actions
+
+**Note:** Can be replaced with human control, remote control, or other control sources that publish to `/control/plan`.
+
+### 3. Visualization Sub-Graph
+
+**Purpose:** Visualize robot state and sensor data for monitoring and debugging.
+
+**Key Components:**
+- Foxglove Bridge (remote visualization)
+- RViz2 (local visualization)
+- Other visualization tools
+
+**Consumes:**
+- `/sensor_fusion/*` - Fused sensor data from system sub-graph
+- `/viz/remote/*` - Pre-downsampled visualization topics (optional)
+
+**Publishes:**
+- Visualization data (via bridge or local display)
+
+**Note:** Can be enabled/disabled independently. Does not affect system or planner operation.
+
+### 4. Logging Sub-Graph
+
+**Purpose:** Record sensor data and system state for analysis and training.
+
+**Key Components:**
+- ROS bag recorder
+- Custom logging nodes
+- Data export tools
+
+**Consumes:**
+- `/sensor_fusion/*` - Fused sensor data from system sub-graph
+
+**Publishes:**
+- Log files, bag files, exported data
+
+**Note:** Can be enabled/disabled independently. Does not affect system or planner operation.
+
+## Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Hardware Layer                            │
+│  Cameras, IMU, Chassis, Microphones, Servos                 │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│              System Sub-Graph (Core Interface)               │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ Hardware     │  │ Sensor       │  │ Control      │      │
+│  │ Drivers      │→ │ Fusion       │  │ Planner      │      │
+│  │              │  │ Node         │← │ Node         │      │
+│  └──────────────┘  └──────┬───────┘  └──────┬───────┘      │
+│                            │                  │              │
+│                            │                  │              │
+│                            ▼                  │              │
+│                    /sensor_fusion/*           │              │
+│                    (Stable Sense Vector)     │              │
+│                            │                  │              │
+│                            │                  │              │
+│                            │                  ▼              │
+│                            │            /control/plan        │
+│                            │            (Control Plan)       │
+└────────────────────────────┼──────────────────┼──────────────┘
+                             │                  │
+                             │                  │
+        ┌────────────────────┼──────────────────┼────────────────────┐
+        │                    │                  │                    │
+        ▼                    ▼                  ▼                    ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│   Planner     │   │ Visualization │   │   Logging    │   │   Other       │
+│  Sub-Graph   │   │   Sub-Graph   │   │   Sub-Graph  │   │  Consumers    │
+│               │   │               │   │               │   │               │
+│ Consumes:     │   │ Consumes:     │   │ Consumes:     │   │ Consumes:     │
+│ /sensor_      │   │ /sensor_      │   │ /sensor_      │   │ /sensor_      │
+│ fusion/*      │   │ fusion/*      │   │ fusion/*      │   │ fusion/*      │
+│               │   │               │   │               │   │               │
+│ Publishes:    │   │ Publishes:    │   │ Publishes:    │   │               │
+│ /control/plan │   │ Viz data      │   │ Log files     │   │               │
+└───────────────┘   └───────────────┘   └───────────────┘   └───────────────┘
+```
 
 ## Graph Configurations
+
+Graph configurations define which sub-graphs are enabled and how they're configured:
 
 ### `robot` Graph (Full System)
 
 **Purpose:** Development, testing, and remote monitoring
 
-**Components:**
-- ✅ All sensors (cameras, IMU, chassis)
-- ✅ Sensor fusion node
-- ✅ Feature builder (VLA controller)
-- ✅ Bridge (remote visualization)
-- ✅ Visualization topics (downsampled for bridge)
-
-**Bandwidth:**
-- Feature Builder: ~27.6 MB/s (camera images at 15 Hz, full resolution)
-- Bridge: ~2.3 MB/s (visualization topics at 10 Hz, low resolution)
-- **Total**: ~30 MB/s
+**Enabled Sub-Graphs:**
+- ✅ **System** - All hardware drivers, sensor fusion, control planner
+- ✅ **Planner** - Control planning (when implemented)
+- ✅ **Visualization** - Foxglove Bridge for remote monitoring
+- ✅ **Logging** - ROS bag recording (optional)
 
 **Use Cases:**
 - Development and debugging
@@ -37,62 +163,102 @@ The Isaac robot system supports multiple graph configurations for different oper
 
 ### `minimal` Graph (Production)
 
-**Purpose:** Autonomous operation without visualization overhead
+**Purpose:** Autonomous operation without visualization/logging overhead
 
-**Components:**
-- ✅ All sensors (cameras, IMU, chassis)
-- ✅ Sensor fusion node
-- ✅ Feature builder (VLA controller)
-- ❌ Bridge **disabled**
-- ❌ Visualization topics **disabled**
-
-**Bandwidth:**
-- Feature Builder: ~27.6 MB/s (camera images at 15 Hz, full resolution)
-- Bridge: 0 MB/s (disabled)
-- **Total**: ~28 MB/s
+**Enabled Sub-Graphs:**
+- ✅ **System** - All hardware drivers, sensor fusion, control planner
+- ✅ **Planner** - Control planning (when implemented)
+- ❌ **Visualization** - Disabled
+- ❌ **Logging** - Disabled (or minimal)
 
 **Use Cases:**
 - Autonomous operation
 - Production deployment
-- When visualization is not needed
 - Maximum performance mode
+- When visualization/logging not needed
 
 **Configuration File:** `config/robot/minimal_graph.yaml`
 
+### `bench_test` Graph (Hardware Validation)
+
+**Purpose:** Hardware testing and validation
+
+**Enabled Sub-Graphs:**
+- ✅ **System** - Hardware drivers only (no sensor fusion)
+- ❌ **Planner** - Disabled
+- ✅ **Visualization** - Foxglove Bridge for monitoring
+- ❌ **Logging** - Disabled
+
+**Use Cases:**
+- Hardware validation
+- Individual component testing
+- Bench testing before integration
+
+**Configuration File:** `config/robot/bench_test_graph.yaml`
+
 ## Topic Architecture
 
-### Raw Sensors (High Frequency)
-- `/phat/imu` - 50 Hz
-- `/irobot/battery` - 10 Hz
-- `/irobot/status` - 10 Hz
-- `/hardware/camera_*/color/image_raw` - 30 Hz
+### System Sub-Graph Outputs (Stable Interface)
 
-### Fusion Node Outputs
+**Fused Sensor Data (`/sensor_fusion/*`):**
+- `/sensor_fusion/imu/filtered` - Filtered IMU data (15 Hz)
+- `/sensor_fusion/chassis/battery` - Chassis battery state (15 Hz)
+- `/sensor_fusion/chassis/status` - Chassis status (15 Hz)
+- `/sensor_fusion/camera_front/color/image_raw` - Front camera (15 Hz, 480×360)
+- `/sensor_fusion/camera_rear/color/image_raw` - Rear camera (15 Hz, 480×360)
+- `/sensor_fusion/three_d/camera_front/pointcloud` - Front pointcloud (downsampled)
+- `/sensor_fusion/three_d/camera_rear/pointcloud` - Rear pointcloud (downsampled)
+- `/sensor_fusion/three_d/mesh` - Fused mesh (decimated)
+- `/sensor_fusion/three_d/tsdf` - TSDF voxel grid (coarsened)
+- `/sensor_fusion/vlm_features` - VLM-ready features (15 Hz)
+- `/sensor_fusion/status` - Fusion node status
 
-#### Feature Topics (for VLM/Feature Builder)
-- `/sensor_fusion/imu/filtered` - 15 Hz
-- `/sensor_fusion/chassis/battery` - 15 Hz
-- `/sensor_fusion/chassis/status` - 15 Hz
-- `/sensor_fusion/camera_*/color/image_raw` - 15 Hz, 640×480
-- `/sensor_fusion/vlm_features` - 15 Hz
+**System State (`/system/*`):**
+- `/system/status` - System health status
+- `/system/temperature/cpu` - CPU temperature
+- `/system/temperature/gpu` - GPU temperature
+- `/system/cpu/usage` - CPU usage
+- `/system/gpu/usage` - GPU usage
+- `/system/memory/usage` - Memory usage
+- `/system/disk/usage` - Disk usage
+- `/system/power` - Power consumption
+- `/system/alerts` - System alerts
 
-#### Visualization Topics (for Bridge)
-- `/viz/remote/imu/filtered` - 10 Hz
-- `/viz/remote/chassis/battery` - 10 Hz
-- `/viz/remote/camera_front/color/image_raw` - 10 Hz, 320×240
+**Visualization Topics (`/viz/remote/*`):**
+- `/viz/remote/imu/filtered` - IMU for visualization (10 Hz)
+- `/viz/remote/chassis/battery` - Battery for visualization (10 Hz)
+- `/viz/remote/camera_front/color/image_raw` - Camera for visualization (10 Hz, 320×240)
+- `/viz/remote/three_d/pointcloud` - Pointcloud for visualization (5 Hz, heavily downsampled)
+- `/viz/remote/three_d/mesh` - Mesh for visualization (5 Hz, heavily decimated)
+- `/viz/remote/three_d/tsdf_mesh` - TSDF mesh for visualization (2 Hz)
+
+### Planner Sub-Graph Outputs
+
+**Control Plan (`/control/plan`):**
+- Timestamped control plan message containing:
+  - Motion commands (chassis velocity, servo positions)
+  - Sound/audio commands
+  - Mode switches
+  - Frame rate/frequency changes
+  - Other control actions
 
 ## Switching Between Graphs
 
 ### Select Graph Configuration
+
 ```bash
 # Select robot graph (full system)
 ./scripts/system/manage_graph.sh select robot
 
 # Select minimal graph (production)
 ./scripts/system/manage_graph.sh select minimal
+
+# Select bench test graph (hardware validation)
+./scripts/system/manage_graph.sh select bench_test
 ```
 
 ### Start Graph
+
 ```bash
 # Start selected graph
 ./scripts/system/manage_graph.sh start
@@ -100,35 +266,55 @@ The Isaac robot system supports multiple graph configurations for different oper
 # Or start specific graph
 ./scripts/system/manage_graph.sh start robot
 ./scripts/system/manage_graph.sh start minimal
+./scripts/system/manage_graph.sh start bench_test
 ```
 
 ### Stop Graph
+
 ```bash
 ./scripts/system/manage_graph.sh stop
 ```
 
-## Bandwidth Allocation
+## Interface Stability Guarantees
 
-### Feature Builder Budget: 20 MB/s
-- Camera images: 640×480 @ 15 Hz × 2 cameras = ~27.6 MB/s
-- **Note**: Currently exceeds budget, needs optimization
+### Stable Interface (Must Not Change)
 
-### Bridge Budget: 5 MB/s
-- Camera: 320×240 @ 10 Hz = ~2.3 MB/s
-- IMU/Chassis: ~0.005 MB/s
-- System stats: ~0.001 MB/s
-- **Total**: ~2.3 MB/s (within budget)
+Once model training begins, these interfaces **must remain stable**:
+
+1. **Sense Vector (`/sensor_fusion/*` topics):**
+   - Topic names
+   - Message types
+   - Update frequencies
+   - Data formats
+   - Coordinate frames
+
+2. **Control Plan (`/control/plan` topic):**
+   - Topic name
+   - Message type
+   - Command structure
+   - Timestamp format
+
+### Flexible Implementation
+
+These can change without affecting trained models:
+
+- Internal system graph node implementation
+- Hardware driver implementations
+- Sensor fusion algorithms (as long as output format stays the same)
+- Control planner execution (as long as it consumes sense vector and publishes control plan)
+- Visualization and logging implementations
 
 ## Recommendations
 
-1. **For Development:** Use `robot` graph with bridge for remote monitoring
-2. **For Production:** Use `minimal` graph to maximize performance
-3. **For Testing:** Use `robot` graph to verify all systems
-4. **For Autonomous:** Use `minimal` graph to reduce overhead
+1. **For Development:** Use `robot` graph with all sub-graphs enabled
+2. **For Production:** Use `minimal` graph with only system and planner sub-graphs
+3. **For Testing:** Use `bench_test` graph for hardware validation
+4. **For Training:** Use `robot` graph with logging enabled to capture training data
+5. **For Autonomous:** Use `minimal` graph to maximize performance
 
 ## Future Enhancements
 
-- **`debug` graph**: Additional logging and diagnostics
-- **`bench_test` graph**: Hardware validation mode
-- **Dynamic graph switching**: Change graphs without full restart
-- **Bandwidth monitoring**: Automatic graph switching based on bandwidth
+- **Dynamic sub-graph enabling/disabling** - Enable/disable sub-graphs without full restart
+- **Multiple planner support** - Switch between different planners (VLA, remote, human)
+- **Bandwidth monitoring** - Automatic sub-graph disabling based on bandwidth
+- **Interface versioning** - Support for interface evolution while maintaining backward compatibility

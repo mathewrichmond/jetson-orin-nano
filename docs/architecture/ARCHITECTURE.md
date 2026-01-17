@@ -12,16 +12,16 @@ The Isaac robot system is built on a Jetson Orin Nano running Ubuntu 22.04 and R
 - **Middleware**: ROS 2 Humble
 - **Storage**: microSD (SSD migration planned)
 
-### Hardware Integration
-- **Cameras**: Intel Realsense (D435/D455 planned)
-- **Motor Controllers**: TBD
-- **Sub-modules**: Raspberry Pi controllers (planned)
-- **Sensors**: Additional sensors as needed
+### Final Hardware Setup (Electronics Complete)
+- **Cameras**: Two Intel RealSense cameras (USB ports) with hardware frame sync
+- **Audio**: USB microphone (USB port)
+- **Chassis**: iRobot Create (USB port)
+- **Servo + IMU**: SparkFun Auto pHAT via 40-pin GPIO (four servos + ICM-20948 IMU)
 
 ### Software Stack
-- **VLA Controller**: Custom Vision-Language-Action model
-- **Hardware Drivers**: ROS 2 wrappers for hardware interfaces
-- **Control Modes**: Multiple operational modes (manual, autonomous, safe, etc.)
+- **System Nodes**: One node per hardware or system device
+- **Sensor Fusion**: Time-align and resample all sensor streams
+- **Control Planner**: Consumes fused sense vector and outputs time-stamped control plans (not implemented yet)
 - **Monitoring**: System and hardware health monitoring
 - **Logging**: Centralized logging infrastructure
 
@@ -38,7 +38,7 @@ The Isaac robot system is built on a Jetson Orin Nano running Ubuntu 22.04 and R
 - Device initialization and management
 
 ### 3. Control Layer
-- VLA model inference
+- Control planner (system interface for all control execution)
 - Control mode switching
 - Safety interlocks and checks
 
@@ -52,21 +52,50 @@ The Isaac robot system is built on a Jetson Orin Nano running Ubuntu 22.04 and R
 - Logging and diagnostics
 - Maintenance and recovery
 
-## Data Flow
+## System Sub-Graph (Stable Interfaces)
+
+The system sub-graph is the stable interface boundary for training and runtime. It is responsible for:
+
+1. **Sense Interface**: Gather all sensor and system data, time-align and resample it, then publish a synchronized fused sense vector to downstream consumers (planner, logging, visualization).
+2. **Control Interface**: Consume time-stamped control plans from control sources (onboard model, remote model, or human operator) and execute them as close to real-time as possible.
+
+**Key constraint**: The sense and control interfaces must be stable once model training begins. The internal implementation of the system sub-graph can evolve, but interface changes require model retraining.
+
+### Sense Vector (System Output)
+The fused sense vector includes all information needed by downstream consumers:
+- Sensor streams (cameras, IMU, chassis)
+- System state and health (temperatures, diagnostics, status)
+- Synchronization metadata (timestamps, alignment info)
+
+**Excludes**: The control plan itself, which is produced by the control planner.
+
+### Control Plan (System Input)
+The control plan is a time-stamped plan that may include:
+- Motion commands
+- Audio commands
+- Mode switches
+- Frame rate or frequency changes
+- Other system actuation parameters
+
+The control planner is the interface point for all control execution, even if it delegates to other system nodes.
+
+## Data Flow (High-Level)
 
 ```
-Hardware → Drivers → ROS 2 Topics → Control Modes → VLA Controller → Motor Commands → Hardware
-                ↓
-         Monitoring & Logging
+Hardware Nodes → Sensor Fusion → Fused Sense Vector → Consumers (planner, logging, viz)
+                                             ↑
+                                  Control Plan (time-stamped)
+                                             ↑
+                     Control Planner (executes control in real time)
 ```
 
 ## Control Modes
 
-The system supports multiple control modes:
+The system supports multiple control modes, coordinated through the control planner:
 
 1. **Safe Mode**: All motors disabled, sensors active
 2. **Manual Mode**: Direct user control via joystick/interface
-3. **Autonomous Mode**: VLA controller active
+3. **Autonomous Mode**: Onboard model active
 4. **Calibration Mode**: Hardware calibration and testing
 5. **Recovery Mode**: System recovery and diagnostics
 
@@ -92,4 +121,3 @@ Mode switching includes safety checks and graceful transitions.
 - Cloud connectivity for model updates
 - Advanced monitoring dashboard
 - Automated testing framework
-
