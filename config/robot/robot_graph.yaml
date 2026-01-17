@@ -57,15 +57,17 @@ robot:
       enable_color: true
       enable_depth: true
       enable_pointcloud: false  # Disabled - using nvblox downsampled point clouds instead
-      color_width: 320  # Reduced from 640 for bridge bandwidth (83% reduction)
-      color_height: 240  # Reduced from 480 for bridge bandwidth
-      color_fps: 10  # Reduced from 15 for bridge stability
-      depth_width: 320  # Reduced from 640 for bridge bandwidth
-      depth_height: 240  # Reduced from 480 for bridge bandwidth
-      depth_fps: 10  # Reduced from 15 for bridge stability
-      publish_rate: 10.0  # Reduced from 15.0 for bridge stability
-      enable_inter_cam_sync: false  # Enable firmware-based inter-camera sync (requires sync cables)
+      color_width: 640  # 320x240 @ 10 Hz is not supported on D435
+      color_height: 480
+      color_fps: 15
+      depth_width: 640
+      depth_height: 480
+      depth_fps: 15
+      publish_rate: 15.0
+      enable_inter_cam_sync: true  # Enable firmware-based inter-camera sync (requires sync cables)
       inter_cam_sync_mode: 0  # 0=None, 1=Master, 2=Slave (auto-assigned: first=master, others=slaves)
+      sync_status_interval_sec: 5.0
+      sync_status_tolerance_ms: 5.0
     topics:
       publish:
         - /camera_front/color/image_raw
@@ -293,6 +295,23 @@ robot:
       motor_right_dir_pin: 20
       pwm_frequency: 1000
       pwm_initial_duty_cycle: 0.0
+      enable_servos: true
+      servo_i2c_bus: 7
+      servo_i2c_address: 0x40
+      servo_pwm_frequency: 50
+      servo_pan_channel: 0
+      servo_tilt_channel: 1
+      servo_pan_inverted: false
+      servo_tilt_inverted: false
+      servo_min_angle_deg: 0.0
+      servo_max_angle_deg: 180.0
+      servo_min_pulse_us: 1000.0
+      servo_max_pulse_us: 2000.0
+      servo_startup_pan_deg: 90.0
+      servo_startup_tilt_deg: 90.0
+      servo_initialize_on_start: false
+      servo_pan_topic: '/phat/camera_pan'
+      servo_tilt_topic: '/phat/camera_tilt'
       wheelbase: 0.2
       max_speed: 1.0
       gpio_mode: 'BOARD'
@@ -308,6 +327,8 @@ robot:
         - /phat/magnetometer
       subscribe:
         - /cmd_vel
+        - /phat/camera_pan
+        - /phat/camera_tilt
 
   # Foxglove Bridge (for remote visualization)
   # Note: Bridge subscribes to all topics by default, which can cause connection drops
