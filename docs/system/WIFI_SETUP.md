@@ -33,11 +33,13 @@ When prompted, answer 'y' to setup WiFi. You'll be asked for:
 - WiFi SSID (network name)
 - WiFi password (if secured)
 
-### Manual Setup
+### Manual Setup (Troubleshooting Only)
 
 ```bash
 sudo ./scripts/system/setup_wifi.sh
 ```
+
+Use this only if the unified setup cannot be used. For standard setup, run `./setup.sh` and answer "yes" to the WiFi prompt.
 
 This will:
 1. Scan for available WiFi networks

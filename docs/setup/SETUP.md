@@ -40,7 +40,9 @@ This handles:
 - ROS 2 workspace setup
 - Virtual environment creation
 - Pre-commit hooks
-- Optional components (Bluetooth, WiFi, USB-C, RealSense cameras, services)
+- Optional components (Bluetooth, WiFi, RealSense cameras, services)
+
+**Important**: All setup tasks that require `sudo` are handled by the unified setup workflow. Avoid running setup scripts directly unless you're troubleshooting.
 
 ### 3. Activate Environment
 
@@ -81,7 +83,7 @@ The `setup.sh` script is the main entry point for all setup operations:
 ./setup.sh
 ```
 
-Prompts you for optional components (Bluetooth, WiFi, USB-C, services).
+Prompts you for optional components (Bluetooth, WiFi, services).
 
 **Non-Interactive Setup** (Auto-Yes + Auto-Reboot):
 
@@ -101,10 +103,9 @@ Auto-answers 'yes' to all prompts and reboots if needed.
 6. **Pre-commit Hooks** - Installs git hooks
 7. **Bluetooth** (optional) - Sets up Bluetooth support
 8. **WiFi** (optional) - Configures WiFi with Ethernet priority
-9. **USB-C Display** (optional) - Sets up USB-C display/dock support
-10. **RealSense Cameras** (optional) - Installs RealSense SDK and ROS wrapper
-11. **Systemd Services** (optional) - Installs auto-start services
-12. **Build ROS Packages** - Builds all ROS 2 packages including RealSense
+9. **RealSense Cameras** (optional) - Installs RealSense SDK and ROS wrapper
+10. **Systemd Services** (optional) - Installs auto-start services
+11. **Build ROS Packages** - Builds all ROS 2 packages including RealSense
 
 #### After Setup
 
@@ -196,7 +197,7 @@ ros2 --help
 
 ### Package Installation Fails
 
-1. Update package list: `sudo apt-get update`
+1. Re-run the unified setup (handles package updates with `sudo`): `./setup.sh`
 2. Check configuration: `python3 scripts/utils/package_manager.py list system`
 3. Try dry-run: `python3 scripts/utils/package_manager.py install-system --groups dev_minimal --dry-run`
 

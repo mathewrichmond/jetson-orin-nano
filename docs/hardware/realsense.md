@@ -12,19 +12,26 @@ This guide covers the installation and configuration of Intel Realsense cameras 
 
 ## Installation
 
-### Step 1: Install Realsense SDK
+### Step 1: Install Realsense SDK (Unified Setup)
+
+Run the unified setup and enable RealSense when prompted:
 
 ```bash
 cd ~/src/jetson-orin-nano
-sudo ./scripts/hardware/install_realsense.sh
+./setup.sh
 ```
 
-This script will:
-- Install system dependencies
-- Build and install librealsense from source (Jetson-compatible)
-- Install pyrealsense2 Python package
-- Set up udev rules for USB access
-- Optionally clone the official ROS 2 wrapper (if ROS 2 is installed)
+This installs:
+- System dependencies
+- librealsense (Jetson-compatible)
+- pyrealsense2 Python package
+- udev rules for USB access
+- ROS 2 wrapper (if ROS 2 is installed)
+
+**Manual (troubleshooting only):**
+```bash
+sudo python3 scripts/utils/hardware_manager.py install-realsense
+```
 
 ### Step 2: Add User to dialout Group
 

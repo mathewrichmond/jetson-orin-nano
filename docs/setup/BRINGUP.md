@@ -4,21 +4,25 @@
 
 [Mathew Richmond](mailto:mathewrichmond@gmail.com)Jan 4, 2026
 
-Username: nano  
+Username: nano
 Password: nano
 
-**Setup**  
-[Setup Guide](https://forums.developer.nvidia.com/t/how-to-get-into-recovery-mode/250525)  
-[Quick Start](https://docs.nvidia.com/jetson/archives/r35.2.1/DeveloperGuide/text/IN/QuickStart.html#jetson-modules-and-configurations)  
-[Getting Started Guide](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit#prepare)  
+**Setup**
+[Setup Guide](https://forums.developer.nvidia.com/t/how-to-get-into-recovery-mode/250525)
+[Quick Start](https://docs.nvidia.com/jetson/archives/r35.2.1/DeveloperGuide/text/IN/QuickStart.html#jetson-modules-and-configurations)
+[Getting Started Guide](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit#prepare)
 [Recovery Mode](https://forums.developer.nvidia.com/t/how-to-get-into-recovery-mode/250525)
 
-**Bringup**  
+**Bringup**
 [LeRobot](https://www.jetson-ai-lab.com/archive/lerobot.html)
 
 ## **First-Time System Bringup (After Flashing)**
 
 This section covers the comprehensive system bringup after first boot, including network configuration with dynamic IP and hostname resolution, system updates, and ROS installation.
+
+**Important**: Use the automated scripts for all setup tasks that require `sudo`. The only supported flow is:
+1. `sudo ./scripts/system/setup_isaac.sh` (first boot only)
+2. `./setup.sh` (unified setup for all dependencies and optional components)
 
 ### **Quick Start: Automated Setup**
 
@@ -45,18 +49,17 @@ This script will:
 3. Verify NetworkManager is using DHCP (dynamic IP)
 4. Update all system packages
 5. Install development tools
-6. Install and configure zsh (optional)
-7. Install ROS 2 Humble
-8. Configure SSH and create ROS workspace
+6. Install ROS 2 Humble
+7. Configure SSH and create ROS workspace
 
 **After running the script, reboot:**
 ```bash
 sudo reboot
 ```
 
-### **Manual Setup (Step-by-Step)**
+### **Manual Setup (Reference Only)**
 
-If you prefer to run the steps manually or need to customize the setup:
+If you need to troubleshoot or customize specific steps, use the manual commands below. For standard setup and any task that requires `sudo`, use `setup_isaac.sh` and `setup.sh` instead.
 
 #### **Step 1: Network Configuration (Dynamic IP + Hostname Resolution)**
 
@@ -409,7 +412,7 @@ You should now be able to SSH without entering a password\!
 
 ### **Network Issues**
 
-- **Hostname not resolving**: 
+- **Hostname not resolving**:
   - Check if avahi-daemon is running: `sudo systemctl status avahi-daemon`
   - Restart avahi: `sudo systemctl restart avahi-daemon`
   - Verify hostname: `hostname` (should show "isaac")
@@ -427,7 +430,7 @@ You should now be able to SSH without entering a password\!
   - Find current IP: `ip addr show` or `hostname -I`
   - Update SSH config to use `isaac.local` instead of IP
 
-- **Connection refused**: 
+- **Connection refused**:
   - Verify Isaac is on the network: `ping 8.8.8.8`
   - Check SSH is running: `sudo systemctl status ssh`
   - Verify IP address: `ip addr show`
@@ -435,7 +438,7 @@ You should now be able to SSH without entering a password\!
 
 ### **ROS Issues**
 
-- **ROS 2 not found**: 
+- **ROS 2 not found**:
   - Source the setup file: `source /opt/ros/humble/setup.bash`
   - Add to `~/.bashrc` if not already there
   - Verify installation: `dpkg -l | grep ros-humble`
@@ -465,6 +468,6 @@ You should now be able to SSH without entering a password\!
 
 ### **General Issues**
 
-- **Permission denied**: Make sure you've copied your public key correctly  
-- **Package installation fails**: Run `sudo apt-get update` first
+- **Permission denied**: Make sure you've copied your public key correctly
+- **Package installation fails**: Re-run `sudo ./scripts/system/setup_isaac.sh` (first boot) or `./setup.sh`
 - **Hostname not persisting**: Verify `/etc/hostname` contains `isaac`

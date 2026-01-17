@@ -81,7 +81,7 @@ step_update_system() {
         return 0
     fi
 
-    log_step "1" "10" "Updating system packages"
+    log_step "1" "13" "Updating system packages"
 
     if ! check_root; then
         sudo apt-get update
@@ -101,7 +101,7 @@ step_install_system_packages() {
         return 0
     fi
 
-    log_step "2" "10" "Installing system packages"
+    log_step "2" "13" "Installing system packages"
 
     # Check if package manager exists
     if [ ! -f "$SCRIPT_DIR/scripts/utils/package_manager.py" ]; then
@@ -137,7 +137,7 @@ step_install_python_packages() {
         return 0
     fi
 
-    log_step "3" "10" "Installing Python packages"
+    log_step "3" "13" "Installing Python packages"
 
     # Upgrade pip (pin setuptools to <80 for colcon-core compatibility)
     pip3 install --upgrade pip wheel --user || sudo pip3 install --upgrade pip wheel
@@ -171,7 +171,7 @@ step_setup_ros2_workspace() {
         return 0
     fi
 
-    log_step "4" "10" "Setting up ROS 2 workspace"
+    log_step "4" "13" "Setting up ROS 2 workspace"
 
     # Check if ROS 2 is installed
     if [ ! -f "/opt/ros/humble/setup.bash" ]; then
@@ -244,7 +244,7 @@ step_setup_venv() {
         return 0
     fi
 
-    log_step "5" "10" "Setting up Python virtual environment"
+    log_step "5" "13" "Setting up Python virtual environment"
 
     if [ ! -d "$SCRIPT_DIR/.venv" ]; then
         python3 -m venv "$SCRIPT_DIR/.venv"
@@ -269,7 +269,7 @@ step_install_precommit() {
         return 0
     fi
 
-    log_step "6" "10" "Installing pre-commit hooks"
+    log_step "6" "13" "Installing pre-commit hooks"
 
     if [ -d "$SCRIPT_DIR/.git" ] && [ -f "$SCRIPT_DIR/.pre-commit-config.yaml" ]; then
         if command -v pre-commit &> /dev/null; then
@@ -296,7 +296,7 @@ step_setup_bluetooth() {
         return 0
     fi
 
-    log_step "7" "10" "Setting up Bluetooth (optional)"
+    log_step "7" "13" "Setting up Bluetooth (optional)"
 
     # Auto-answer if non-interactive
     if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
@@ -331,7 +331,7 @@ step_setup_wifi() {
         return 0
     fi
 
-    log_step "8" "10" "Setting up WiFi with Ethernet priority (optional)"
+    log_step "8" "13" "Setting up WiFi with Ethernet priority (optional)"
 
     # Auto-answer if non-interactive
     if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
@@ -359,42 +359,7 @@ step_setup_wifi() {
     fi
 }
 
-# Step 9: Setup USB-C display and dock (optional, only on Jetson)
-step_setup_usbc_display() {
-    if [ "$ENV_TYPE" != "jetson" ]; then
-        return 0
-    fi
-
-    if check_step "setup_usbc_display"; then
-        log "Skipping: USB-C display setup already completed"
-        return 0
-    fi
-
-    log_step "9" "10" "Setting up USB-C display and dock support (optional)"
-
-    # Auto-answer if non-interactive
-    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
-        response="y"
-    else
-        echo ""
-        echo "Setup USB-C display and dock support? (y/N)"
-        echo "This will check your USB-C ports and configure display support."
-        read -r response
-    fi
-
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        if [ -f "$SCRIPT_DIR/scripts/hardware/setup_usbc_display.sh" ]; then
-            "$SCRIPT_DIR/scripts/hardware/setup_usbc_display.sh"
-            mark_step_complete "setup_usbc_display"
-        else
-            log "WARNING: USB-C display setup script not found"
-        fi
-    else
-        log "Skipping USB-C display setup. Run manually: ./scripts/hardware/setup_usbc_display.sh"
-    fi
-}
-
-# Step 10: Install RealSense cameras (optional, only on Jetson)
+# Step 9: Install RealSense cameras (optional, only on Jetson)
 step_install_realsense() {
     if [ "$ENV_TYPE" != "jetson" ]; then
         return 0
@@ -405,7 +370,7 @@ step_install_realsense() {
         return 0
     fi
 
-    log_step "10" "12" "Installing RealSense cameras (optional)"
+    log_step "9" "13" "Installing RealSense cameras (optional)"
 
     # Auto-answer if non-interactive
     if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
@@ -451,7 +416,7 @@ step_install_realsense() {
     fi
 }
 
-# Step 11: Install systemd services (optional, only on Jetson)
+# Step 10: Install systemd services (optional, only on Jetson)
 step_install_services() {
     if [ "$ENV_TYPE" != "jetson" ]; then
         return 0
@@ -462,7 +427,7 @@ step_install_services() {
         return 0
     fi
 
-    log_step "11" "12" "Installing systemd services (optional)"
+    log_step "10" "13" "Installing systemd services (optional)"
 
     # Auto-answer if non-interactive
     if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
@@ -485,14 +450,14 @@ step_install_services() {
     fi
 }
 
-# Step 12: Setup visualization tools (rosbridge and Foxglove Bridge)
+# Step 11: Setup visualization tools (rosbridge and Foxglove Bridge)
 step_setup_visualization() {
     if check_step "setup_visualization"; then
         log "Skipping: Visualization tools already set up"
         return 0
     fi
 
-    log_step "12" "13" "Setting up visualization tools (rosbridge and Foxglove Bridge)"
+    log_step "11" "13" "Setting up visualization tools (rosbridge and Foxglove Bridge)"
 
     # Check if ROS 2 is installed
     if [ ! -f "/opt/ros/humble/setup.bash" ]; then
@@ -562,7 +527,7 @@ step_build_ros2_packages() {
         return 0
     fi
 
-    log_step "13" "14" "Building ROS 2 packages"
+    log_step "13" "13" "Building ROS 2 packages"
 
     # Check if ROS 2 is installed
     if [ ! -f "/opt/ros/humble/setup.bash" ]; then
@@ -674,7 +639,6 @@ main() {
     step_install_precommit
     step_setup_bluetooth
     step_setup_wifi
-    step_setup_usbc_display
     step_install_realsense
     step_install_services
     step_setup_visualization

@@ -24,7 +24,6 @@ NON_INTERACTIVE=true sudo ./setup.sh
 - Virtual environment
 - Bluetooth (optional)
 - WiFi (optional)
-- USB-C display (optional)
 - RealSense cameras (optional)
 - Systemd services (optional)
 
@@ -49,15 +48,10 @@ The script will:
 - See [Bluetooth Setup](system/BLUETOOTH_SETUP.md) for details
 
 ### WiFi
-- **Setup**: `sudo ./scripts/system/setup_wifi.sh`
+- **Setup**: Run `./setup.sh` and answer "yes" to WiFi setup
 - **Check**: `./scripts/system/check_network.sh`
 - **Status**: `nmcli device status`
 - See [WiFi Setup](system/WIFI_SETUP.md) for details
-
-### USB-C Display
-- **Check**: `./scripts/hardware/setup_usbc_display.sh`
-- **Configure**: `./scripts/hardware/configure_display.sh`
-- See [USB-C Display](hardware/USBC_DISPLAY.md) for details
 
 ### Robot System
 - **Start robot graph**: `./scripts/system/manage_graph.sh start robot`

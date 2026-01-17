@@ -64,8 +64,10 @@ Systemd services are provided for auto-start:
 ### Install Services
 
 ```bash
-sudo ./scripts/system/install_services.sh
+./setup.sh
 ```
+
+When prompted, enable systemd services to install auto-start units.
 
 This installs:
 - `isaac-system-monitor.service` - System monitoring

@@ -45,10 +45,10 @@ This guide covers the integration of iRobot Create/Roomba robots with the Isaac 
 ### Install Dependencies
 
 ```bash
-sudo apt update
-sudo apt install -y python3-pip python3-serial
-pip3 install pyserial
+./setup.sh
 ```
+
+The unified setup installs required Python dependencies (including `pyserial`).
 
 ### Build ROS 2 Package
 

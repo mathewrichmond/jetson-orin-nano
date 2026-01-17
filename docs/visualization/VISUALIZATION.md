@@ -85,8 +85,8 @@ ros2 launch isaac_robot unified_visualization.launch.py viz_backend:=rviz2 rviz_
 #### Install rosbridge_suite
 
 ```bash
-# On Ubuntu/Debian
-sudo apt install ros-humble-rosbridge-suite
+# Preferred: run unified setup (installs rosbridge_suite and foxglove_bridge)
+./setup.sh
 
 # Or build from source
 cd ~/ros2_ws/src

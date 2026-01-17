@@ -139,6 +139,8 @@ rm .hardware_state
 
 ### RealSense Installation Fails
 
+Prefer running `./setup.sh` and enabling RealSense support. Use the manual steps below only for troubleshooting.
+
 1. Check dependencies:
    ```bash
    sudo apt-get update

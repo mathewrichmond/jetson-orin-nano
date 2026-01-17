@@ -12,6 +12,17 @@ system:
     - curl
     - wget
     - vim
+    - net-tools
+    - iputils-ping
+    - software-properties-common
+    - apt-transport-https
+    - ca-certificates
+    - gnupg
+    - lsb-release
+    - can-utils
+    - i2c-tools
+    - usbutils
+    - pciutils
     - neovim
     - nano
     - emacs
@@ -37,6 +48,8 @@ system:
     - fzf
     - zsh
     - fish
+    - terminator
+    - neofetch
 
   # Python development
   python:
@@ -46,6 +59,7 @@ system:
     - python3-setuptools
     - python3-wheel
     - python3-distutils
+    - python3-serial
     - python3-numpy
     - python3-scipy
     - python3-matplotlib
@@ -137,6 +151,8 @@ system:
     - iw
     - wpasupplicant
     - network-manager-gnome
+    - avahi-daemon
+    - avahi-utils
 
   # Bluetooth
   bluetooth:
@@ -154,6 +170,12 @@ system:
     - bmon
     - powertop
     - stress-ng
+
+  # Audio devices
+  audio:
+    - alsa-utils
+    - pulseaudio
+    - pulseaudio-utils
 
 # Package groups - collections of packages for specific purposes
 groups:
@@ -193,3 +215,4 @@ groups:
     - monitoring
     - networking
     - visualization
+    - audio

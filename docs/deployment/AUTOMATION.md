@@ -48,8 +48,10 @@ The Isaac robot system includes comprehensive automation for:
 Install all services and timers:
 
 ```bash
-sudo ./scripts/system/install_services.sh
+./setup.sh
 ```
+
+When prompted, enable systemd services to install timers and services.
 
 This installs:
 - All service files
@@ -138,8 +140,10 @@ Edit timer files in `config/systemd/`:
 
 After editing, reinstall services:
 ```bash
-sudo ./scripts/system/install_services.sh
+./setup.sh
 ```
+
+Re-run the unified setup and enable systemd services when prompted.
 
 ### Thresholds
 
@@ -210,7 +214,7 @@ systemctl list-timers isaac-*
 1. Check timer status: `systemctl status isaac-update.timer`
 2. Check if enabled: `systemctl is-enabled isaac-update.timer`
 3. Manually trigger: `sudo systemctl start isaac-update.service`
-4. Reinstall: `sudo ./scripts/system/install_services.sh`
+4. Reinstall: Re-run `./setup.sh` and enable systemd services
 
 ### Maintenance Not Running
 

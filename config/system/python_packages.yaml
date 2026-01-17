@@ -63,6 +63,7 @@ utilities:
   - python-dotenv>=1.0.0
   - rich>=13.0.0
   - click>=8.1.0
+  - pyserial>=3.5
 
 # Package groups
 groups:
@@ -90,4 +91,3 @@ groups:
   code_quality_only:
     - code_quality
     - pre_commit
-

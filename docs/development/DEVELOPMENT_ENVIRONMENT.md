@@ -190,7 +190,7 @@ See `scripts/deployment/deploy.sh` for deployment scripts.
 ### Package Installation Fails
 
 1. Check package exists: `apt-cache search package-name`
-2. Update package list: `sudo apt-get update`
+2. Re-run unified setup (handles package updates with `sudo`): `./setup.sh`
 3. Check configuration: `python3 scripts/utils/package_manager.py list system`
 
 ### Python Package Issues
@@ -214,4 +214,3 @@ See `scripts/deployment/deploy.sh` for deployment scripts.
 5. **Document**: Add comments in YAML files
 6. **Virtual Environments**: Use venv for Python projects
 7. **Pre-commit Hooks**: Run before committing code
-

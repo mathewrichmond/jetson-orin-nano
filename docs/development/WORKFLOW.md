@@ -189,7 +189,7 @@ jetson-orin-nano/
 
 ### Package Installation Fails
 
-1. Update package list: `sudo apt-get update`
+1. Re-run unified setup (handles package updates with `sudo`): `./setup.sh`
 2. Check configuration: `python3 scripts/utils/package_manager.py list system`
 3. Try dry-run: `python3 scripts/utils/package_manager.py install-system --groups dev_minimal --dry-run`
 
@@ -234,4 +234,3 @@ source scripts/utils/env_setup.sh
 - See [DEVELOPMENT_ENVIRONMENT.md](docs/development/DEVELOPMENT_ENVIRONMENT.md) for detailed development setup
 - See [PACKAGE_MANAGEMENT.md](docs/development/PACKAGE_MANAGEMENT.md) for package management
 - See [SYSTEM_MONITOR.md](docs/monitoring/SYSTEM_MONITOR.md) for system monitoring
-

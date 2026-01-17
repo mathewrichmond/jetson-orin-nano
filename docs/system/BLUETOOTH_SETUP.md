@@ -16,11 +16,13 @@ Bluetooth setup is integrated into the unified setup script:
 
 When prompted, answer 'y' to setup Bluetooth.
 
-### Manual Setup
+### Manual Setup (Troubleshooting Only)
 
 ```bash
 ./scripts/system/setup_bluetooth.sh
 ```
+
+Use this only if the unified setup cannot be used. For standard setup, run `./setup.sh` and answer "yes" to the Bluetooth prompt.
 
 ## What Gets Installed
 
@@ -159,7 +161,7 @@ sudo hciconfig hci0 down
 
 If using Bluetooth audio devices:
 
-1. **Install PulseAudio Bluetooth module** (already included):
+1. **Install PulseAudio Bluetooth module**: Prefer re-running `./setup.sh` with Bluetooth enabled. If troubleshooting requires manual install:
    ```bash
    sudo apt install pulseaudio-module-bluetooth
    ```

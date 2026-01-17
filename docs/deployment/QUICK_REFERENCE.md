@@ -28,8 +28,10 @@ isaac-setup
 ## Install Auto-Start Services
 
 ```bash
-sudo ./scripts/system/install_services.sh
+./setup.sh
 ```
+
+When prompted, enable systemd services.
 
 ## Service Management
 

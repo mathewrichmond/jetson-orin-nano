@@ -31,9 +31,10 @@ This guide covers the setup and configuration of USB microphones for the Isaac r
 ### Install Dependencies
 
 ```bash
-sudo apt update
-sudo apt install -y alsa-utils pulseaudio
+./setup.sh
 ```
+
+The unified setup installs audio dependencies (ALSA/PulseAudio). Re-run it if audio tools are missing.
 
 ### Build ROS 2 Package
 

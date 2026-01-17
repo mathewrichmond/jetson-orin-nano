@@ -4,11 +4,10 @@
 
 ZSH has been added to Cursor's terminal profiles. To use it:
 
-1. **Install ZSH** (if not already installed):
+1. **Install ZSH** (if not already installed): Prefer `./setup.sh` (ZSH is included in unified setup). For troubleshooting:
    ```bash
    sudo apt-get install zsh
    ```
-   Or it will be installed automatically when you run `sudo ./setup.sh`
 
 2. **Restart Cursor**:
    - Close Cursor completely

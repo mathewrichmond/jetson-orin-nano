@@ -186,7 +186,7 @@ export ENV_TYPE=jetson  # or docker, ubuntu
 
 ### Package Installation Fails
 
-1. Update packages: `sudo apt-get update`
+1. Re-run unified setup (handles package updates with `sudo`): `./setup.sh`
 2. Check config: `python3 scripts/utils/package_manager.py list system`
 3. Dry run: `python3 scripts/utils/package_manager.py install-system --groups dev_minimal --dry-run`
 
