@@ -237,7 +237,7 @@ robot:
       viz_pointcloud_factor: 16  # Every 16th point
       viz_mesh_decimation: 0.75  # 75% triangle reduction
       viz_tsdf_extract_mesh: true  # Extract mesh from TSDF instead of voxel grid
-      viz_tsdf_fps: 2  # Lower frequency for TSDF mesh
+      viz_tsdf_fps: 2.0  # Lower frequency for TSDF mesh
     topics:
       publish:
         # Feature topics (for VLM/feature builder) - 15 Hz, moderate downsampling
@@ -248,18 +248,18 @@ robot:
         - /sensor_fusion/camera_front/color/image_raw  # 480×360, downsampled from 640×480
         - /sensor_fusion/camera_rear/color/image_raw  # 480×360, downsampled from 640×480
         # 3D data for features (moderate downsampling)
-        - /sensor_fusion/3d/camera_front/pointcloud  # Factor 2 downsampling
-        - /sensor_fusion/3d/camera_rear/pointcloud  # Factor 2 downsampling
-        - /sensor_fusion/3d/mesh  # 50% decimation, fused cameras
-        - /sensor_fusion/3d/tsdf  # Coarser voxel grid (0.1m)
+        - /sensor_fusion/three_d/camera_front/pointcloud  # Factor 2 downsampling
+        - /sensor_fusion/three_d/camera_rear/pointcloud  # Factor 2 downsampling
+        - /sensor_fusion/three_d/mesh  # 50% decimation, fused cameras
+        - /sensor_fusion/three_d/tsdf  # Coarser voxel grid (0.1m)
         # Visualization topics (for bridge) - Aggressive downsampling
         - /viz/remote/imu/filtered
         - /viz/remote/chassis/battery
         - /viz/remote/camera_front/color/image_raw  # 320×240 @ 10 Hz
         # 3D data topics (aggressively downsampled)
-        - /viz/remote/3d/pointcloud  # Factor 16 downsampling @ 5 Hz
-        - /viz/remote/3d/mesh  # 75% decimation @ 5 Hz
-        - /viz/remote/3d/tsdf_mesh  # TSDF mesh extraction @ 2 Hz
+        - /viz/remote/three_d/pointcloud  # Factor 16 downsampling @ 5 Hz
+        - /viz/remote/three_d/mesh  # 75% decimation @ 5 Hz
+        - /viz/remote/three_d/tsdf_mesh  # TSDF mesh extraction @ 2 Hz
         - /sensor_fusion/status
       subscribe:
         - /phat/imu

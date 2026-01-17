@@ -162,6 +162,10 @@ class SensorSyncNode(Node):
         self.camera_frame_sync: Dict[str, Optional[Image]] = {}
         self.camera_frame_timestamps: Dict[str, float] = {}
 
+        # Latched camera frames (last received frame per camera, used when new frames don't arrive)
+        self.latched_camera_frames: Dict[str, Optional[Image]] = {}
+        self.latched_camera_timestamps: Dict[str, float] = {}
+
         # 3D data buffers (from nvblox)
         self.pointcloud_buffers: Dict[str, deque] = {}
         self.mesh_buffers: Dict[str, deque] = {}
@@ -202,6 +206,9 @@ class SensorSyncNode(Node):
                 self.mesh_buffers[camera_name] = deque(maxlen=self.max_buffer_size)
                 self.tsdf_buffers[camera_name] = deque(maxlen=self.max_buffer_size)
                 self.last_viz_publish_time[camera_name] = 0.0
+                # Initialize latched frame storage
+                self.latched_camera_frames[camera_name] = None
+                self.latched_camera_timestamps[camera_name] = 0.0
 
         # nvblox subscribers (full quality 3D data)
         self.nvblox_pointcloud_subs: Dict[str, rclpy.subscription.Subscription] = {}
@@ -246,15 +253,15 @@ class SensorSyncNode(Node):
         # Feature topics (moderate downsampling)
         self.feature_camera_pubs: Dict[str, rclpy.publisher.Publisher] = {}
         self.feature_pointcloud_pubs: Dict[str, rclpy.publisher.Publisher] = {}
-        self.feature_mesh_pub = self.create_publisher(MarkerArray, f"{output_ns}/3d/mesh", 10)
-        self.feature_tsdf_pub = self.create_publisher(MarkerArray, f"{output_ns}/3d/tsdf", 10)
+        self.feature_mesh_pub = self.create_publisher(MarkerArray, f"{output_ns}/three_d/mesh", 10)
+        self.feature_tsdf_pub = self.create_publisher(MarkerArray, f"{output_ns}/three_d/tsdf", 10)
 
         for camera_name in ["camera_front", "camera_rear"]:
             self.feature_camera_pubs[camera_name] = self.create_publisher(
                 Image, f"{output_ns}/{camera_name}/color/image_raw", 10
             )
             self.feature_pointcloud_pubs[camera_name] = self.create_publisher(
-                PointCloud2, f"{output_ns}/3d/{camera_name}/pointcloud", 10
+                PointCloud2, f"{output_ns}/three_d/{camera_name}/pointcloud", 10
             )
 
         # Viz topics (aggressive downsampling)
@@ -267,11 +274,11 @@ class SensorSyncNode(Node):
                 Image, "/viz/remote/camera_front/color/image_raw", 10
             )
             self.viz_pointcloud_pub = self.create_publisher(
-                PointCloud2, "/viz/remote/3d/pointcloud", 10
+                PointCloud2, "/viz/remote/three_d/pointcloud", 10
             )
-            self.viz_mesh_pub = self.create_publisher(MarkerArray, "/viz/remote/3d/mesh", 10)
+            self.viz_mesh_pub = self.create_publisher(MarkerArray, "/viz/remote/three_d/mesh", 10)
             self.viz_tsdf_mesh_pub = self.create_publisher(
-                MarkerArray, "/viz/remote/3d/tsdf_mesh", 10
+                MarkerArray, "/viz/remote/three_d/tsdf_mesh", 10
             )
 
         # Synchronized sensor data (for VLM)
@@ -283,8 +290,10 @@ class SensorSyncNode(Node):
 
         # Timer for synchronized publishing
         if self.sync_to_camera:
-            # Will be triggered by camera callbacks
-            self.sync_timer = None
+            # Will be triggered by camera callbacks, but also use timer as fallback
+            # This ensures topics are published even if cameras aren't available
+            timer_period = 1.0 / float(self.target_frequency)
+            self.sync_timer = self.create_timer(timer_period, self._publish_synchronized_data)
         else:
             # Fixed rate publishing
             timer_period = 1.0 / float(self.target_frequency)
@@ -336,8 +345,9 @@ class SensorSyncNode(Node):
             self.status_buffer.append({"timestamp": timestamp, "msg": msg})
 
     def _camera_callback(self, msg: Image, topic: str):
-        """Handle camera frame - trigger synchronization"""
+        """Handle camera frame - latch it and trigger synchronization"""
         timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        camera_name = topic.split("/")[-3]  # Extract camera name
 
         with self.buffer_lock:
             self.camera_timestamps.append(
@@ -347,15 +357,28 @@ class SensorSyncNode(Node):
             self.camera_frame_sync[topic] = msg
             self.camera_frame_timestamps[topic] = timestamp
 
+            # Latch the frame (always keep the last frame for each camera)
+            self.latched_camera_frames[camera_name] = msg
+            self.latched_camera_timestamps[camera_name] = timestamp
+
+        # Always attempt to sync cameras, but don't block publishing
         if self.sync_to_camera:
             # Check if we should wait for all cameras to sync
             if self.sync_camera_frames:
+                # Try to sync cameras, but don't block forever
                 if self._check_camera_frame_sync():
                     # All cameras are synced, use average timestamp
                     avg_timestamp = sum(self.camera_frame_timestamps.values()) / len(
                         self.camera_frame_timestamps
                     )
                     self._publish_synchronized_data(avg_timestamp)
+                else:
+                    # Not all cameras synced yet, but publish anyway if we have at least one camera
+                    # This prevents blocking when cameras aren't perfectly synchronized
+                    if len(self.camera_frame_timestamps) > 0:
+                        # Use the most recent timestamp
+                        latest_timestamp = max(self.camera_frame_timestamps.values())
+                        self._publish_synchronized_data(latest_timestamp)
             else:
                 # Publish immediately on any camera frame
                 self._publish_synchronized_data(timestamp)
@@ -392,7 +415,11 @@ class SensorSyncNode(Node):
         pass
 
     def _check_camera_frame_sync(self) -> bool:
-        """Check if all cameras have frames within sync tolerance"""
+        """
+        Check if all cameras have frames within sync tolerance.
+        Always attempts to sync, but returns False if cameras aren't perfectly synced.
+        This allows the system to function with or without hardware sync.
+        """
         if len(self.camera_frame_timestamps) < len(self.camera_subs):
             return False  # Not all cameras have frames yet
 
@@ -406,7 +433,17 @@ class SensorSyncNode(Node):
         min_ts = min(timestamps)
         max_ts = max(timestamps)
         tolerance = float(self.camera_frame_sync_tolerance)
-        return (max_ts - min_ts) <= tolerance
+        synced = (max_ts - min_ts) <= tolerance
+
+        # Log sync status for debugging
+        if not synced and len(timestamps) > 1:
+            time_diff = max_ts - min_ts
+            self.get_logger().debug(
+                f"Camera sync check: {len(timestamps)} cameras, "
+                f"time diff: {time_diff:.4f}s (tolerance: {tolerance:.4f}s)"
+            )
+
+        return synced
 
     def _downsample_image(self, img_msg: Image, width: int, height: int) -> Image:
         """Downsample image to target resolution"""
@@ -513,7 +550,30 @@ class SensorSyncNode(Node):
             # Find closest IMU data
             imu_data = self._find_closest_sensor_data(self.imu_buffer, sync_timestamp)
 
+            # If no IMU data, still publish empty/placeholder messages for viz topics
+            # to ensure topics exist for bridge discovery
             if imu_data is None:
+                # Publish placeholder messages for viz topics so bridge can discover them
+                if self.publish_viz_topics:
+                    # Create empty IMU message
+                    empty_imu = Imu()
+                    empty_imu.header.stamp = self.get_clock().now().to_msg()
+                    empty_imu.header.frame_id = "base_link"
+                    if "imu" not in self.last_viz_publish_time or (
+                        current_time - self.last_viz_publish_time["imu"]
+                    ) >= (1.0 / self.viz_frequency):
+                        self.viz_imu_pub.publish(empty_imu)
+                        self.last_viz_publish_time["imu"] = current_time
+
+                    # Create empty battery message
+                    empty_battery = BatteryState()
+                    empty_battery.header.stamp = self.get_clock().now().to_msg()
+                    empty_battery.header.frame_id = "base_link"
+                    if "battery" not in self.last_viz_publish_time or (
+                        current_time - self.last_viz_publish_time["battery"]
+                    ) >= (1.0 / self.viz_frequency):
+                        self.viz_chassis_pub.publish(empty_battery)
+                        self.last_viz_publish_time["battery"] = current_time
                 return
 
             # Apply Kalman filter if enabled
@@ -587,8 +647,27 @@ class SensorSyncNode(Node):
                 self.synced_status_pub.publish(synced_status)
 
             # Process camera images
-            for topic, camera_msg in self.camera_frame_sync.items():
-                camera_name = topic.split("/")[-3]  # Extract camera name
+            # Always attempt to sync cameras, using latched frames if sync fails
+            cameras_to_process = {}
+
+            # First, try to get synced frames from camera_frame_sync
+            if self.sync_camera_frames and self._check_camera_frame_sync():
+                # All cameras synced, use synced frames
+                for topic, camera_msg in self.camera_frame_sync.items():
+                    camera_name = topic.split("/")[-3]
+                    cameras_to_process[camera_name] = camera_msg
+            else:
+                # Not synced or sync disabled, use latched frames
+                # (last received frame per camera)
+                # This ensures we always have frames to publish, even if cameras
+                # aren't perfectly synced
+                cameras_to_process = self.latched_camera_frames.copy()
+
+            # Process each camera (synced or latched)
+            for camera_name, camera_msg in cameras_to_process.items():
+                if camera_msg is None:
+                    continue
+
                 if camera_name in self.feature_camera_pubs:
                     # Downsample for feature topics
                     feature_img = self._downsample_image(
@@ -608,6 +687,26 @@ class SensorSyncNode(Node):
                             viz_img.header.stamp = self.get_clock().now().to_msg()
                             self.viz_camera_front_pub.publish(viz_img)
                             self.last_viz_publish_time[camera_name] = current_time
+
+            # If no camera frames available, publish blank frames for viz topics
+            if self.publish_viz_topics and len(cameras_to_process) == 0:
+                if "camera_front" not in self.last_viz_publish_time or (
+                    current_time - self.last_viz_publish_time.get("camera_front", 0)
+                ) >= (1.0 / self.viz_frequency):
+                    # Create blank image
+                    blank_img = Image()
+                    blank_img.header.stamp = self.get_clock().now().to_msg()
+                    blank_img.header.frame_id = "camera_front_optical_frame"
+                    blank_img.height = self.viz_resolution_height
+                    blank_img.width = self.viz_resolution_width
+                    blank_img.encoding = "rgb8"
+                    blank_img.is_bigendian = False
+                    blank_img.step = self.viz_resolution_width * 3
+                    blank_img.data = bytes(
+                        self.viz_resolution_width * self.viz_resolution_height * 3
+                    )
+                    self.viz_camera_front_pub.publish(blank_img)
+                    self.last_viz_publish_time["camera_front"] = current_time
 
             # Process 3D data (pointclouds, mesh, TSDF)
             for camera_name in self.pointcloud_buffers.keys():

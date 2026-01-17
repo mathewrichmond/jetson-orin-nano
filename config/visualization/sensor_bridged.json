@@ -53,21 +53,21 @@
         "smooth": true
       },
       "topics": {
-        "/viz/remote/3d/pointcloud": {
+        "/viz/remote/three_d/pointcloud": {
           "visible": true,
           "frameLocked": false
         },
-        "/viz/remote/3d/mesh": {
+        "/viz/remote/three_d/mesh": {
           "visible": true,
           "frameLocked": false
         }
       },
       "layers": {
-        "/viz/remote/3d/pointcloud": {
+        "/viz/remote/three_d/pointcloud": {
           "visible": true,
           "frameLocked": false
         },
-        "/viz/remote/3d/mesh": {
+        "/viz/remote/three_d/mesh": {
           "visible": true,
           "frameLocked": false
         }
