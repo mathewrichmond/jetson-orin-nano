@@ -134,17 +134,6 @@ system:
     - docker-compose
     - podman
 
-  # Display and GUI
-  display:
-    - xserver-xorg-core
-    - xserver-xorg-input-all
-    - x11-xserver-utils
-    - x11-utils
-    - x11-apps
-    - xrandr
-    # DisplayLink driver for USB-C docks (optional, install separately if needed)
-    # - displaylink-driver
-
   # WiFi and networking
   networking:
     - wireless-tools
@@ -202,7 +191,6 @@ groups:
     - cpp
     - debugging
     - documentation
-    - display
     - networking
     - monitoring
     - containers
