@@ -49,6 +49,8 @@ class RealSenseCameraNode(Node):
         self.declare_parameter("enable_inter_cam_sync", False)  # Enable firmware-based inter-camera sync
         self.declare_parameter("inter_cam_sync_mode", 0)  # 0=None, 1=Master, 2=Slave
         # If multiple cameras, first is master, others are slaves
+        self.declare_parameter("sync_status_interval_sec", 5.0)
+        self.declare_parameter("sync_status_tolerance_ms", 5.0)
 
         # Get parameters (with safe fallback to defaults)
         try:
@@ -76,6 +78,12 @@ class RealSenseCameraNode(Node):
         self.shutdown_delay = self.get_parameter("shutdown_delay").value
         self.enable_inter_cam_sync = self.get_parameter("enable_inter_cam_sync").value
         self.inter_cam_sync_mode = self.get_parameter("inter_cam_sync_mode").value
+        self.sync_status_interval_sec = float(
+            self.get_parameter("sync_status_interval_sec").value
+        )
+        self.sync_status_tolerance_ms = float(
+            self.get_parameter("sync_status_tolerance_ms").value
+        )
 
         # Initialize
         self.bridge = CvBridge()
@@ -84,6 +92,7 @@ class RealSenseCameraNode(Node):
         self.aligns: Dict[str, rs.align] = {}
         self.camera_infos: Dict[str, Dict] = {}
         self.running = True
+        self.last_sync_status_time = 0.0
 
         # Status publisher
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
@@ -348,8 +357,26 @@ class RealSenseCameraNode(Node):
 
                 # Store frames in queue (thread-safe)
                 if color_frame or depth_frame:
+                    timestamp_ms = None
+                    frame_number = None
+                    if color_frame:
+                        timestamp_ms = float(color_frame.get_timestamp())
+                        frame_number = int(color_frame.get_frame_number())
+                    elif depth_frame:
+                        timestamp_ms = float(depth_frame.get_timestamp())
+                        frame_number = int(depth_frame.get_frame_number())
+
+                    if timestamp_ms is None:
+                        timestamp_ms = time.time() * 1000.0
+
                     self.frame_queues[camera_name].append(
-                        {"color": color_frame, "depth": depth_frame, "timestamp": time.time()}
+                        {
+                            "color": color_frame,
+                            "depth": depth_frame,
+                            "timestamp": time.time(),
+                            "timestamp_ms": timestamp_ms,
+                            "frame_number": frame_number,
+                        }
                     )
 
             except Exception as e:
@@ -365,6 +392,8 @@ class RealSenseCameraNode(Node):
 
     def _publish_frames(self):
         """Publish frames from all cameras (runs on main thread)"""
+        frame_data_by_camera: Dict[str, Dict] = {}
+
         for camera_name in self.pipelines.keys():
             try:
                 # Get latest frames from queue
@@ -372,6 +401,7 @@ class RealSenseCameraNode(Node):
                     continue
 
                 frame_data = self.frame_queues[camera_name][-1]  # Get most recent
+                frame_data_by_camera[camera_name] = frame_data
                 color_frame = frame_data["color"]
                 depth_frame = frame_data["depth"]
 
@@ -425,6 +455,50 @@ class RealSenseCameraNode(Node):
             except Exception as e:
                 self.get_logger().error(f"Error publishing frames for {camera_name}: {e}")
                 # Don't call publish_status here as it might cause recursion issues
+
+        self._maybe_publish_sync_status(frame_data_by_camera)
+
+    def _maybe_publish_sync_status(self, frame_data_by_camera: Dict[str, Dict]) -> None:
+        """Publish inter-camera sync status based on hardware timestamps."""
+        if not self.enable_inter_cam_sync:
+            return
+
+        if len(frame_data_by_camera) < 2:
+            return
+
+        now = time.time()
+        if (now - self.last_sync_status_time) < self.sync_status_interval_sec:
+            return
+
+        timestamps_ms = []
+        camera_names = []
+        for camera_name, frame_data in frame_data_by_camera.items():
+            timestamp_ms = frame_data.get("timestamp_ms")
+            if timestamp_ms is not None:
+                timestamps_ms.append(float(timestamp_ms))
+                camera_names.append(camera_name)
+
+        if len(timestamps_ms) < 2:
+            return
+
+        delta_ms = max(timestamps_ms) - min(timestamps_ms)
+        camera_list = ", ".join(camera_names)
+
+        if delta_ms <= self.sync_status_tolerance_ms:
+            self.publish_status(
+                "sync_ok",
+                f"Inter-camera sync delta {delta_ms:.2f} ms (cameras: {camera_list})",
+            )
+        else:
+            self.publish_status(
+                "sync_warn",
+                f"Inter-camera sync delta {delta_ms:.2f} ms exceeds {self.sync_status_tolerance_ms:.2f} ms",
+            )
+            self.get_logger().warn(
+                f"Inter-camera sync delta {delta_ms:.2f} ms exceeds {self.sync_status_tolerance_ms:.2f} ms"
+            )
+
+        self.last_sync_status_time = now
 
     def _depth_to_pointcloud(
         self, depth_frame: rs.depth_frame, color_frame: Optional[rs.video_frame], camera_name: str
