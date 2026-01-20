@@ -175,10 +175,13 @@ class NvbloxProcessorNode(Node):
 
     def _color_callback(self, msg: Image, camera_name: str):
         """Callback for color images"""
+        # OPTIMIZATION: Store message reference (no copy) and republish directly
+        # This avoids unnecessary conversions - just update timestamp and republish
         with self.lock:
             self.latest_color_images[camera_name] = msg
 
             # Publish full quality image (fusion node will downsample)
+            # OPTIMIZATION: Republish message directly without conversion (zero-copy)
             if camera_name in self.full_image_publishers:
                 msg.header.stamp = self.get_clock().now().to_msg()
                 self.full_image_publishers[camera_name].publish(msg)
@@ -196,7 +199,8 @@ class NvbloxProcessorNode(Node):
         try:
             # Convert depth image to numpy array
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
-            depth_array = np.array(depth_image, dtype=np.float32) / 1000.0  # Convert mm to meters
+            # OPTIMIZATION: Use astype with copy=False to avoid unnecessary copy if possible
+            depth_array = depth_image.astype(np.float32, copy=False) / 1000.0  # Convert mm to meters
 
             # Get camera info
             cam_info = self.camera_infos[camera_name]
@@ -240,7 +244,8 @@ class NvbloxProcessorNode(Node):
         try:
             # Convert depth image to numpy array
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
-            depth_array = np.array(depth_image, dtype=np.float32) / 1000.0  # Convert mm to meters
+            # OPTIMIZATION: Use astype with copy=False to avoid unnecessary copy if possible
+            depth_array = depth_image.astype(np.float32, copy=False) / 1000.0  # Convert mm to meters
 
             # Get camera info
             cam_info = self.camera_infos[camera_name]
@@ -418,7 +423,8 @@ class NvbloxProcessorNode(Node):
         try:
             # Convert depth image to numpy array
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
-            depth_array = np.array(depth_image, dtype=np.float32) / 1000.0  # Convert mm to meters
+            # OPTIMIZATION: Use astype with copy=False to avoid unnecessary copy if possible
+            depth_array = depth_image.astype(np.float32, copy=False) / 1000.0  # Convert mm to meters
 
             # Get camera info
             cam_info = self.camera_infos[camera_name]
