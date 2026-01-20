@@ -13,8 +13,10 @@ from typing import Optional
 from geometry_msgs.msg import Twist
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_system_default
 from sensor_msgs.msg import Imu, MagneticField
-from std_msgs.msg import Float32, Header, String
+from std_msgs.msg import Bool, Float32, Header, String
+from std_srvs.srv import SetBool
 
 # Try to import I2C library (smbus2 is preferred, fallback to smbus)
 try:
@@ -92,6 +94,16 @@ class PHATMotorControllerNode(Node):
         self.declare_parameter("servo_startup_tilt_deg", 90.0)
         self.declare_parameter("servo_initialize_on_start", False)
 
+        # Servo safety parameters
+        self.declare_parameter("servo_max_speed_deg_per_sec", 30.0)  # Maximum angular velocity (deg/s)
+        self.declare_parameter("servo_max_accel_deg_per_sec2", 60.0)  # Maximum angular acceleration (deg/s²)
+        self.declare_parameter("servo_watchdog_timeout_sec", 1.0)  # Timeout before emergency stop (seconds)
+        self.declare_parameter("servo_soft_limit_margin_deg", 5.0)  # Margin before hard limits (degrees)
+        self.declare_parameter("servo_emergency_stop_enabled", True)  # Enable emergency stop
+        self.declare_parameter("servo_safe_mode_enabled", True)  # Start in safe mode (rate limited)
+        self.declare_parameter("servo_init_speed_deg_per_sec", 10.0)  # Speed for initialization (deg/s)
+        self.declare_parameter("servo_init_delay_sec", 0.1)  # Delay between init steps (seconds)
+
         # Robot kinematics parameters
         self.declare_parameter("wheelbase", 0.2)  # Distance between wheels in meters
         self.declare_parameter("max_speed", 1.0)  # Maximum speed in m/s
@@ -141,6 +153,22 @@ class PHATMotorControllerNode(Node):
             "servo_initialize_on_start"
         ).value
 
+        # Servo safety parameters
+        self.servo_max_speed = self.get_parameter("servo_max_speed_deg_per_sec").value
+        self.servo_max_accel = self.get_parameter("servo_max_accel_deg_per_sec2").value
+        self.servo_watchdog_timeout = self.get_parameter("servo_watchdog_timeout_sec").value
+        self.servo_soft_limit_margin = self.get_parameter("servo_soft_limit_margin_deg").value
+        self.servo_emergency_stop_enabled = self.get_parameter("servo_emergency_stop_enabled").value
+        self.servo_safe_mode = self.get_parameter("servo_safe_mode_enabled").value
+        self.servo_init_speed = self.get_parameter("servo_init_speed_deg_per_sec").value
+        self.servo_init_delay = self.get_parameter("servo_init_delay_sec").value
+
+        # Calculate soft limits
+        self.servo_pan_soft_min = self.servo_min_angle + self.servo_soft_limit_margin
+        self.servo_pan_soft_max = self.servo_max_angle - self.servo_soft_limit_margin
+        self.servo_tilt_soft_min = self.servo_min_angle + self.servo_soft_limit_margin
+        self.servo_tilt_soft_max = self.servo_max_angle - self.servo_soft_limit_margin
+
         self.wheelbase = self.get_parameter("wheelbase").value
         self.max_speed = self.get_parameter("max_speed").value
 
@@ -168,6 +196,20 @@ class PHATMotorControllerNode(Node):
         self.servo_bus: Optional[SMBus] = None
         self.servo_bus_shared = False
 
+        # Servo safety state
+        self.servo_emergency_stopped = False
+        self.servo_pan_current_angle: Optional[float] = None
+        self.servo_tilt_current_angle: Optional[float] = None
+        self.servo_pan_target_angle: Optional[float] = None
+        self.servo_tilt_target_angle: Optional[float] = None
+        self.servo_pan_last_command_time: Optional[float] = None
+        self.servo_tilt_last_command_time: Optional[float] = None
+        self.servo_pan_last_angle: Optional[float] = None
+        self.servo_tilt_last_angle: Optional[float] = None
+        self.servo_pan_last_update_time: Optional[float] = None
+        self.servo_tilt_last_update_time: Optional[float] = None
+        self.servo_initializing = False
+
         # Publishers
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
         self.imu_pub = self.create_publisher(Imu, self.imu_topic, 10) if self.enable_accel else None
@@ -183,6 +225,7 @@ class PHATMotorControllerNode(Node):
         )
         self.servo_pan_sub = None
         self.servo_tilt_sub = None
+        self.servo_emergency_stop_sub = None
         if self.enable_servos:
             self.servo_pan_sub = self.create_subscription(
                 Float32, self.servo_pan_topic, self.servo_pan_callback, 10
@@ -190,6 +233,18 @@ class PHATMotorControllerNode(Node):
             self.servo_tilt_sub = self.create_subscription(
                 Float32, self.servo_tilt_topic, self.servo_tilt_callback, 10
             )
+            # Emergency stop topic
+            self.servo_emergency_stop_sub = self.create_subscription(
+                Bool, "/phat/servo_emergency_stop", self.servo_emergency_stop_callback, 10
+            )
+            # Emergency stop service
+            self.servo_emergency_stop_srv = self.create_service(
+                SetBool, "/phat/servo_emergency_stop", self.servo_emergency_stop_service
+            )
+            # Watchdog timer for servos
+            self.servo_watchdog_timer = self.create_timer(0.1, self._servo_watchdog_callback)
+            # Servo control update timer (for rate limiting)
+            self.servo_control_timer = self.create_timer(0.05, self._servo_control_update)  # 20 Hz
 
         # Timer for status updates
         self.status_timer = self.create_timer(
@@ -289,17 +344,23 @@ class PHATMotorControllerNode(Node):
                     "Servo controller initialized (PCA9685 on I2C)"
                 )
 
+                # Initialize current positions
+                self.servo_pan_current_angle = self.servo_startup_pan
+                self.servo_tilt_current_angle = self.servo_startup_tilt
+                self.servo_pan_target_angle = self.servo_startup_pan
+                self.servo_tilt_target_angle = self.servo_startup_tilt
+                self.servo_pan_last_angle = self.servo_startup_pan
+                self.servo_tilt_last_angle = self.servo_startup_tilt
+                current_time = time.time()
+                self.servo_pan_last_update_time = current_time
+                self.servo_tilt_last_update_time = current_time
+
                 if self.servo_initialize_on_start:
-                    self._set_servo_angle(
-                        self.servo_pan_channel,
-                        self.servo_startup_pan,
-                        inverted=self.servo_pan_inverted,
+                    self.get_logger().info(
+                        f"Initializing servos to safe position: pan={self.servo_startup_pan}°, "
+                        f"tilt={self.servo_startup_tilt}°"
                     )
-                    self._set_servo_angle(
-                        self.servo_tilt_channel,
-                        self.servo_startup_tilt,
-                        inverted=self.servo_tilt_inverted,
-                    )
+                    self._safe_servo_initialize()
 
             except Exception as e:
                 self.get_logger().warn(f"Failed to initialize servo controller: {e}")
@@ -853,7 +914,14 @@ class PHATMotorControllerNode(Node):
 
         if self.enable_servos:
             if self.servo_initialized:
-                status_parts.append("servos:ok")
+                servo_status = "servos:ok"
+                if self.servo_emergency_stopped:
+                    servo_status += "|servo_estop:active"
+                if self.servo_initializing:
+                    servo_status += "|servo_init:in_progress"
+                if self.servo_safe_mode:
+                    servo_status += "|servo_safe_mode:on"
+                status_parts.append(servo_status)
             else:
                 status_parts.append("servos:disabled")
 
@@ -938,25 +1006,326 @@ class PHATMotorControllerNode(Node):
         off_count = int(duty_cycle * 4095)
         self._set_pwm(channel, 0, off_count)
 
-    def _handle_servo_command(self, channel: int, angle_deg: float, inverted: bool):
+    def _check_servo_limits(self, angle_deg: float, is_pan: bool):
+        """Check servo limits and return (clamped_angle, is_soft_limit, is_hard_limit)
+        
+        Args:
+            angle_deg: Desired angle in degrees
+            is_pan: True for pan servo, False for tilt servo
+            
+        Returns:
+            Tuple of (clamped_angle, soft_limit_warning, hard_limit_hit)
+        """
+        soft_min = self.servo_pan_soft_min if is_pan else self.servo_tilt_soft_min
+        soft_max = self.servo_pan_soft_max if is_pan else self.servo_tilt_soft_max
+        hard_min = self.servo_min_angle
+        hard_max = self.servo_max_angle
+        
+        # Check hard limits
+        if angle_deg < hard_min:
+            clamped = hard_min
+            return clamped, False, True
+        if angle_deg > hard_max:
+            clamped = hard_max
+            return clamped, False, True
+        
+        # Check soft limits
+        soft_limit_warning = False
+        if angle_deg < soft_min or angle_deg > soft_max:
+            soft_limit_warning = True
+        
+        return angle_deg, soft_limit_warning, False
+
+    def _limit_servo_velocity(self, target_angle: float, current_angle: float, 
+                             last_angle: Optional[float], last_time: Optional[float],
+                             is_pan: bool) -> float:
+        """Apply rate limiting and acceleration limiting to servo movement
+        
+        Returns:
+            Limited target angle
+        """
+        if current_angle is None:
+            return target_angle
+        
+        current_time = time.time()
+        
+        # Calculate current velocity if we have history
+        current_velocity = 0.0
+        if last_angle is not None and last_time is not None:
+            dt = current_time - last_time
+            if dt > 0.001:  # Avoid division by zero
+                current_velocity = abs(current_angle - last_angle) / dt
+        
+        # Calculate desired velocity
+        angle_diff = target_angle - current_angle
+        desired_velocity = abs(angle_diff) / 0.05  # Assuming 20 Hz update rate
+        
+        # Limit velocity
+        if desired_velocity > self.servo_max_speed:
+            # Scale down movement to respect max speed
+            max_movement = self.servo_max_speed * 0.05
+            if angle_diff > 0:
+                limited_target = current_angle + max_movement
+            else:
+                limited_target = current_angle - max_movement
+        else:
+            limited_target = target_angle
+        
+        # Limit acceleration
+        if last_angle is not None and last_time is not None:
+            dt = current_time - last_time
+            if dt > 0.001:
+                velocity_change = abs(desired_velocity - current_velocity) / dt
+                if velocity_change > self.servo_max_accel:
+                    # Limit acceleration by reducing movement
+                    max_accel_movement = current_velocity * dt + 0.5 * self.servo_max_accel * dt * dt
+                    if abs(limited_target - current_angle) > max_accel_movement:
+                        if limited_target > current_angle:
+                            limited_target = current_angle + max_accel_movement
+                        else:
+                            limited_target = current_angle - max_accel_movement
+        
+        return limited_target
+
+    def _handle_servo_command(self, channel: int, angle_deg: float, inverted: bool, is_pan: bool):
+        """Handle servo command with safety checks"""
         if not self.servo_initialized:
+            self.get_logger().warn("Servo command received but servos not initialized")
             return
+        
+        if self.servo_emergency_stopped:
+            self.get_logger().warn("Servo command ignored: emergency stop active")
+            return
+        
+        if self.servo_initializing:
+            self.get_logger().warn("Servo command ignored: initialization in progress")
+            return
+        
         try:
-            self._set_servo_angle(channel, angle_deg, inverted=inverted)
+            # Check limits
+            clamped_angle, soft_limit, hard_limit = self._check_servo_limits(angle_deg, is_pan)
+            
+            if hard_limit:
+                self.get_logger().error(
+                    f"Servo {'pan' if is_pan else 'tilt'} hard limit hit: "
+                    f"requested {angle_deg:.1f}°, clamped to {clamped_angle:.1f}°"
+                )
+                return
+            
+            if soft_limit:
+                self.get_logger().warn(
+                    f"Servo {'pan' if is_pan else 'tilt'} approaching limit: "
+                    f"{angle_deg:.1f}° (soft limit: {self.servo_pan_soft_min if is_pan else self.servo_tilt_soft_min:.1f}° - "
+                    f"{self.servo_pan_soft_max if is_pan else self.servo_tilt_soft_max:.1f}°)"
+                )
+            
+            # Update target angle (will be rate-limited in control update)
+            if is_pan:
+                self.servo_pan_target_angle = clamped_angle
+                self.servo_pan_last_command_time = time.time()
+            else:
+                self.servo_tilt_target_angle = clamped_angle
+                self.servo_tilt_last_command_time = time.time()
+                
         except Exception as e:
-            self.get_logger().warn(f"Failed to set servo angle: {e}")
+            self.get_logger().error(f"Failed to handle servo command: {e}")
 
     def servo_pan_callback(self, msg: Float32):
         """Handle pan servo commands (degrees)"""
         self._handle_servo_command(
-            self.servo_pan_channel, msg.data, inverted=self.servo_pan_inverted
+            self.servo_pan_channel, msg.data, inverted=self.servo_pan_inverted, is_pan=True
         )
 
     def servo_tilt_callback(self, msg: Float32):
         """Handle tilt servo commands (degrees)"""
         self._handle_servo_command(
-            self.servo_tilt_channel, msg.data, inverted=self.servo_tilt_inverted
+            self.servo_tilt_channel, msg.data, inverted=self.servo_tilt_inverted, is_pan=False
         )
+
+    def servo_emergency_stop_callback(self, msg: Bool):
+        """Handle emergency stop topic"""
+        if msg.data:
+            self._servo_emergency_stop()
+        else:
+            self._servo_emergency_release()
+
+    def servo_emergency_stop_service(self, request: SetBool.Request, response: SetBool.Response):
+        """Handle emergency stop service"""
+        if request.data:
+            self._servo_emergency_stop()
+            response.message = "Emergency stop activated"
+        else:
+            self._servo_emergency_release()
+            response.message = "Emergency stop released"
+        response.success = True
+        return response
+
+    def _servo_emergency_stop(self):
+        """Activate emergency stop"""
+        if not self.servo_emergency_stopped:
+            self.servo_emergency_stopped = True
+            self.get_logger().error("SERVO EMERGENCY STOP ACTIVATED")
+            # Stop all servo movement immediately
+            if self.servo_pan_current_angle is not None:
+                self.servo_pan_target_angle = self.servo_pan_current_angle
+            if self.servo_tilt_current_angle is not None:
+                self.servo_tilt_target_angle = self.servo_tilt_current_angle
+
+    def _servo_emergency_release(self):
+        """Release emergency stop"""
+        if self.servo_emergency_stopped:
+            self.servo_emergency_stopped = False
+            self.get_logger().info("Servo emergency stop released")
+
+    def _servo_watchdog_callback(self):
+        """Watchdog timer to detect missing commands"""
+        if not self.enable_servos or not self.servo_initialized:
+            return
+        
+        if self.servo_emergency_stopped or self.servo_initializing:
+            return
+        
+        current_time = time.time()
+        
+        # Check pan servo
+        if self.servo_pan_last_command_time is not None:
+            time_since_command = current_time - self.servo_pan_last_command_time
+            if time_since_command > self.servo_watchdog_timeout:
+                self.get_logger().warn(
+                    f"Pan servo watchdog timeout: no command for {time_since_command:.2f}s. "
+                    "Holding current position."
+                )
+                if self.servo_pan_current_angle is not None:
+                    self.servo_pan_target_angle = self.servo_pan_current_angle
+        
+        # Check tilt servo
+        if self.servo_tilt_last_command_time is not None:
+            time_since_command = current_time - self.servo_tilt_last_command_time
+            if time_since_command > self.servo_watchdog_timeout:
+                self.get_logger().warn(
+                    f"Tilt servo watchdog timeout: no command for {time_since_command:.2f}s. "
+                    "Holding current position."
+                )
+                if self.servo_tilt_current_angle is not None:
+                    self.servo_tilt_target_angle = self.servo_tilt_current_angle
+
+    def _servo_control_update(self):
+        """Update servo positions with rate limiting (called by timer)"""
+        if not self.enable_servos or not self.servo_initialized:
+            return
+        
+        if self.servo_emergency_stopped or self.servo_initializing:
+            return
+        
+        current_time = time.time()
+        
+        # Update pan servo
+        if (self.servo_pan_current_angle is not None and 
+            self.servo_pan_target_angle is not None):
+            
+            # Apply rate limiting if in safe mode
+            if self.servo_safe_mode:
+                limited_target = self._limit_servo_velocity(
+                    self.servo_pan_target_angle,
+                    self.servo_pan_current_angle,
+                    self.servo_pan_last_angle,
+                    self.servo_pan_last_update_time,
+                    is_pan=True
+                )
+            else:
+                limited_target = self.servo_pan_target_angle
+            
+            # Move towards target
+            if abs(limited_target - self.servo_pan_current_angle) > 0.1:  # 0.1° threshold
+                try:
+                    self._set_servo_angle(
+                        self.servo_pan_channel,
+                        limited_target,
+                        inverted=self.servo_pan_inverted
+                    )
+                    self.servo_pan_last_angle = self.servo_pan_current_angle
+                    self.servo_pan_current_angle = limited_target
+                    self.servo_pan_last_update_time = current_time
+                except Exception as e:
+                    self.get_logger().error(f"Failed to update pan servo: {e}")
+        
+        # Update tilt servo
+        if (self.servo_tilt_current_angle is not None and 
+            self.servo_tilt_target_angle is not None):
+            
+            # Apply rate limiting if in safe mode
+            if self.servo_safe_mode:
+                limited_target = self._limit_servo_velocity(
+                    self.servo_tilt_target_angle,
+                    self.servo_tilt_current_angle,
+                    self.servo_tilt_last_angle,
+                    self.servo_tilt_last_update_time,
+                    is_pan=False
+                )
+            else:
+                limited_target = self.servo_tilt_target_angle
+            
+            # Move towards target
+            if abs(limited_target - self.servo_tilt_current_angle) > 0.1:  # 0.1° threshold
+                try:
+                    self._set_servo_angle(
+                        self.servo_tilt_channel,
+                        limited_target,
+                        inverted=self.servo_tilt_inverted
+                    )
+                    self.servo_tilt_last_angle = self.servo_tilt_current_angle
+                    self.servo_tilt_current_angle = limited_target
+                    self.servo_tilt_last_update_time = current_time
+                except Exception as e:
+                    self.get_logger().error(f"Failed to update tilt servo: {e}")
+
+    def _safe_servo_initialize(self):
+        """Safely initialize servos to startup position with slow movement"""
+        if not self.servo_initialized:
+            return
+        
+        self.servo_initializing = True
+        self.get_logger().info("Starting safe servo initialization...")
+        
+        try:
+            # Move pan servo slowly
+            pan_steps = int(abs(self.servo_startup_pan - (self.servo_pan_current_angle or 90.0)) / 5.0) + 1
+            pan_step_size = (self.servo_startup_pan - (self.servo_pan_current_angle or 90.0)) / pan_steps
+            
+            for i in range(pan_steps + 1):
+                target_pan = (self.servo_pan_current_angle or 90.0) + pan_step_size * i
+                self._set_servo_angle(
+                    self.servo_pan_channel,
+                    target_pan,
+                    inverted=self.servo_pan_inverted
+                )
+                self.servo_pan_current_angle = target_pan
+                self.servo_pan_target_angle = target_pan
+                time.sleep(self.servo_init_delay)
+            
+            # Move tilt servo slowly
+            tilt_steps = int(abs(self.servo_startup_tilt - (self.servo_tilt_current_angle or 90.0)) / 5.0) + 1
+            tilt_step_size = (self.servo_startup_tilt - (self.servo_tilt_current_angle or 90.0)) / tilt_steps
+            
+            for i in range(tilt_steps + 1):
+                target_tilt = (self.servo_tilt_current_angle or 90.0) + tilt_step_size * i
+                self._set_servo_angle(
+                    self.servo_tilt_channel,
+                    target_tilt,
+                    inverted=self.servo_tilt_inverted
+                )
+                self.servo_tilt_current_angle = target_tilt
+                self.servo_tilt_target_angle = target_tilt
+                time.sleep(self.servo_init_delay)
+            
+            self.get_logger().info(
+                f"Servo initialization complete: pan={self.servo_pan_current_angle:.1f}°, "
+                f"tilt={self.servo_tilt_current_angle:.1f}°"
+            )
+        except Exception as e:
+            self.get_logger().error(f"Servo initialization failed: {e}")
+        finally:
+            self.servo_initializing = False
 
     def destroy_node(self):
         """Cleanup on shutdown"""
