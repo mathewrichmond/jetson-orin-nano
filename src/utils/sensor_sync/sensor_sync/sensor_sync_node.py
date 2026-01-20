@@ -18,8 +18,8 @@ from cv_bridge import CvBridge
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import BatteryState, Image, Imu, PointCloud2, PointField
-from std_msgs.msg import Header, String
+from sensor_msgs.msg import BatteryState, Image, Imu, PointCloud2, PointField, Temperature
+from std_msgs.msg import Header, String, Float32
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -90,6 +90,18 @@ class SensorSyncNode(Node):
         self.declare_parameter("battery_topic", "/irobot/battery")
         self.declare_parameter("status_topic", "/irobot/status")
 
+        # System monitor topics (optional - will subscribe if topics exist)
+        self.declare_parameter("system_status_topic", "/system/status")
+        self.declare_parameter("system_cpu_temp_topic", "/system/temperature/cpu")
+        self.declare_parameter("system_gpu_temp_topic", "/system/temperature/gpu")
+        self.declare_parameter("system_cpu_usage_topic", "/system/cpu/usage")
+        self.declare_parameter("system_gpu_usage_topic", "/system/gpu/usage")
+        self.declare_parameter("system_memory_usage_topic", "/system/memory/usage")
+        self.declare_parameter("system_disk_usage_topic", "/system/disk/usage")
+        self.declare_parameter("system_power_topic", "/system/power")
+        self.declare_parameter("system_alerts_topic", "/system/alerts")
+        self.declare_parameter("enable_system_status", True)  # Allow disabling if system monitor not available
+
         # Output topics
         self.declare_parameter("output_namespace", "/sensor_sync")
         self.declare_parameter("publish_vlm_features", True)
@@ -158,13 +170,38 @@ class SensorSyncNode(Node):
         self.status_buffer: deque = deque(maxlen=self.max_buffer_size)
         self.camera_timestamps: deque = deque(maxlen=self.max_buffer_size)
 
+        # System status buffers
+        self.system_status_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_cpu_temp_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_gpu_temp_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_cpu_usage_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_gpu_usage_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_memory_usage_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_disk_usage_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_power_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_alerts_buffer: deque = deque(maxlen=self.max_buffer_size)
+
+        # Camera sync status tracking
+        self.camera_sync_status: Dict[str, any] = {}  # Track sync status per camera pair
+        self.last_sync_check_time = 0.0
+
         # Camera frame sync tracking (for multi-camera synchronization)
         self.camera_frame_sync: Dict[str, Optional[Image]] = {}
         self.camera_frame_timestamps: Dict[str, float] = {}
 
         # Latched camera frames (last received frame per camera, used when new frames don't arrive)
+        # NOTE: Raw camera frames are now only used for sync checking
         self.latched_camera_frames: Dict[str, Optional[Image]] = {}
         self.latched_camera_timestamps: Dict[str, float] = {}
+        
+        # Latched nvblox images (used for downsampling - eliminates 4 copies per frame)
+        self.latched_nvblox_images: Dict[str, Optional[Image]] = {}
+        self.latched_nvblox_timestamps: Dict[str, float] = {}
+
+        # OPTIMIZATION: Cache downsampled images to avoid redundant processing
+        # Key: (camera_name, width, height), Value: (downsampled_image, source_timestamp)
+        self.downsampled_image_cache: Dict[tuple, tuple] = {}
+        self.cache_lock = threading.Lock()
 
         # 3D data buffers (from nvblox)
         self.pointcloud_buffers: Dict[str, deque] = {}
@@ -192,6 +229,58 @@ class SensorSyncNode(Node):
         )
         self.status_sub = self.create_subscription(String, status_topic, self._status_callback, 10)
 
+        # System monitor subscribers (only if enabled)
+        enable_system_status = bool(self.get_parameter("enable_system_status").value)
+        if enable_system_status:
+            system_status_topic = str(self.get_parameter("system_status_topic").value)
+            system_cpu_temp_topic = str(self.get_parameter("system_cpu_temp_topic").value)
+            system_gpu_temp_topic = str(self.get_parameter("system_gpu_temp_topic").value)
+            system_cpu_usage_topic = str(self.get_parameter("system_cpu_usage_topic").value)
+            system_gpu_usage_topic = str(self.get_parameter("system_gpu_usage_topic").value)
+            system_memory_usage_topic = str(self.get_parameter("system_memory_usage_topic").value)
+            system_disk_usage_topic = str(self.get_parameter("system_disk_usage_topic").value)
+            system_power_topic = str(self.get_parameter("system_power_topic").value)
+            system_alerts_topic = str(self.get_parameter("system_alerts_topic").value)
+
+            self.system_status_sub = self.create_subscription(
+                String, system_status_topic, self._system_status_callback, 10
+            )
+            self.system_cpu_temp_sub = self.create_subscription(
+                Temperature, system_cpu_temp_topic, self._system_cpu_temp_callback, 10
+            )
+            self.system_gpu_temp_sub = self.create_subscription(
+                Temperature, system_gpu_temp_topic, self._system_gpu_temp_callback, 10
+            )
+            self.system_cpu_usage_sub = self.create_subscription(
+                Float32, system_cpu_usage_topic, self._system_cpu_usage_callback, 10
+            )
+            self.system_gpu_usage_sub = self.create_subscription(
+                Float32, system_gpu_usage_topic, self._system_gpu_usage_callback, 10
+            )
+            self.system_memory_usage_sub = self.create_subscription(
+                Float32, system_memory_usage_topic, self._system_memory_usage_callback, 10
+            )
+            self.system_disk_usage_sub = self.create_subscription(
+                Float32, system_disk_usage_topic, self._system_disk_usage_callback, 10
+            )
+            self.system_power_sub = self.create_subscription(
+                Float32, system_power_topic, self._system_power_callback, 10
+            )
+            self.system_alerts_sub = self.create_subscription(
+                String, system_alerts_topic, self._system_alerts_callback, 10
+            )
+        else:
+            # Create dummy subscribers to avoid errors
+            self.system_status_sub = None
+            self.system_cpu_temp_sub = None
+            self.system_gpu_temp_sub = None
+            self.system_cpu_usage_sub = None
+            self.system_gpu_usage_sub = None
+            self.system_memory_usage_sub = None
+            self.system_disk_usage_sub = None
+            self.system_power_sub = None
+            self.system_alerts_sub = None
+
         # Camera subscribers (for synchronization)
         camera_topics = self.get_parameter("camera_topics").value
         self.camera_subs = []
@@ -217,6 +306,7 @@ class SensorSyncNode(Node):
         self.nvblox_image_subs: Dict[str, rclpy.subscription.Subscription] = {}
 
         # Subscribe to nvblox full quality outputs
+        # OPTIMIZATION: Use nvblox images directly for downsampling (eliminates 4 copies per frame)
         for camera_name in ["camera_front", "camera_rear"]:
             self.nvblox_pointcloud_subs[camera_name] = self.create_subscription(
                 PointCloud2,
@@ -230,6 +320,9 @@ class SensorSyncNode(Node):
                 lambda msg, name=camera_name: self._nvblox_image_callback(msg, name),
                 10,
             )
+            # Initialize nvblox image latch
+            self.latched_nvblox_images[camera_name] = None
+            self.latched_nvblox_timestamps[camera_name] = 0.0
 
         self.nvblox_mesh_sub = self.create_subscription(
             MarkerArray, "/nvblox/full/mesh", self._nvblox_mesh_callback, 10
@@ -249,6 +342,37 @@ class SensorSyncNode(Node):
             BatteryState, f"{output_ns}/chassis/battery", 10
         )
         self.synced_status_pub = self.create_publisher(String, f"{output_ns}/chassis/status", 10)
+
+        # System status publishers (feature topics - for controller)
+        self.system_status_pub = self.create_publisher(String, f"{output_ns}/system/status", 10)
+        self.system_cpu_temp_pub = self.create_publisher(
+            Temperature, f"{output_ns}/system/temperature/cpu", 10
+        )
+        self.system_gpu_temp_pub = self.create_publisher(
+            Temperature, f"{output_ns}/system/temperature/gpu", 10
+        )
+        self.system_cpu_usage_pub = self.create_publisher(
+            Float32, f"{output_ns}/system/cpu/usage", 10
+        )
+        self.system_gpu_usage_pub = self.create_publisher(
+            Float32, f"{output_ns}/system/gpu/usage", 10
+        )
+        self.system_memory_usage_pub = self.create_publisher(
+            Float32, f"{output_ns}/system/memory/usage", 10
+        )
+        self.system_disk_usage_pub = self.create_publisher(
+            Float32, f"{output_ns}/system/disk/usage", 10
+        )
+        self.system_power_pub = self.create_publisher(
+            Float32, f"{output_ns}/system/power", 10
+        )
+        self.system_alerts_pub = self.create_publisher(
+            String, f"{output_ns}/system/alerts", 10
+        )
+        # Camera sync status
+        self.system_camera_sync_status_pub = self.create_publisher(
+            String, f"{output_ns}/system/hardware/camera_sync_status", 10
+        )
 
         # Feature topics (moderate downsampling)
         self.feature_camera_pubs: Dict[str, rclpy.publisher.Publisher] = {}
@@ -279,6 +403,25 @@ class SensorSyncNode(Node):
             self.viz_mesh_pub = self.create_publisher(MarkerArray, "/viz/remote/three_d/mesh", 10)
             self.viz_tsdf_mesh_pub = self.create_publisher(
                 MarkerArray, "/viz/remote/three_d/tsdf_mesh", 10
+            )
+            # System status for visualization (lower frequency)
+            self.viz_system_status_pub = self.create_publisher(
+                String, "/viz/remote/system/status", 10
+            )
+            self.viz_system_cpu_temp_pub = self.create_publisher(
+                Temperature, "/viz/remote/system/temperature/cpu", 10
+            )
+            self.viz_system_gpu_temp_pub = self.create_publisher(
+                Temperature, "/viz/remote/system/temperature/gpu", 10
+            )
+            self.viz_system_cpu_usage_pub = self.create_publisher(
+                Float32, "/viz/remote/system/cpu/usage", 10
+            )
+            self.viz_system_memory_usage_pub = self.create_publisher(
+                Float32, "/viz/remote/system/memory/usage", 10
+            )
+            self.viz_system_alerts_pub = self.create_publisher(
+                String, "/viz/remote/system/alerts", 10
             )
 
         # Synchronized sensor data (for VLM)
@@ -344,6 +487,61 @@ class SensorSyncNode(Node):
             timestamp = time.time()  # Status messages may not have timestamps
             self.status_buffer.append({"timestamp": timestamp, "msg": msg})
 
+    # System monitor callbacks
+    def _system_status_callback(self, msg: String):
+        """Store system status in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_status_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_cpu_temp_callback(self, msg: Temperature):
+        """Store CPU temperature in buffer"""
+        with self.buffer_lock:
+            timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            self.system_cpu_temp_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_gpu_temp_callback(self, msg: Temperature):
+        """Store GPU temperature in buffer"""
+        with self.buffer_lock:
+            timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            self.system_gpu_temp_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_cpu_usage_callback(self, msg: Float32):
+        """Store CPU usage in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_cpu_usage_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_gpu_usage_callback(self, msg: Float32):
+        """Store GPU usage in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_gpu_usage_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_memory_usage_callback(self, msg: Float32):
+        """Store memory usage in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_memory_usage_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_disk_usage_callback(self, msg: Float32):
+        """Store disk usage in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_disk_usage_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_power_callback(self, msg: Float32):
+        """Store power consumption in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_power_buffer.append({"timestamp": timestamp, "msg": msg})
+
+    def _system_alerts_callback(self, msg: String):
+        """Store system alerts in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_alerts_buffer.append({"timestamp": timestamp, "msg": msg})
+
     def _camera_callback(self, msg: Image, topic: str):
         """Handle camera frame - latch it and trigger synchronization"""
         timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
@@ -361,27 +559,14 @@ class SensorSyncNode(Node):
             self.latched_camera_frames[camera_name] = msg
             self.latched_camera_timestamps[camera_name] = timestamp
 
-        # Always attempt to sync cameras, but don't block publishing
-        if self.sync_to_camera:
-            # Check if we should wait for all cameras to sync
-            if self.sync_camera_frames:
-                # Try to sync cameras, but don't block forever
-                if self._check_camera_frame_sync():
-                    # All cameras are synced, use average timestamp
-                    avg_timestamp = sum(self.camera_frame_timestamps.values()) / len(
-                        self.camera_frame_timestamps
-                    )
-                    self._publish_synchronized_data(avg_timestamp)
-                else:
-                    # Not all cameras synced yet, but publish anyway if we have at least one camera
-                    # This prevents blocking when cameras aren't perfectly synchronized
-                    if len(self.camera_frame_timestamps) > 0:
-                        # Use the most recent timestamp
-                        latest_timestamp = max(self.camera_frame_timestamps.values())
-                        self._publish_synchronized_data(latest_timestamp)
-            else:
-                # Publish immediately on any camera frame
-                self._publish_synchronized_data(timestamp)
+        # OPTIMIZATION: Don't trigger publishing from camera callbacks when sync_to_camera=True
+        # The timer will handle publishing at the correct rate (15 Hz)
+        # Camera callbacks only update latched frames for the timer to use
+        # This prevents double-triggering (callbacks + timer) which was causing 44 Hz instead of 15 Hz
+        # Only trigger from callbacks if sync_to_camera is False (timer-only mode)
+        if not self.sync_to_camera:
+            # Fixed rate mode - publish immediately on camera frame
+            self._publish_synchronized_data(timestamp)
 
     def _nvblox_pointcloud_callback(self, msg: PointCloud2, camera_name: str):
         """Store nvblox pointcloud data"""
@@ -410,9 +595,12 @@ class SensorSyncNode(Node):
 
     def _nvblox_image_callback(self, msg: Image, camera_name: str):
         """Store nvblox full quality images (for downsampling)"""
-        # These can be used if we want to downsample from nvblox images instead of raw camera images
-        # For now, we use raw camera images
-        pass
+        # OPTIMIZATION: Use nvblox images directly instead of raw camera images
+        # This eliminates 4 memory copies per frame (nvblox → sensor fusion path)
+        timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        with self.buffer_lock:
+            self.latched_nvblox_images[camera_name] = msg
+            self.latched_nvblox_timestamps[camera_name] = timestamp
 
     def _check_camera_frame_sync(self) -> bool:
         """
@@ -443,15 +631,79 @@ class SensorSyncNode(Node):
                 f"time diff: {time_diff:.4f}s (tolerance: {tolerance:.4f}s)"
             )
 
+        # Update camera sync status tracking
+        sync_status_str = "synced" if synced else "not_synced"
+        if len(timestamps) > 1:
+            time_diff = max_ts - min_ts if len(timestamps) > 1 else 0.0
+            self.camera_sync_status["status"] = sync_status_str
+            self.camera_sync_status["time_diff"] = time_diff
+            self.camera_sync_status["tolerance"] = tolerance
+            self.camera_sync_status["num_cameras"] = len(timestamps)
+        else:
+            self.camera_sync_status["status"] = "single_camera"
+            self.camera_sync_status["time_diff"] = 0.0
+            self.camera_sync_status["tolerance"] = tolerance
+            self.camera_sync_status["num_cameras"] = len(timestamps)
+
         return synced
 
-    def _downsample_image(self, img_msg: Image, width: int, height: int) -> Image:
-        """Downsample image to target resolution"""
+    def _downsample_image(self, img_msg: Image, width: int, height: int, camera_name: Optional[str] = None) -> Image:
+        """Downsample image to target resolution with caching"""
+        # OPTIMIZATION: Cache downsampled images to avoid redundant processing
+        # This is critical since we downsample the same image for feature and viz topics
+        
         try:
+            # Check if already correct size (avoid unnecessary processing)
+            if img_msg.width == width and img_msg.height == height:
+                # Already correct size, just update header and return
+                img_msg.header.stamp = self.get_clock().now().to_msg()
+                return img_msg
+            
+            # Get source image timestamp for cache key
+            source_timestamp = img_msg.header.stamp.sec + img_msg.header.stamp.nanosec * 1e-9
+            
+            # Check cache if camera name provided
+            cache_key = None
+            if camera_name:
+                cache_key = (camera_name, width, height)
+                with self.cache_lock:
+                    if cache_key in self.downsampled_image_cache:
+                        cached_img, cached_timestamp = self.downsampled_image_cache[cache_key]
+                        # Reuse cached image if source hasn't changed
+                        if abs(source_timestamp - cached_timestamp) < 0.001:  # 1ms tolerance
+                            # Update timestamp and return cached image
+                            cached_img.header.stamp = self.get_clock().now().to_msg()
+                            return cached_img
+            
+            # Cache miss or no camera name - perform downsampling
+            # Convert ROS Image to numpy array (one conversion)
             cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="passthrough")
-            resized = cv2.resize(cv_image, (width, height), interpolation=cv2.INTER_LINEAR)
+            
+            # OPTIMIZATION: Use INTER_AREA for downsampling (better quality + faster for downsampling)
+            # INTER_LINEAR is better for upsampling, INTER_AREA is better for downsampling
+            if width < img_msg.width or height < img_msg.height:
+                interpolation = cv2.INTER_AREA  # Better for downsampling
+            else:
+                interpolation = cv2.INTER_LINEAR  # Better for upsampling
+            
+            # Resize (creates new array - necessary for resize operation)
+            resized = cv2.resize(cv_image, (width, height), interpolation=interpolation)
+            
+            # Convert back to ROS Image (one conversion)
+            # Use same encoding to avoid extra conversion
             downsampled_msg = self.bridge.cv2_to_imgmsg(resized, encoding=img_msg.encoding)
             downsampled_msg.header = img_msg.header
+            
+            # Cache the result if camera name provided
+            if cache_key:
+                with self.cache_lock:
+                    # Limit cache size to prevent memory growth
+                    if len(self.downsampled_image_cache) > 20:
+                        # Remove oldest entry (simple FIFO - could be improved)
+                        oldest_key = next(iter(self.downsampled_image_cache))
+                        del self.downsampled_image_cache[oldest_key]
+                    self.downsampled_image_cache[cache_key] = (downsampled_msg, source_timestamp)
+            
             return downsampled_msg
         except Exception as e:
             self.get_logger().error(f"Error downsampling image: {e}")
@@ -647,42 +899,55 @@ class SensorSyncNode(Node):
                 self.synced_status_pub.publish(synced_status)
 
             # Process camera images
-            # Always attempt to sync cameras, using latched frames if sync fails
+            # OPTIMIZATION: Use nvblox images directly instead of raw camera images
+            # This eliminates 4 memory copies per frame (nvblox → sensor fusion path)
+            # Raw camera frames are still subscribed for sync checking only
+            
+            # Use nvblox images for downsampling (more efficient - eliminates copies)
             cameras_to_process = {}
+            
+            # Get nvblox images (prefer these over raw camera images)
+            for camera_name in self.latched_nvblox_images.keys():
+                nvblox_img = self.latched_nvblox_images.get(camera_name)
+                if nvblox_img is not None:
+                    cameras_to_process[camera_name] = nvblox_img
+            
+            # Fallback to raw camera images if nvblox images not available yet
+            # (during startup or if nvblox node not running)
+            if len(cameras_to_process) == 0:
+                # Try to get synced frames from camera_frame_sync
+                if self.sync_camera_frames and self._check_camera_frame_sync():
+                    # All cameras synced, use synced frames
+                    for topic, camera_msg in self.camera_frame_sync.items():
+                        camera_name = topic.split("/")[-3]
+                        cameras_to_process[camera_name] = camera_msg
+                else:
+                    # Not synced or sync disabled, use latched frames
+                    cameras_to_process = {
+                        k: v for k, v in self.latched_camera_frames.items() if v is not None
+                    }
 
-            # First, try to get synced frames from camera_frame_sync
-            if self.sync_camera_frames and self._check_camera_frame_sync():
-                # All cameras synced, use synced frames
-                for topic, camera_msg in self.camera_frame_sync.items():
-                    camera_name = topic.split("/")[-3]
-                    cameras_to_process[camera_name] = camera_msg
-            else:
-                # Not synced or sync disabled, use latched frames
-                # (last received frame per camera)
-                # This ensures we always have frames to publish, even if cameras
-                # aren't perfectly synced
-                cameras_to_process = self.latched_camera_frames.copy()
-
-            # Process each camera (synced or latched)
+            # Process each camera (prefer nvblox images, fallback to raw camera images)
             for camera_name, camera_msg in cameras_to_process.items():
                 if camera_msg is None:
                     continue
 
                 if camera_name in self.feature_camera_pubs:
-                    # Downsample for feature topics
+                    # OPTIMIZATION: Use caching to avoid redundant downsampling
+                    # Downsample for feature topics (with caching)
                     feature_img = self._downsample_image(
-                        camera_msg, self.feature_image_width, self.feature_image_height
+                        camera_msg, self.feature_image_width, self.feature_image_height, camera_name
                     )
                     feature_img.header.stamp = self.get_clock().now().to_msg()
                     self.feature_camera_pubs[camera_name].publish(feature_img)
 
-                    # Downsample for viz topics
+                    # Downsample for viz topics (with caching - reuses cache if same source image)
                     if self.publish_viz_topics and camera_name == "camera_front":
                         if camera_name not in self.last_viz_publish_time or (
                             current_time - self.last_viz_publish_time[camera_name]
                         ) >= (1.0 / self.viz_frequency):
                             viz_img = self._downsample_image(
-                                camera_msg, self.viz_resolution_width, self.viz_resolution_height
+                                camera_msg, self.viz_resolution_width, self.viz_resolution_height, camera_name
                             )
                             viz_img.header.stamp = self.get_clock().now().to_msg()
                             self.viz_camera_front_pub.publish(viz_img)
@@ -785,6 +1050,9 @@ class SensorSyncNode(Node):
                             self.viz_tsdf_mesh_pub.publish(tsdf_mesh)
                             self.last_viz_tsdf_publish_time = current_time
 
+            # Publish synchronized system status
+            self._publish_system_status(sync_timestamp, current_time)
+
             # Prepare VLM features if enabled
             if self.get_parameter("publish_vlm_features").value:
                 self._publish_vlm_features(filtered_imu, sync_timestamp, battery_data, status_data)
@@ -848,6 +1116,126 @@ class SensorSyncNode(Node):
         feature_msg = String()
         feature_msg.data = json.dumps(features)
         self.vlm_features_pub.publish(feature_msg)
+
+    def _publish_system_status(self, sync_timestamp: float, current_time: float):
+        """Publish synchronized system status (feature topics and viz topics)"""
+        # Find closest system status data
+        system_status_data = self._find_closest_sensor_data(
+            self.system_status_buffer, sync_timestamp
+        )
+        cpu_temp_data = self._find_closest_sensor_data(
+            self.system_cpu_temp_buffer, sync_timestamp
+        )
+        gpu_temp_data = self._find_closest_sensor_data(
+            self.system_gpu_temp_buffer, sync_timestamp
+        )
+        cpu_usage_data = self._find_closest_sensor_data(
+            self.system_cpu_usage_buffer, sync_timestamp
+        )
+        gpu_usage_data = self._find_closest_sensor_data(
+            self.system_gpu_usage_buffer, sync_timestamp
+        )
+        memory_usage_data = self._find_closest_sensor_data(
+            self.system_memory_usage_buffer, sync_timestamp
+        )
+        disk_usage_data = self._find_closest_sensor_data(
+            self.system_disk_usage_buffer, sync_timestamp
+        )
+        power_data = self._find_closest_sensor_data(
+            self.system_power_buffer, sync_timestamp
+        )
+        alerts_data = self._find_closest_sensor_data(
+            self.system_alerts_buffer, sync_timestamp
+        )
+
+        # Publish feature topics (for controller) - synchronized with sensor data
+        if system_status_data:
+            synced_status = String()
+            synced_status.data = system_status_data["msg"].data
+            self.system_status_pub.publish(synced_status)
+
+        if cpu_temp_data:
+            synced_cpu_temp = Temperature()
+            synced_cpu_temp.header.stamp = self.get_clock().now().to_msg()
+            synced_cpu_temp.header.frame_id = cpu_temp_data["msg"].header.frame_id
+            synced_cpu_temp.temperature = cpu_temp_data["msg"].temperature
+            synced_cpu_temp.variance = cpu_temp_data["msg"].variance
+            self.system_cpu_temp_pub.publish(synced_cpu_temp)
+
+        if gpu_temp_data:
+            synced_gpu_temp = Temperature()
+            synced_gpu_temp.header.stamp = self.get_clock().now().to_msg()
+            synced_gpu_temp.header.frame_id = gpu_temp_data["msg"].header.frame_id
+            synced_gpu_temp.temperature = gpu_temp_data["msg"].temperature
+            synced_gpu_temp.variance = gpu_temp_data["msg"].variance
+            self.system_gpu_temp_pub.publish(synced_gpu_temp)
+
+        if cpu_usage_data:
+            synced_cpu_usage = Float32()
+            synced_cpu_usage.data = cpu_usage_data["msg"].data
+            self.system_cpu_usage_pub.publish(synced_cpu_usage)
+
+        if gpu_usage_data:
+            synced_gpu_usage = Float32()
+            synced_gpu_usage.data = gpu_usage_data["msg"].data
+            self.system_gpu_usage_pub.publish(synced_gpu_usage)
+
+        if memory_usage_data:
+            synced_memory_usage = Float32()
+            synced_memory_usage.data = memory_usage_data["msg"].data
+            self.system_memory_usage_pub.publish(synced_memory_usage)
+
+        if disk_usage_data:
+            synced_disk_usage = Float32()
+            synced_disk_usage.data = disk_usage_data["msg"].data
+            self.system_disk_usage_pub.publish(synced_disk_usage)
+
+        if power_data:
+            synced_power = Float32()
+            synced_power.data = power_data["msg"].data
+            self.system_power_pub.publish(synced_power)
+
+        if alerts_data:
+            synced_alerts = String()
+            synced_alerts.data = alerts_data["msg"].data
+            self.system_alerts_pub.publish(synced_alerts)
+
+        # Publish camera sync status
+        sync_status_msg = String()
+        sync_status_json = {
+            "status": self.camera_sync_status.get("status", "unknown"),
+            "time_diff": self.camera_sync_status.get("time_diff", 0.0),
+            "tolerance": self.camera_sync_status.get("tolerance", 0.05),
+            "num_cameras": self.camera_sync_status.get("num_cameras", 0),
+        }
+        sync_status_msg.data = json.dumps(sync_status_json)
+        self.system_camera_sync_status_pub.publish(sync_status_msg)
+
+        # Publish viz topics (lower frequency, same data)
+        if self.publish_viz_topics:
+            # Check if it's time to publish viz system status
+            if "system_status" not in self.last_viz_publish_time or (
+                current_time - self.last_viz_publish_time["system_status"]
+            ) >= (1.0 / self.viz_frequency):
+                if system_status_data:
+                    self.viz_system_status_pub.publish(synced_status)
+
+                if cpu_temp_data:
+                    self.viz_system_cpu_temp_pub.publish(synced_cpu_temp)
+
+                if gpu_temp_data:
+                    self.viz_system_gpu_temp_pub.publish(synced_gpu_temp)
+
+                if cpu_usage_data:
+                    self.viz_system_cpu_usage_pub.publish(synced_cpu_usage)
+
+                if memory_usage_data:
+                    self.viz_system_memory_usage_pub.publish(synced_memory_usage)
+
+                if alerts_data:
+                    self.viz_system_alerts_pub.publish(synced_alerts)
+
+                self.last_viz_publish_time["system_status"] = current_time
 
 
 def main(args=None):
