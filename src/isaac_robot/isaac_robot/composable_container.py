@@ -154,12 +154,18 @@ class ComposableNodeContainer(Node):
             node_class = getattr(node_module, class_name)
 
             # Create node instance
-            # Note: Node name/namespace are set in __init__ with hardcoded values
-            # We'll use the default names from the classes (e.g., "realsense_camera_node")
-            # Topic namespaces can be handled via topic remapping if needed
-            # The key benefit is zero-copy communication, not name customization
+            # Pass node_name if provided, otherwise use default from class
+            # Note: Some nodes may not accept node_name parameter - that's OK
             try:
-                node_instance = node_class()
+                if node_name:
+                    # Try to instantiate with node_name parameter
+                    try:
+                        node_instance = node_class(node_name=node_name)
+                    except TypeError:
+                        # Node doesn't accept node_name, use default
+                        node_instance = node_class()
+                else:
+                    node_instance = node_class()
             except Exception as e:
                 self.get_logger().error(f"Failed to instantiate {class_name}: {e}")
                 import traceback
@@ -348,8 +354,9 @@ class ComposableNodeContainer(Node):
 
         self.get_logger().info(f"Spinning executor: {type(executor_to_check)}, id: {id(executor_to_check)}, nodes: {len(self.nodes)}")
         try:
-            while rclpy.ok() and self.running:
-                executor_to_check.spin_once(timeout_sec=0.1)
+            # Use spin() instead of spin_once() in a loop to avoid excessive CPU usage
+            # spin() handles timing internally and is more efficient
+            executor_to_check.spin()
         except KeyboardInterrupt:
             self.get_logger().info("Received shutdown signal")
         except Exception as e:
