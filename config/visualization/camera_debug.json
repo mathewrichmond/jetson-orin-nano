@@ -122,30 +122,27 @@
     "speed": 1
   },
   "layout": {
-    "direction": "row",
+    "direction": "column",
     "first": {
-      "direction": "column",
-      "first": {
-        "direction": "row",
-        "first": "Image!camera_front",
-        "second": {
-          "direction": "column",
-          "first": "RawMessages!camera_front_info",
-          "second": "RawMessages!camera_front_depth_info",
-          "third": "Plot!camera_front_timestamps"
-        }
-      },
+      "direction": "row",
+      "first": "Image!camera_front",
       "second": {
-        "direction": "row",
-        "first": "Image!camera_rear",
-        "second": {
-          "direction": "column",
-          "first": "RawMessages!camera_rear_info",
-          "second": "RawMessages!camera_rear_depth_info",
-          "third": "Plot!camera_rear_timestamps"
-        }
-      },
-      "third": "RawMessages!camera_sync_status"
-    }
+        "direction": "column",
+        "first": "RawMessages!camera_front_info",
+        "second": "RawMessages!camera_front_depth_info",
+        "third": "Plot!camera_front_timestamps"
+      }
+    },
+    "second": {
+      "direction": "row",
+      "first": "Image!camera_rear",
+      "second": {
+        "direction": "column",
+        "first": "RawMessages!camera_rear_info",
+        "second": "RawMessages!camera_rear_depth_info",
+        "third": "Plot!camera_rear_timestamps"
+      }
+    },
+    "third": "RawMessages!camera_sync_status"
   }
 }
