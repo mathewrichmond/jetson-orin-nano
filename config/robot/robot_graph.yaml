@@ -342,6 +342,15 @@ robot:
       servo_initialize_on_start: false
       servo_pan_topic: '/phat/camera_pan'
       servo_tilt_topic: '/phat/camera_tilt'
+      # Servo safety parameters
+      servo_max_speed_deg_per_sec: 30.0
+      servo_max_accel_deg_per_sec2: 60.0
+      servo_watchdog_timeout_sec: 1.0
+      servo_soft_limit_margin_deg: 5.0
+      servo_emergency_stop_enabled: true
+      servo_safe_mode_enabled: true
+      servo_init_speed_deg_per_sec: 10.0
+      servo_init_delay_sec: 0.1
       wheelbase: 0.2
       max_speed: 1.0
       gpio_mode: 'BOARD'
