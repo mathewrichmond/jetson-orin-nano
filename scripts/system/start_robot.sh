@@ -30,6 +30,18 @@ if [ -f ~/ros2_ws/install/setup.bash ]; then
     source ~/ros2_ws/install/setup.bash
 fi
 
+# OPTIMIZATION: Enable ROS 2 shared memory transport for zero-copy communication
+# This reduces memory copies and CPU usage for inter-process communication
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [ -z "$RMW_IMPLEMENTATION" ]; then
+    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+fi
+if [ -f "$PROJECT_ROOT/config/ros2/fastdds_profiles.xml" ]; then
+    export FASTRTPS_DEFAULT_PROFILES_FILE="$PROJECT_ROOT/config/ros2/fastdds_profiles.xml"
+    export RMW_FASTRTPS_USE_QOS_FROM_XML=1
+fi
+
 # Change to Isaac root
 cd "$ISAAC_ROOT"
 
