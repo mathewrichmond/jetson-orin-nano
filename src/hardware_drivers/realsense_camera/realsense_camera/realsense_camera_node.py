@@ -49,6 +49,7 @@ class RealSenseCameraNode(Node):
         self.declare_parameter("enable_inter_cam_sync", False)  # Enable firmware-based inter-camera sync
         self.declare_parameter("inter_cam_sync_mode", 0)  # 0=None, 1=Master, 2=Slave
         # If multiple cameras, first is master, others are slaves
+        self.declare_parameter("inter_cam_sync_master_serial", "")
         self.declare_parameter("sync_status_interval_sec", 5.0)
         self.declare_parameter("sync_status_tolerance_ms", 5.0)
 
@@ -78,6 +79,9 @@ class RealSenseCameraNode(Node):
         self.shutdown_delay = self.get_parameter("shutdown_delay").value
         self.enable_inter_cam_sync = self.get_parameter("enable_inter_cam_sync").value
         self.inter_cam_sync_mode = self.get_parameter("inter_cam_sync_mode").value
+        self.inter_cam_sync_master_serial = str(
+            self.get_parameter("inter_cam_sync_master_serial").value
+        ).strip()
         self.sync_status_interval_sec = float(
             self.get_parameter("sync_status_interval_sec").value
         )
@@ -150,6 +154,22 @@ class RealSenseCameraNode(Node):
             target_serials = available_serials[: len(self.camera_names)]
 
         # Initialize cameras
+        master_serial = None
+        if self.enable_inter_cam_sync and self.inter_cam_sync_master_serial:
+            if self.inter_cam_sync_master_serial in available_serials:
+                master_serial = self.inter_cam_sync_master_serial
+            else:
+                self.get_logger().warn(
+                    "Inter-camera sync master serial not found; using first camera as master"
+                )
+
+        # Log camera name mapping for identification
+        self.get_logger().info("Camera name mapping:")
+        for i, serial in enumerate(target_serials):
+            if serial in available_serials:
+                camera_name = self.camera_names[i] if i < len(self.camera_names) else f"camera_{i}"
+                self.get_logger().info(f"  {camera_name} → Serial: {serial}")
+
         for i, serial in enumerate(target_serials):
             if serial not in available_serials:
                 self.get_logger().warn(f"Camera with serial {serial} not found")
@@ -162,7 +182,10 @@ class RealSenseCameraNode(Node):
 
             # Determine sync mode: first camera is master (1), others are slaves (2)
             if self.enable_inter_cam_sync:
-                sync_mode = 1 if i == 0 else 2  # First camera = master, others = slaves
+                if master_serial:
+                    sync_mode = 1 if serial == master_serial else 2
+                else:
+                    sync_mode = 1 if i == 0 else 2  # First camera = master, others = slaves
             else:
                 sync_mode = 0  # No sync
 
@@ -188,26 +211,29 @@ class RealSenseCameraNode(Node):
         self.get_logger().info(f"Initializing camera: {camera_name} (serial: {serial})")
 
         # Configure inter-camera sync (firmware-based, requires physical sync cables)
-        if sync_mode > 0:
-            try:
-                sensor = device.first_depth_sensor()
-                if sensor.supports(rs.option.inter_cam_sync_mode):
-                    sensor.set_option(rs.option.inter_cam_sync_mode, sync_mode)
-                    sync_mode_name = "Master" if sync_mode == 1 else "Slave"
-                    self.get_logger().info(
-                        f"Configured {camera_name} for inter-camera sync: {sync_mode_name}"
-                    )
+        # Set mode even when 0 to clear any persistent slave/master state.
+        try:
+            sensor = device.first_depth_sensor()
+            if sensor.supports(rs.option.inter_cam_sync_mode):
+                sensor.set_option(rs.option.inter_cam_sync_mode, sync_mode)
+                if sync_mode == 0:
+                    sync_mode_name = "Disabled"
                 else:
-                    self.get_logger().warn(
-                        f"Camera {camera_name} does not support inter-camera sync"
-                    )
-            except Exception as e:
-                self.get_logger().warn(
-                    f"Failed to configure inter-camera sync for {camera_name}: {e}"
-                )
+                    sync_mode_name = "Master" if sync_mode == 1 else "Slave"
                 self.get_logger().info(
-                    "Note: Inter-camera sync requires physical sync cables between cameras"
+                    f"Configured {camera_name} for inter-camera sync: {sync_mode_name}"
                 )
+            else:
+                self.get_logger().warn(
+                    f"Camera {camera_name} does not support inter-camera sync"
+                )
+        except Exception as e:
+            self.get_logger().warn(
+                f"Failed to configure inter-camera sync for {camera_name}: {e}"
+            )
+            self.get_logger().info(
+                "Note: Inter-camera sync requires physical sync cables between cameras"
+            )
 
         # Create pipeline and config
         pipeline = rs.pipeline()
@@ -407,10 +433,14 @@ class RealSenseCameraNode(Node):
 
                 # Publish color image
                 if color_frame and self.enable_color:
+                    # OPTIMIZATION: Use numpy view for RGB→BGR conversion (zero-copy)
+                    # RealSense provides RGB, OpenCV expects BGR
                     color_image = np.asanyarray(color_frame.get_data())
-                    # Convert RGB to BGR for OpenCV
-                    color_image = color_image[:, :, ::-1]
-                    ros_image = self.bridge.cv2_to_imgmsg(color_image, "bgr8")
+                    # Use view instead of copy for RGB→BGR conversion
+                    # Note: [:, :, ::-1] creates a view, not a copy, but cv2_to_imgmsg may copy anyway
+                    # However, this is still more efficient than explicit copy
+                    bgr_image = color_image[:, :, ::-1]  # View (zero-copy)
+                    ros_image = self.bridge.cv2_to_imgmsg(bgr_image, "bgr8")
                     ros_image.header.frame_id = f"{camera_name}_color_optical_frame"
                     ros_image.header.stamp = self.get_clock().now().to_msg()
                     self.camera_publishers[camera_name]["color_image"].publish(ros_image)

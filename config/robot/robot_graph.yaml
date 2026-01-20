@@ -240,6 +240,8 @@ robot:
       viz_mesh_decimation: 0.75  # 75% triangle reduction
       viz_tsdf_extract_mesh: true  # Extract mesh from TSDF instead of voxel grid
       viz_tsdf_fps: 2.0  # Lower frequency for TSDF mesh
+      # System status integration
+      enable_system_status: true  # Enable system status synchronization
     topics:
       publish:
         # Feature topics (for VLM/feature builder) - 15 Hz, moderate downsampling
@@ -254,6 +256,17 @@ robot:
         - /sensor_fusion/three_d/camera_rear/pointcloud  # Factor 2 downsampling
         - /sensor_fusion/three_d/mesh  # 50% decimation, fused cameras
         - /sensor_fusion/three_d/tsdf  # Coarser voxel grid (0.1m)
+        # System status topics (for controller) - Synchronized with sensor data
+        - /sensor_fusion/system/status
+        - /sensor_fusion/system/temperature/cpu
+        - /sensor_fusion/system/temperature/gpu
+        - /sensor_fusion/system/cpu/usage
+        - /sensor_fusion/system/gpu/usage
+        - /sensor_fusion/system/memory/usage
+        - /sensor_fusion/system/disk/usage
+        - /sensor_fusion/system/power
+        - /sensor_fusion/system/alerts
+        - /sensor_fusion/system/hardware/camera_sync_status
         # Visualization topics (for bridge) - Aggressive downsampling
         - /viz/remote/imu/filtered
         - /viz/remote/chassis/battery
@@ -262,6 +275,13 @@ robot:
         - /viz/remote/three_d/pointcloud  # Factor 16 downsampling @ 5 Hz
         - /viz/remote/three_d/mesh  # 75% decimation @ 5 Hz
         - /viz/remote/three_d/tsdf_mesh  # TSDF mesh extraction @ 2 Hz
+        # System status for visualization (lower frequency)
+        - /viz/remote/system/status
+        - /viz/remote/system/temperature/cpu
+        - /viz/remote/system/temperature/gpu
+        - /viz/remote/system/cpu/usage
+        - /viz/remote/system/memory/usage
+        - /viz/remote/system/alerts
         - /sensor_fusion/status
       subscribe:
         - /phat/imu
@@ -269,6 +289,16 @@ robot:
         - /irobot/status
         - /hardware/camera_front/color/image_raw
         - /hardware/camera_rear/color/image_raw
+        # System monitor topics
+        - /system/status
+        - /system/temperature/cpu
+        - /system/temperature/gpu
+        - /system/cpu/usage
+        - /system/gpu/usage
+        - /system/memory/usage
+        - /system/disk/usage
+        - /system/power
+        - /system/alerts
         # Full quality 3D data from nvblox (for downsampling)
         - /nvblox/full/camera_front/pointcloud  # Full resolution pointclouds
         - /nvblox/full/camera_rear/pointcloud
