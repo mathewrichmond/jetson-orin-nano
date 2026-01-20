@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Fast DDS Profiles for ROS 2 Shared Memory Transport
+Enables zero-copy communication between nodes on the same machine
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <!-- Default Publisher Profile -->
+  <publisher profile_name="default_publisher" is_default_profile="true">
+    <qos>
+      <!-- Enable Data Sharing for zero-copy shared memory transport -->
+      <data_sharing>
+        <kind>AUTOMATIC</kind>
+        <!-- Maximum shared memory segment size (256 MB) -->
+        <max_size>268435456</max_size>
+      </data_sharing>
+      <!-- Reliability: RELIABLE for critical data -->
+      <reliability>
+        <kind>RELIABLE</kind>
+      </reliability>
+      <!-- Durability: VOLATILE (default) -->
+      <durability>
+        <kind>VOLATILE</kind>
+      </durability>
+    </qos>
+  </publisher>
+
+  <!-- Default Subscriber Profile -->
+  <subscriber profile_name="default_subscriber" is_default_profile="true">
+    <qos>
+      <!-- Enable Data Sharing for zero-copy shared memory transport -->
+      <data_sharing>
+        <kind>AUTOMATIC</kind>
+        <!-- Maximum shared memory segment size (256 MB) -->
+        <max_size>268435456</max_size>
+      </data_sharing>
+      <!-- Reliability: RELIABLE for critical data -->
+      <reliability>
+        <kind>RELIABLE</kind>
+      </reliability>
+      <!-- Durability: VOLATILE (default) -->
+      <durability>
+        <kind>VOLATILE</kind>
+      </durability>
+    </qos>
+  </subscriber>
+</profiles>
