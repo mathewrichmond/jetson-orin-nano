@@ -16,6 +16,14 @@ This directory contains Foxglove Studio layout configurations for visualizing ro
 - Both cameras
 - All sensors including raw + filtered comparison
 
+**`camera_debug.json`** - Camera debugging and monitoring layout
+- Two side-by-side camera views (front and rear)
+- Shows downsampled visualization images (`/viz/remote/camera_*/color/image_raw`)
+- Displays camera info messages (calibration data)
+- Shows timestamp plots for frame rate monitoring
+- Includes sync status from sensor fusion
+- Optimized for debugging camera publishing, sync, and frame rates
+
 ## Usage
 
 1. Open Foxglove Studio

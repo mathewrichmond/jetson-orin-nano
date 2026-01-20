@@ -397,6 +397,9 @@ class SensorSyncNode(Node):
             self.viz_camera_front_pub = self.create_publisher(
                 Image, "/viz/remote/camera_front/color/image_raw", 10
             )
+            self.viz_camera_rear_pub = self.create_publisher(
+                Image, "/viz/remote/camera_rear/color/image_raw", 10
+            )
             self.viz_pointcloud_pub = self.create_publisher(
                 PointCloud2, "/viz/remote/three_d/pointcloud", 10
             )
@@ -942,7 +945,7 @@ class SensorSyncNode(Node):
                     self.feature_camera_pubs[camera_name].publish(feature_img)
 
                     # Downsample for viz topics (with caching - reuses cache if same source image)
-                    if self.publish_viz_topics and camera_name == "camera_front":
+                    if self.publish_viz_topics and camera_name in ["camera_front", "camera_rear"]:
                         if camera_name not in self.last_viz_publish_time or (
                             current_time - self.last_viz_publish_time[camera_name]
                         ) >= (1.0 / self.viz_frequency):
@@ -950,7 +953,10 @@ class SensorSyncNode(Node):
                                 camera_msg, self.viz_resolution_width, self.viz_resolution_height, camera_name
                             )
                             viz_img.header.stamp = self.get_clock().now().to_msg()
-                            self.viz_camera_front_pub.publish(viz_img)
+                            if camera_name == "camera_front":
+                                self.viz_camera_front_pub.publish(viz_img)
+                            elif camera_name == "camera_rear":
+                                self.viz_camera_rear_pub.publish(viz_img)
                             self.last_viz_publish_time[camera_name] = current_time
 
             # If no camera frames available, publish blank frames for viz topics

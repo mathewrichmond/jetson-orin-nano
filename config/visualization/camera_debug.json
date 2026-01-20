@@ -1,0 +1,151 @@
+{
+  "configById": {
+    "Image!camera_front": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/viz/remote/camera_front/color/image_raw",
+        "calibrationTopic": "/hardware/camera_front/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
+    },
+    "Image!camera_rear": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/viz/remote/camera_rear/color/image_raw",
+        "calibrationTopic": "/hardware/camera_rear/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
+    },
+    "RawMessages!camera_front_info": {
+      "topicName": "/hardware/camera_front/color/camera_info",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    },
+    "RawMessages!camera_rear_info": {
+      "topicName": "/hardware/camera_rear/color/camera_info",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    },
+    "RawMessages!camera_sync_status": {
+      "topicName": "/sensor_fusion/system/hardware/camera_sync_status",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    },
+    "RawMessages!camera_front_depth_info": {
+      "topicName": "/hardware/camera_front/depth/camera_info",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    },
+    "RawMessages!camera_rear_depth_info": {
+      "topicName": "/hardware/camera_rear/depth/camera_info",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    },
+    "Plot!camera_front_timestamps": {
+      "paths": [
+        {
+          "value": "/hardware/camera_front/color/image_raw.header.stamp.nanosec",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Front Color (ns)"
+        },
+        {
+          "value": "/hardware/camera_front/depth/image_rect_raw.header.stamp.nanosec",
+          "enabled": true,
+          "color": "#0088ff",
+          "label": "Front Depth (ns)"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1000000000,
+      "showLegend": true
+    },
+    "Plot!camera_rear_timestamps": {
+      "paths": [
+        {
+          "value": "/hardware/camera_rear/color/image_raw.header.stamp.nanosec",
+          "enabled": true,
+          "color": "#ff8800",
+          "label": "Rear Color (ns)"
+        },
+        {
+          "value": "/hardware/camera_rear/depth/image_rect_raw.header.stamp.nanosec",
+          "enabled": true,
+          "color": "#ff0088",
+          "label": "Rear Depth (ns)"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1000000000,
+      "showLegend": true
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": {
+      "direction": "column",
+      "first": {
+        "direction": "row",
+        "first": "Image!camera_front",
+        "second": {
+          "direction": "column",
+          "first": "RawMessages!camera_front_info",
+          "second": "RawMessages!camera_front_depth_info",
+          "third": "Plot!camera_front_timestamps"
+        }
+      },
+      "second": {
+        "direction": "row",
+        "first": "Image!camera_rear",
+        "second": {
+          "direction": "column",
+          "first": "RawMessages!camera_rear_info",
+          "second": "RawMessages!camera_rear_depth_info",
+          "third": "Plot!camera_rear_timestamps"
+        }
+      },
+      "third": "RawMessages!camera_sync_status"
+    }
+  }
+}

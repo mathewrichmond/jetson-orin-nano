@@ -108,5 +108,14 @@
   },
   "cursorpyright.analysis.autoImportCompletions": true,
   "cursorpyright.analysis.diagnosticMode": "workspace",
-  "cursorpyright.analysis.typeCheckingMode": "basic"
+  "cursorpyright.analysis.typeCheckingMode": "basic",
+  // Port forwarding for Foxglove Bridge
+  "remote.portsAttributes": {
+    "8765": {
+      "label": "Foxglove Bridge",
+      "onAutoForward": "notify",
+      "protocol": "http"
+    }
+  },
+  "remote.autoForwardPorts": true
 }

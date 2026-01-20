@@ -271,6 +271,7 @@ robot:
         - /viz/remote/imu/filtered
         - /viz/remote/chassis/battery
         - /viz/remote/camera_front/color/image_raw  # 320×240 @ 10 Hz
+        - /viz/remote/camera_rear/color/image_raw  # 320×240 @ 10 Hz
         # 3D data topics (aggressively downsampled)
         - /viz/remote/three_d/pointcloud  # Factor 16 downsampling @ 5 Hz
         - /viz/remote/three_d/mesh  # 75% decimation @ 5 Hz
