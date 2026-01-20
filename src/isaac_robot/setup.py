@@ -27,6 +27,7 @@ setup(
     entry_points={
         "console_scripts": [
             "isaac_graph_manager = isaac_robot.graph_manager:main",
+            "composable_container = isaac_robot.composable_container:main",
         ],
     },
 )

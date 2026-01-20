@@ -423,6 +423,12 @@ groups:
     - phat_motor_controller
     - hardware_sync_generator
     - sensor_fusion
+  
+  # Composable pipeline (zero-copy intra-process communication)
+  composable_pipeline:
+    - realsense_camera
+    - nvblox_processor
+    - sensor_fusion
 
   bench_test:
     - system_monitor

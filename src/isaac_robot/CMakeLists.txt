@@ -36,6 +36,17 @@ install(CODE "
                 GROUP_READ GROUP_EXECUTE
                 WORLD_READ WORLD_EXECUTE
   )
+  file(WRITE \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/composable_container\"
+    \"#!/usr/bin/env python3\\n\"
+    \"from isaac_robot.composable_container import main\\n\"
+    \"if __name__ == '__main__':\\n\"
+    \"    main()\\n\"
+  )
+  file(CHMOD \"${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/composable_container\"
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                GROUP_READ GROUP_EXECUTE
+                WORLD_READ WORLD_EXECUTE
+  )
 ")
 
 if(BUILD_TESTING)
