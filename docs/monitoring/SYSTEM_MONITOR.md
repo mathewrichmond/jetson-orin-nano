@@ -166,21 +166,36 @@ sudo pip3 install -U jetson-stats
 - Check for errors: `ros2 topic echo /system/status`
 - Verify package is built: `colcon build --packages-select system_monitor`
 
+## Integration with Sensor Fusion
+
+The system monitor is integrated into the **system sub-graph** and its status is included in the **fused sense vector** (`/sensor_fusion/system/*`). This ensures:
+
+- **Single Point of Understanding**: Same system status information is available to both the controller and visualization
+- **Stable Interface**: System status is part of the stable sense vector interface
+- **Bandwidth Control**: Frequency can be adjusted for different consumers (controller vs visualization)
+- **Comprehensive Status**: Includes traditional metrics (CPU, GPU, memory) AND system-specific status (camera sync, device errors, voltages)
+
+The sensor fusion node consumes system monitor topics and includes them in the fused output, synchronized with sensor data.
+
 ## Integration
 
 The system monitor can be integrated with:
-- Control systems for thermal management
-- Logging systems for historical data
-- Alert systems for notifications
-- Dashboard systems for visualization
+- **Sensor Fusion Node**: System status included in fused sense vector
+- **Control Planner**: Consumes system status as part of sense vector
+- **Visualization**: System status available for monitoring dashboards
+- **Logging**: System status recorded alongside sensor data
+- **Alert Systems**: Threshold-based alerts for notifications
 
 ## Future Enhancements
 
+- [ ] Network I/O rate monitoring (rx/tx rates)
+- [ ] USB device monitoring and status
+- [ ] Camera sync status integration
+- [ ] Device error state tracking
+- [ ] Missing hardware detection
+- [ ] Voltage monitoring (if sensors available)
 - [ ] Historical data logging
 - [ ] Web-based dashboard
 - [ ] Email/SMS alerts
 - [ ] Predictive thermal management
 - [ ] Power mode recommendations
-- [ ] Network monitoring
-- [ ] USB device monitoring
-

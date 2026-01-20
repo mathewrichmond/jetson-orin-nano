@@ -22,8 +22,12 @@ The Isaac robot system is organized into four sub-graphs that communicate throug
   - IMU data (filtered, synchronized)
   - Chassis state (battery, status, synchronized)
   - 3D data (pointclouds, mesh, TSDF - downsampled for consumers)
-  - System state (temperatures, CPU, memory, disk, power)
-  - System health and alerts
+  - **System status** (`/sensor_fusion/system/*`) - Comprehensive system health and state
+    - Traditional metrics: CPU/GPU usage, memory usage, disk usage, network I/O rates
+    - System-specific: camera sync status, temperatures (all thermal zones), device errors, missing hardware, voltages, power consumption
+    - Hardware status: device connectivity, error states, calibration status
+    - System alerts and warnings
+  - Synchronization metadata (timestamps, alignment info, frame sync status)
 
 **Consumes:**
 - `/control/plan` - Timestamped control plan from planner sub-graph
@@ -213,16 +217,26 @@ Graph configurations define which sub-graphs are enabled and how they're configu
 - `/sensor_fusion/vlm_features` - VLM-ready features (15 Hz)
 - `/sensor_fusion/status` - Fusion node status
 
-**System State (`/system/*`):**
-- `/system/status` - System health status
-- `/system/temperature/cpu` - CPU temperature
-- `/system/temperature/gpu` - GPU temperature
-- `/system/cpu/usage` - CPU usage
-- `/system/gpu/usage` - GPU usage
-- `/system/memory/usage` - Memory usage
-- `/system/disk/usage` - Disk usage
-- `/system/power` - Power consumption
-- `/system/alerts` - System alerts
+**System Status (`/sensor_fusion/system/*`):**
+- `/sensor_fusion/system/status` - System health status summary
+- `/sensor_fusion/system/temperature/cpu` - CPU temperature
+- `/sensor_fusion/system/temperature/gpu` - GPU temperature
+- `/sensor_fusion/system/temperature/*` - All thermal zones
+- `/sensor_fusion/system/cpu/usage` - CPU usage percentage
+- `/sensor_fusion/system/gpu/usage` - GPU usage percentage
+- `/sensor_fusion/system/memory/usage` - Memory usage percentage
+- `/sensor_fusion/system/disk/usage` - Disk usage percentage
+- `/sensor_fusion/system/network/rx_rate` - Network receive rate
+- `/sensor_fusion/system/network/tx_rate` - Network transmit rate
+- `/sensor_fusion/system/power` - Power consumption (watts)
+- `/sensor_fusion/system/voltage/*` - System voltages (if available)
+- `/sensor_fusion/system/hardware/camera_sync_status` - Camera frame sync status
+- `/sensor_fusion/system/hardware/device_errors` - Device error states
+- `/sensor_fusion/system/hardware/missing_devices` - Missing hardware detection
+- `/sensor_fusion/system/hardware/connectivity` - Device connectivity status
+- `/sensor_fusion/system/alerts` - System alerts and warnings
+
+**Note:** System status is synchronized and resampled to match sensor fusion rate (typically 15 Hz for controller, 10 Hz for visualization). The same information is available to both controller and visualization, following the "single point of understanding" principle.
 
 **Visualization Topics (`/viz/remote/*`):**
 - `/viz/remote/imu/filtered` - IMU for visualization (10 Hz)
@@ -287,12 +301,19 @@ Once model training begins, these interfaces **must remain stable**:
    - Update frequencies
    - Data formats
    - Coordinate frames
+   - **System status topics** (`/sensor_fusion/system/*`) - All system status information must be included in the sense vector
 
 2. **Control Plan (`/control/plan` topic):**
    - Topic name
    - Message type
    - Command structure
    - Timestamp format
+
+**System Status Requirements:**
+- System status must be part of the fused sense vector (not separate topics)
+- Same system status information exposed to controller and visualization
+- Frequency can be adjusted for bandwidth, but data completeness must be maintained
+- All system-specific status (camera sync, device errors, voltages, etc.) must be included
 
 ### Flexible Implementation
 

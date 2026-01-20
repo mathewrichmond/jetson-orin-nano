@@ -16,8 +16,9 @@ The system computes everything at full quality, then downsamples/decimates to fi
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Raw Sensors (High Frequency)              │
-│  - IMU  - Chassis  - Cameras  - System Health               │
+│                    Raw Sensors & System State                │
+│  - IMU  - Chassis  - Cameras  - System Monitor              │
+│  - Hardware Status  - Device Errors  - Sync Status         │
 └───────────────────────┬─────────────────────────────────────┘
                         │
                         ▼
@@ -25,13 +26,18 @@ The system computes everything at full quality, then downsamples/decimates to fi
 │        Sensor Fusion Node (Sync + Resample + Align)          │
 │  - Time-align all streams                                   │
 │  - Resample to uniform rates                                │
-│  - Publish fused sense vector                               │
+│  - Fuse sensor data + system status                        │
+│  - Publish unified sense vector                             │
 └───────────────────────┬─────────────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │     Fused Sense Vector (Stable Interface)                    │
-│  - Used by planner, logging, visualization                  │
+│  - Sensor streams (cameras, IMU, chassis)                  │
+│  - System status (CPU, GPU, memory, temps, errors)         │
+│  - Hardware status (sync, devices, voltages)               │
+│  - Same data for controller & visualization                │
+│  - Frequency controlled for bandwidth                      │
 └───────────────────────┬─────────────────────────────────────┘
                         │
                         ▼
@@ -50,13 +56,17 @@ The system computes everything at full quality, then downsamples/decimates to fi
 
 ## Data Flow
 
-### 1. Raw Sensors → Sensor Fusion
-- Hardware and system nodes publish raw sensor streams
+### 1. Raw Sensors & System State → Sensor Fusion
+- Hardware nodes publish raw sensor streams (cameras, IMU, chassis)
+- System monitor publishes system status (CPU, GPU, memory, disk, network I/O)
+- Hardware-specific status (camera sync, device errors, temperatures, voltages)
 - Fusion node time-aligns, resamples, and synchronizes all inputs
 
 ### 2. Sensor Fusion → Fused Sense Vector
 - Unified, stable interface for all downstream consumers
-- Includes system health, temps, and state alongside sensor data
+- Includes sensor streams AND comprehensive system status
+- **Single Point of Understanding**: Same system status exposed to controller and visualization
+- Frequency controlled for bandwidth (higher for controller, lower for visualization)
 
 ### 3. Fused Sense Vector → Control Planner
 - Planner consumes the sense vector

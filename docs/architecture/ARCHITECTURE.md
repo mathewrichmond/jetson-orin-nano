@@ -63,9 +63,15 @@ The system sub-graph is the stable interface boundary for training and runtime. 
 
 ### Sense Vector (System Output)
 The fused sense vector includes all information needed by downstream consumers:
-- Sensor streams (cameras, IMU, chassis)
-- System state and health (temperatures, diagnostics, status)
-- Synchronization metadata (timestamps, alignment info)
+- **Sensor streams** (cameras, IMU, chassis, microphones)
+- **System status** (comprehensive system health and state information)
+  - Traditional system metrics: CPU/GPU usage, memory usage, disk usage, network I/O rates
+  - System-specific status: camera sync status, temperatures (all thermal zones), device errors, missing hardware, voltages, power consumption
+  - Hardware status: device connectivity, error states, calibration status
+  - System alerts and warnings
+- **Synchronization metadata** (timestamps, alignment info, frame sync status)
+
+**Single Point of Understanding**: The same system status information is exposed to both the controller and visualization, with frequency controlled for bandwidth. This ensures consistent understanding across all consumers.
 
 **Excludes**: The control plan itself, which is produced by the control planner.
 
