@@ -38,18 +38,18 @@ import sys
 try:
     with open("$GRAPH_CONFIG", "r") as f:
         config = yaml.safe_load(f) or {}
-    
+
     nodes_config = config.get("robot", {})
     node_config = nodes_config.get("$NODE_NAME", {})
-    
+
     if not node_config:
         print(f"Error: Node '$NODE_NAME' not found in graph config", file=sys.stderr)
         sys.exit(1)
-    
+
     if not node_config.get("enabled", True):
         print(f"Error: Node '$NODE_NAME' is disabled in graph config", file=sys.stderr)
         sys.exit(1)
-    
+
     # Extract node configuration
     result = {
         "package": node_config.get("package", ""),
@@ -58,10 +58,10 @@ try:
         "parameters": node_config.get("parameters", {}),
         "enabled": node_config.get("enabled", True),
     }
-    
+
     # Output as JSON for easy parsing
     print(json.dumps(result))
-    
+
 except Exception as e:
     print(f"Error parsing graph config: {e}", file=sys.stderr)
     sys.exit(1)

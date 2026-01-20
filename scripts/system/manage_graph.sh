@@ -260,7 +260,7 @@ source_ros2() {
 
 list_nodes() {
     local graph="${1:-}"
-    
+
     if [ -z "$graph" ]; then
         graph=$("${UTILS_DIR}/get_graph.sh" 2>/dev/null || echo "robot")
     fi
@@ -284,21 +284,21 @@ import sys
 try:
     with open("$graph_config", "r") as f:
         config = yaml.safe_load(f) or {}
-    
+
     nodes_config = config.get("robot", {})
-    
+
     enabled_nodes = []
     disabled_nodes = []
-    
+
     for node_name, node_config in nodes_config.items():
         if not isinstance(node_config, dict) or "package" not in node_config:
             continue
-        
+
         if node_config.get("enabled", True):
             enabled_nodes.append((node_name, node_config))
         else:
             disabled_nodes.append((node_name, node_config))
-    
+
     if enabled_nodes:
         print("Enabled Nodes:")
         for node_name, node_config in sorted(enabled_nodes):
@@ -308,15 +308,15 @@ try:
             ns_str = f" (ns: {namespace})" if namespace else ""
             print(f"  {node_name:30} {package}/{executable}{ns_str}")
         print("")
-    
+
     if disabled_nodes:
         print("Disabled Nodes:")
         for node_name, node_config in sorted(disabled_nodes):
             print(f"  {node_name:30} (disabled)")
         print("")
-    
+
     print(f"Total: {len(enabled_nodes)} enabled, {len(disabled_nodes)} disabled")
-    
+
 except Exception as e:
     print(f"Error parsing graph config: {e}", file=sys.stderr)
     sys.exit(1)
@@ -325,7 +325,7 @@ EOF
 
 start_node() {
     local node_name="${1:-}"
-    
+
     if [ -z "$node_name" ]; then
         echo "Error: Node name required" >&2
         echo "Usage: $0 node-start <node_name>" >&2
@@ -394,7 +394,7 @@ start_node() {
         # Check if we need a YAML file for complex nested structures
         local has_nested_dict
         has_nested_dict=$(echo "$params_json" | python3 -c "import sys, json; params=json.load(sys.stdin); print('true' if any(isinstance(v, dict) for v in params.values()) else 'false')" 2>/dev/null || echo "false")
-        
+
         if [ "$has_nested_dict" = "true" ]; then
             # Use YAML file for complex parameters
             local temp_param_file="/tmp/${node_name}_params.yaml"
@@ -447,14 +447,14 @@ PYEOF
     # Start node in background
     echo "Starting node..."
     cd "$PROJECT_ROOT"
-    
+
     # Run node with proper arguments
     nohup ros2 run "$package" "$executable" \
         --ros-args -r __node:="$node_name" \
-        $ns_arg \
-        $param_args \
+        "$ns_arg" \
+        "$param_args" \
         > "/tmp/${node_name}_node.log" 2>&1 &
-    
+
     local pid=$!
     echo "Node started with PID: $pid"
     echo "Logs: /tmp/${node_name}_node.log"
@@ -465,7 +465,7 @@ PYEOF
 
 stop_node() {
     local node_name="${1:-}"
-    
+
     if [ -z "$node_name" ]; then
         echo "Error: Node name required" >&2
         echo "Usage: $0 node-stop <node_name>" >&2
@@ -499,11 +499,11 @@ stop_node() {
     # Find and kill the process
     # Try multiple methods to find the process
     local pids=""
-    
+
     # Method 1: Find by executable name pattern
     local executable_pattern="${node_name}_node"
     pids=$(pgrep -f "$executable_pattern" 2>/dev/null || true)
-    
+
     # Method 2: Find by ROS 2 node name
     if [ -z "$pids" ]; then
         # Get node info to find process
@@ -512,7 +512,7 @@ stop_node() {
         # This is tricky - ROS 2 doesn't directly expose PIDs
         # We'll use process name matching instead
     fi
-    
+
     # Method 3: Find by package/executable combination
     if [ -z "$pids" ]; then
         # Get node config to find executable name
@@ -556,7 +556,7 @@ stop_node() {
 
 restart_node() {
     local node_name="${1:-}"
-    
+
     if [ -z "$node_name" ]; then
         echo "Error: Node name required" >&2
         echo "Usage: $0 node-restart <node_name>" >&2
@@ -565,13 +565,13 @@ restart_node() {
 
     echo "Restarting node: $node_name"
     echo ""
-    
+
     # Stop the node (ignore errors if not running)
     stop_node "$node_name" 2>/dev/null || true
-    
+
     # Wait a moment
     sleep 2
-    
+
     # Start the node
     start_node "$node_name"
 }
@@ -646,7 +646,7 @@ show_container_logs() {
     # Check if systemd service is running
     if systemctl --user is-active --quiet isaac-robot.service 2>/dev/null; then
         local journal_cmd="journalctl --user -u isaac-robot.service --no-pager"
-        
+
         # Add follow flag if requested
         if [ "$follow" = "true" ]; then
             journal_cmd="$journal_cmd -f"
@@ -688,13 +688,13 @@ show_container_logs() {
 
         echo "Container PID: $container_pid"
         echo ""
-        
+
         # Try to find ROS log files
         local ros_log_dir="$HOME/.ros/log"
         if [ -d "$ros_log_dir" ]; then
             local latest_log
             latest_log=$(find "$ros_log_dir" -name "*composable_container*" -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
-            
+
             if [ -n "$latest_log" ] && [ -f "$latest_log" ]; then
                 echo "Found log file: $latest_log"
                 echo ""
@@ -737,14 +737,14 @@ show_container_status() {
     if [ -n "$container_pid" ]; then
         echo "Container Process:"
         echo "  PID: $container_pid"
-        
+
         # Get process stats
         if command -v ps > /dev/null; then
             local cpu_mem
             cpu_mem=$(ps -p "$container_pid" -o %cpu,%mem,rss,vsz --no-headers 2>/dev/null || echo "")
             if [ -n "$cpu_mem" ]; then
-                echo "  CPU: $(echo $cpu_mem | awk '{print $1}')%"
-                echo "  Memory: $(echo $cpu_mem | awk '{print $2}')% ($(echo $cpu_mem | awk '{printf "%.1f", $3/1024}') MB)"
+                echo "  CPU: $(echo "$cpu_mem" | awk '{print $1}')%"
+                echo "  Memory: $(echo "$cpu_mem" | awk '{print $2}')% ($(echo "$cpu_mem" | awk '{printf "%.1f", $3/1024}') MB)"
             fi
         fi
         echo ""
@@ -754,11 +754,11 @@ show_container_status() {
     echo "Nodes in Container:"
     local container_node
     container_node=$(ros2 node list 2>/dev/null | grep composable_container | head -1)
-    
+
     if [ -n "$container_node" ]; then
         echo "  Container node: $container_node"
         echo ""
-        
+
         # Try to get node info
         if ros2 node info "$container_node" &>/dev/null; then
             echo "Node Details:"
@@ -771,7 +771,7 @@ show_container_status() {
     local composable_nodes="realsense_camera nvblox_processor sensor_fusion"
     local running_nodes
     running_nodes=$(ros2 node list 2>/dev/null || echo "")
-    
+
     for node_name in $composable_nodes; do
         # Check if node appears in ROS 2 node list (may be namespaced)
         if echo "$running_nodes" | grep -q "$node_name"; then
@@ -828,12 +828,12 @@ monitor_container_perf() {
             stats=$(ps -p "$container_pid" -o %cpu,%mem,rss,vsz,etime --no-headers 2>/dev/null)
             if [ -n "$stats" ]; then
                 local cpu mem rss vsz etime
-                cpu=$(echo $stats | awk '{print $1}')
-                mem=$(echo $stats | awk '{print $2}')
-                rss=$(echo $stats | awk '{printf "%.1f", $3/1024}')
-                vsz=$(echo $stats | awk '{printf "%.1f", $4/1024}')
-                etime=$(echo $stats | awk '{print $5}')
-                
+                cpu=$(echo "$stats" | awk '{print $1}')
+                mem=$(echo "$stats" | awk '{print $2}')
+                rss=$(echo "$stats" | awk '{printf "%.1f", $3/1024}')
+                vsz=$(echo "$stats" | awk '{printf "%.1f", $4/1024}')
+                etime=$(echo "$stats" | awk '{print $5}')
+
                 # Clear line and print stats
                 printf "\rCPU: %5s%%  Memory: %5s%% (%6s MB)  RSS: %6s MB  VSZ: %7s MB  Uptime: %s" \
                     "$cpu" "$mem" "$rss" "$rss" "$vsz" "$etime"

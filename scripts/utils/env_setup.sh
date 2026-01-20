@@ -45,6 +45,10 @@ if [ -f "$PROJECT_ROOT/config/ros2/fastdds_profiles.xml" ]; then
     export FASTRTPS_DEFAULT_PROFILES_FILE="$PROJECT_ROOT/config/ros2/fastdds_profiles.xml"
     export RMW_FASTRTPS_USE_QOS_FROM_XML=1
 fi
+# CRITICAL: Use ASYNCHRONOUS publication mode to prevent blocking writes
+# This ensures spin_once() timeout is respected even during publish operations
+# Async mode queues messages and returns immediately, preventing executor blocking
+export RMW_FASTRTPS_PUBLICATION_MODE=ASYNCHRONOUS
 
 # Change to project directory
 cd "$PROJECT_ROOT" || return

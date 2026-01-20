@@ -17,6 +17,7 @@ import numpy as np
 import pyrealsense2 as rs
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import String
 
@@ -24,8 +25,19 @@ from std_msgs.msg import String
 class RealSenseCameraNode(Node):
     """ROS 2 node for Intel RealSense depth cameras"""
 
-    def __init__(self):
-        super().__init__("realsense_camera_node")
+    def __init__(
+        self,
+        defer_init: bool = False,
+        node_name: Optional[str] = None,
+        namespace: Optional[str] = None,
+    ):
+        # Use provided node_name or default
+        actual_node_name = node_name if node_name else "realsense_camera_node"
+        # ROS 2 Node constructor accepts namespace parameter
+        if namespace:
+            super().__init__(actual_node_name, namespace=namespace)
+        else:
+            super().__init__(actual_node_name)
 
         # Parameters
         self.declare_parameter("camera_serial_numbers", [])
@@ -46,12 +58,39 @@ class RealSenseCameraNode(Node):
         self.declare_parameter("shutdown_delay", 0.5)  # Seconds to wait for threads on shutdown
 
         # Inter-camera sync configuration (firmware-based)
-        self.declare_parameter("enable_inter_cam_sync", False)  # Enable firmware-based inter-camera sync
+        self.declare_parameter(
+            "enable_inter_cam_sync", False
+        )  # Enable firmware-based inter-camera sync
         self.declare_parameter("inter_cam_sync_mode", 0)  # 0=None, 1=Master, 2=Slave
         # If multiple cameras, first is master, others are slaves
         self.declare_parameter("inter_cam_sync_master_serial", "")
         self.declare_parameter("sync_status_interval_sec", 5.0)
         self.declare_parameter("sync_status_tolerance_ms", 5.0)
+
+        # Initialize basic structures
+        self.bridge = CvBridge()
+        self.pipelines: Dict[str, rs.pipeline] = {}
+        self.configs: Dict[str, rs.config] = {}
+        self.aligns: Dict[str, rs.align] = {}
+        self.camera_infos: Dict[str, Dict] = {}
+        self.running = True
+        self.last_sync_status_time = 0.0
+        self.camera_threads: List[threading.Thread] = []
+        self.frame_queues: Dict[str, deque] = {}
+        self.timer = None
+        self.status_pub = None
+        self._initialized = False
+
+        # If defer_init is False (normal case), initialize immediately
+        # If True (composable container case), wait for parameters to be set
+        if not defer_init:
+            self._initialize_cameras()
+
+    def _initialize_cameras(self):
+        """Initialize cameras - can be called after parameters are set"""
+        if self._initialized:
+            self.get_logger().warn("Cameras already initialized, skipping")
+            return
 
         # Get parameters (with safe fallback to defaults)
         try:
@@ -82,35 +121,50 @@ class RealSenseCameraNode(Node):
         self.inter_cam_sync_master_serial = str(
             self.get_parameter("inter_cam_sync_master_serial").value
         ).strip()
-        self.sync_status_interval_sec = float(
-            self.get_parameter("sync_status_interval_sec").value
-        )
-        self.sync_status_tolerance_ms = float(
-            self.get_parameter("sync_status_tolerance_ms").value
-        )
-
-        # Initialize
-        self.bridge = CvBridge()
-        self.pipelines: Dict[str, rs.pipeline] = {}
-        self.configs: Dict[str, rs.config] = {}
-        self.aligns: Dict[str, rs.align] = {}
-        self.camera_infos: Dict[str, Dict] = {}
-        self.running = True
-        self.last_sync_status_time = 0.0
+        self.sync_status_interval_sec = float(self.get_parameter("sync_status_interval_sec").value)
+        self.sync_status_tolerance_ms = float(self.get_parameter("sync_status_tolerance_ms").value)
 
         # Status publisher
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
 
-        # Discover and initialize cameras
-        self._discover_cameras()
+        # Discover and initialize cameras (with retry logic)
+        max_retries = 3
+        retry_delay = 1.0
+
+        for attempt in range(max_retries):
+            self._discover_cameras()
+            if len(self.pipelines) > 0:
+                break
+            if attempt < max_retries - 1:
+                self.get_logger().warn(
+                    f"No cameras initialized (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s..."
+                )
+                time.sleep(retry_delay)
+            else:
+                self.get_logger().error(
+                    f"Failed to initialize any cameras after {max_retries} attempts"
+                )
+                self.publish_status("error", "No cameras detected after retries")
+
+        # Only proceed if we have cameras
+        if len(self.pipelines) == 0:
+            self.get_logger().error("Cannot start camera node: No cameras initialized")
+            self._initialized = True  # Mark as initialized even if failed, to prevent retries
+            return
 
         # Create publishers for each camera
         self._create_publishers()
 
         # Frame queues for each camera (thread-safe communication)
+        # Increased maxlen to prevent frame drops when publishing is slower than capture
+        # At 15 Hz publish rate, we need at least 2-3 frames buffer for 30 FPS capture
         self.frame_queues: Dict[str, deque] = {}
+        queue_size = max(
+            5, int(self.color_fps / self.publish_rate) + 2
+        )  # Buffer for 2+ publish cycles
         for camera_name in self.pipelines.keys():
-            self.frame_queues[camera_name] = deque(maxlen=2)
+            self.frame_queues[camera_name] = deque(maxlen=queue_size)
+            self.get_logger().info(f"Frame queue for {camera_name}: maxlen={queue_size}")
 
         # Start camera capture threads (only for frame capture, not publishing)
         self.camera_threads: List[threading.Thread] = []
@@ -125,14 +179,62 @@ class RealSenseCameraNode(Node):
         # Create timer for publishing (runs on main thread)
         timer_period = 1.0 / self.publish_rate
         self.timer = self.create_timer(timer_period, self._publish_frames)
+        self.get_logger().info(
+            f"Created publishing timer with period {timer_period:.3f}s (rate: {self.publish_rate} Hz)"
+        )
+        self.get_logger().info(
+            f"Timer object: {self.timer}, period_ns: {self.timer.timer_period_ns if self.timer else 'None'}"
+        )
+        self._publish_call_count = 0  # Debug counter
+        self._last_publish_time = time.time()  # Track actual publish timing
 
         self.get_logger().info(
             f"RealSense Camera Node started with {len(self.pipelines)} camera(s)"
         )
         self.publish_status("initialized", f"Started with {len(self.pipelines)} camera(s)")
+        self._initialized = True
+
+    def _check_camera_availability(self, serial: str) -> tuple[bool, str]:
+        """Check if a camera is available for use
+
+        Returns:
+            (is_available, error_message) tuple
+        """
+        try:
+            ctx = rs.context()
+            devices = ctx.query_devices()
+
+            # Find the device
+            device = None
+            for dev in devices:
+                if dev.get_info(rs.camera_info.serial_number) == serial:
+                    device = dev
+                    break
+
+            if device is None:
+                return False, f"Camera with serial {serial} not found"
+
+            # Try to create a test pipeline to check if device is available
+            test_pipeline = rs.pipeline()
+            test_config = rs.config()
+            test_config.enable_device(serial)
+            test_config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 15)
+
+            try:
+                profile = test_pipeline.start(test_config)
+                test_pipeline.stop()
+                return True, ""
+            except RuntimeError as e:
+                error_str = str(e)
+                if "Device or resource busy" in error_str or "errno=16" in error_str:
+                    return False, f"Camera {serial} is currently in use by another process"
+                else:
+                    return False, f"Camera {serial} initialization test failed: {error_str}"
+        except Exception as e:
+            return False, f"Error checking camera availability: {e}"
 
     def _discover_cameras(self):
-        """Discover available RealSense cameras"""
+        """Discover available RealSense cameras with resource availability checking"""
         ctx = rs.context()
         devices = ctx.query_devices()
 
@@ -148,10 +250,34 @@ class RealSenseCameraNode(Node):
 
         if self.camera_serials and len(self.camera_serials) > 0:
             # Use specified serials
-            target_serials = self.camera_serials
+            target_serials = [s for s in self.camera_serials if s in available_serials]
+            if len(target_serials) != len(self.camera_serials):
+                missing = set(self.camera_serials) - set(available_serials)
+                self.get_logger().warn(f"Some requested cameras not found: {missing}")
         else:
             # Use all available cameras
             target_serials = available_serials[: len(self.camera_names)]
+
+        if len(target_serials) == 0:
+            self.get_logger().error("No matching cameras found")
+            self.publish_status("error", "No matching cameras found")
+            return
+
+        # Check availability of all cameras before initializing
+        unavailable_cameras = []
+        for serial in target_serials:
+            is_available, error_msg = self._check_camera_availability(serial)
+            if not is_available:
+                unavailable_cameras.append((serial, error_msg))
+                self.get_logger().error(f"Camera {serial} unavailable: {error_msg}")
+
+        if unavailable_cameras:
+            error_summary = "; ".join([f"{s}: {msg}" for s, msg in unavailable_cameras])
+            self.get_logger().error(
+                f"Cannot initialize cameras - {len(unavailable_cameras)} camera(s) unavailable: {error_summary}"
+            )
+            self.publish_status("error", f"Cameras unavailable: {error_summary}")
+            # Don't return - try to initialize available cameras
 
         # Initialize cameras
         master_serial = None
@@ -165,20 +291,29 @@ class RealSenseCameraNode(Node):
 
         # Log camera name mapping for identification
         self.get_logger().info("Camera name mapping:")
-        for i, serial in enumerate(target_serials):
-            if serial in available_serials:
-                camera_name = self.camera_names[i] if i < len(self.camera_names) else f"camera_{i}"
-                self.get_logger().info(f"  {camera_name} → Serial: {serial}")
+        initialized_count = 0
+        failed_count = 0
 
         for i, serial in enumerate(target_serials):
             if serial not in available_serials:
                 self.get_logger().warn(f"Camera with serial {serial} not found")
+                failed_count += 1
                 continue
 
             if i >= len(self.camera_names):
                 camera_name = f"camera_{i}"
             else:
                 camera_name = self.camera_names[i]
+
+            # Skip if we already know this camera is unavailable
+            if any(s == serial for s, _ in unavailable_cameras):
+                failed_count += 1
+                self.get_logger().info(
+                    f"  {camera_name} → Serial: {serial} (SKIPPED - unavailable)"
+                )
+                continue
+
+            self.get_logger().info(f"  {camera_name} → Serial: {serial}")
 
             # Determine sync mode: first camera is master (1), others are slaves (2)
             if self.enable_inter_cam_sync:
@@ -193,13 +328,39 @@ class RealSenseCameraNode(Node):
                 self._initialize_camera(
                     camera_name, serial, devices[available_serials.index(serial)], sync_mode
                 )
+                initialized_count += 1
             except Exception as e:
-                self.get_logger().error(
-                    f"Failed to initialize camera {camera_name} ({serial}): {e}"
-                )
-                self.publish_status("error", f"Failed to initialize {camera_name}: {e}")
+                failed_count += 1
+                error_msg = str(e)
+                if "Device or resource busy" in error_msg or "errno=16" in error_msg:
+                    self.get_logger().error(
+                        f"FAILED to initialize camera {camera_name} ({serial}): Device is in use by another process. "
+                        f"Please stop other processes using this camera (check with: lsof | grep video) and retry."
+                    )
+                else:
+                    self.get_logger().error(
+                        f"FAILED to initialize camera {camera_name} ({serial}): {error_msg}"
+                    )
+                self.publish_status("error", f"Failed to initialize {camera_name}: {error_msg}")
 
-    def _initialize_camera(self, camera_name: str, serial: str, device: rs.device, sync_mode: int = 0):
+        # Summary
+        if initialized_count == 0:
+            self.get_logger().error(
+                f"CRITICAL: Failed to initialize any cameras ({failed_count} failed, {len(target_serials)} total)"
+            )
+        elif failed_count > 0:
+            self.get_logger().warn(
+                f"Partially initialized: {initialized_count} camera(s) initialized, {failed_count} failed"
+            )
+
+    def _initialize_camera(
+        self,
+        camera_name: str,
+        serial: str,
+        device: rs.device,
+        sync_mode: int = 0,
+        retry_count: int = 3,
+    ):
         """Initialize a single camera
 
         Args:
@@ -207,8 +368,17 @@ class RealSenseCameraNode(Node):
             serial: Camera serial number
             device: RealSense device object
             sync_mode: Inter-camera sync mode (0=None, 1=Master, 2=Slave)
+            retry_count: Number of retry attempts if initialization fails
+
+        Raises:
+            RuntimeError: If camera initialization fails after all retries
         """
         self.get_logger().info(f"Initializing camera: {camera_name} (serial: {serial})")
+
+        # Check availability first
+        is_available, error_msg = self._check_camera_availability(serial)
+        if not is_available:
+            raise RuntimeError(f"Camera {serial} unavailable: {error_msg}")
 
         # Configure inter-camera sync (firmware-based, requires physical sync cables)
         # Set mode even when 0 to clear any persistent slave/master state.
@@ -224,13 +394,9 @@ class RealSenseCameraNode(Node):
                     f"Configured {camera_name} for inter-camera sync: {sync_mode_name}"
                 )
             else:
-                self.get_logger().warn(
-                    f"Camera {camera_name} does not support inter-camera sync"
-                )
+                self.get_logger().warn(f"Camera {camera_name} does not support inter-camera sync")
         except Exception as e:
-            self.get_logger().warn(
-                f"Failed to configure inter-camera sync for {camera_name}: {e}"
-            )
+            self.get_logger().warn(f"Failed to configure inter-camera sync for {camera_name}: {e}")
             self.get_logger().info(
                 "Note: Inter-camera sync requires physical sync cables between cameras"
             )
@@ -251,8 +417,69 @@ class RealSenseCameraNode(Node):
                 rs.stream.depth, self.depth_width, self.depth_height, rs.format.z16, self.depth_fps
             )
 
-        # Start pipeline
-        profile = pipeline.start(config)
+        # Start pipeline (with retry for device busy errors)
+        profile = None
+        last_error = None
+        for attempt in range(retry_count):
+            try:
+                profile = pipeline.start(config)
+                self.get_logger().info(f"✓ Successfully started pipeline for {camera_name}")
+                break  # Success
+            except RuntimeError as e:
+                error_str = str(e)
+                if "Device or resource busy" in error_str or "errno=16" in error_str:
+                    last_error = e
+                    if attempt < retry_count - 1:
+                        wait_time = 0.5 * (attempt + 1)  # Exponential backoff: 0.5s, 1.0s, 1.5s
+                        self.get_logger().warn(
+                            f"Camera {camera_name} (serial: {serial}) is busy - attempt {attempt + 1}/{retry_count}. "
+                            f"Another process may be using this camera. Waiting {wait_time}s before retry..."
+                        )
+                        time.sleep(wait_time)
+                        # Try to stop any existing pipeline before retry
+                        try:
+                            pipeline.stop()
+                        except:
+                            pass
+                        # Create a new pipeline for retry
+                        pipeline = rs.pipeline()
+                        config.enable_device(serial)
+                        if self.enable_color:
+                            config.enable_stream(
+                                rs.stream.color,
+                                self.color_width,
+                                self.color_height,
+                                rs.format.rgb8,
+                                self.color_fps,
+                            )
+                        if self.enable_depth:
+                            config.enable_stream(
+                                rs.stream.depth,
+                                self.depth_width,
+                                self.depth_height,
+                                rs.format.z16,
+                                self.depth_fps,
+                            )
+                    else:
+                        # Last attempt failed - provide clear error message
+                        error_msg = (
+                            f"Camera {camera_name} (serial: {serial}) failed to initialize after {retry_count} attempts. "
+                            f"Device is in use by another process. "
+                            f"Please stop other processes using this camera (check with: lsof | grep video) "
+                            f"or wait for them to release the device."
+                        )
+                        self.get_logger().error(error_msg)
+                        raise RuntimeError(error_msg)
+                else:
+                    # Not a device busy error, re-raise immediately with context
+                    error_msg = f"Camera {camera_name} (serial: {serial}) initialization failed: {error_str}"
+                    self.get_logger().error(error_msg)
+                    raise RuntimeError(error_msg)
+
+        if profile is None:
+            error_msg = f"Failed to start pipeline for {camera_name} after {retry_count} attempts: {last_error}"
+            self.get_logger().error(error_msg)
+            raise RuntimeError(error_msg)
 
         # Get camera intrinsics
         if camera_name not in self.camera_infos:
@@ -334,39 +561,56 @@ class RealSenseCameraNode(Node):
         """Create ROS publishers for each camera"""
         self.camera_publishers = {}
 
+        # Use BEST_EFFORT QoS for image topics to prevent blocking during publish
+        # This is critical for real-time performance - RELIABLE QoS can block for seconds
+        # waiting for subscriber acknowledgment on large messages (images)
+        image_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=5,  # Smaller queue for faster throughput
+        )
+
+        # Use RELIABLE QoS for camera info (small messages)
+        info_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST, depth=10
+        )
+
         for camera_name in self.pipelines.keys():
             self.camera_publishers[camera_name] = {}
 
             if self.enable_color:
                 self.camera_publishers[camera_name]["color_image"] = self.create_publisher(
-                    Image, f"{camera_name}/color/image_raw", 10
+                    Image, f"{camera_name}/color/image_raw", image_qos
                 )
                 self.camera_publishers[camera_name]["color_info"] = self.create_publisher(
-                    CameraInfo, f"{camera_name}/color/camera_info", 10
+                    CameraInfo, f"{camera_name}/color/camera_info", info_qos
                 )
 
             if self.enable_depth:
                 self.camera_publishers[camera_name]["depth_image"] = self.create_publisher(
-                    Image, f"{camera_name}/depth/image_rect_raw", 10
+                    Image, f"{camera_name}/depth/image_rect_raw", image_qos
                 )
                 self.camera_publishers[camera_name]["depth_info"] = self.create_publisher(
-                    CameraInfo, f"{camera_name}/depth/camera_info", 10
+                    CameraInfo, f"{camera_name}/depth/camera_info", info_qos
                 )
 
             if self.enable_pointcloud and self.enable_depth:
                 self.camera_publishers[camera_name]["pointcloud"] = self.create_publisher(
-                    PointCloud2, f"{camera_name}/points", 10
+                    PointCloud2, f"{camera_name}/points", image_qos
                 )
 
     def _camera_capture_loop(self, camera_name: str):
         """Capture loop for a single camera (runs in background thread)"""
         pipeline = self.pipelines[camera_name]
         align = self.aligns.get(camera_name)
+        consecutive_errors = 0
+        max_consecutive_errors = 10
 
         while self.running:
             try:
-                # Wait for frames
+                # Wait for frames (non-blocking with timeout)
                 frames = pipeline.wait_for_frames(timeout_ms=self.frame_timeout_ms)
+                consecutive_errors = 0  # Reset error counter on success
 
                 # Align depth to color if requested
                 if align:
@@ -406,9 +650,16 @@ class RealSenseCameraNode(Node):
                     )
 
             except Exception as e:
+                consecutive_errors += 1
                 if self.running:  # Only log if still running
-                    self.get_logger().error(f"Error capturing frames for {camera_name}: {e}")
-                time.sleep(0.1)
+                    if consecutive_errors <= max_consecutive_errors:
+                        self.get_logger().error(f"Error capturing frames for {camera_name}: {e}")
+                    elif consecutive_errors == max_consecutive_errors + 1:
+                        self.get_logger().error(
+                            f"Suppressing further capture errors for {camera_name} (too many consecutive errors)"
+                        )
+                # Use shorter sleep to avoid blocking too long
+                time.sleep(0.01)  # Reduced from 0.1s to 0.01s for faster recovery
 
         # Cleanup
         try:
@@ -418,73 +669,221 @@ class RealSenseCameraNode(Node):
 
     def _publish_frames(self):
         """Publish frames from all cameras (runs on main thread)"""
+        callback_start_time = time.time()
+        self._publish_call_count = getattr(self, "_publish_call_count", 0) + 1
+
+        # Track actual timer firing rate
+        if hasattr(self, "_last_publish_time"):
+            time_since_last = callback_start_time - self._last_publish_time
+            if time_since_last > 0.2:  # Warn if timer fired >200ms late
+                self.get_logger().warn(
+                    f"Timer fired {time_since_last*1000:.1f}ms late (expected {1.0/self.publish_rate*1000:.1f}ms)"
+                )
+        self._last_publish_time = callback_start_time
+
+        # Performance tracking
+        if not hasattr(self, "_publish_times"):
+            self._publish_times = deque(maxlen=100)  # Track last 100 callback durations
+            self._queue_sizes = {}  # Track queue sizes over time
+            self._last_perf_log_time = time.time()
+
+        # Check if we have any cameras initialized
+        if len(self.pipelines) == 0:
+            current_time = time.time()
+            if not hasattr(self, "_last_no_cameras_warn_time"):
+                self._last_no_cameras_warn_time = 0.0
+            if current_time - self._last_no_cameras_warn_time > 5.0:
+                self.get_logger().warn("No cameras initialized - cannot publish frames")
+                self._last_no_cameras_warn_time = current_time
+            return
+
+        # Check if we have any publishers
+        if not hasattr(self, "camera_publishers") or len(self.camera_publishers) == 0:
+            current_time = time.time()
+            if not hasattr(self, "_last_no_publishers_warn_time"):
+                self._last_no_publishers_warn_time = 0.0
+            if current_time - self._last_no_publishers_warn_time > 5.0:
+                self.get_logger().warn("No camera publishers created - cannot publish frames")
+                self._last_no_publishers_warn_time = current_time
+            return
+
+        # Track queue sizes
+        for camera_name, queue in self.frame_queues.items():
+            queue_len = len(queue)
+            if camera_name not in self._queue_sizes:
+                self._queue_sizes[camera_name] = deque(maxlen=100)
+            self._queue_sizes[camera_name].append(queue_len)
+
+        # Performance logging every 5 seconds
+        current_time = time.time()
+        if current_time - self._last_perf_log_time > 5.0:
+            queue_info = {
+                name: (len(sizes), sum(sizes) / len(sizes) if sizes else 0)
+                for name, sizes in self._queue_sizes.items()
+            }
+            avg_callback_time = (
+                sum(self._publish_times) / len(self._publish_times) if self._publish_times else 0
+            )
+            max_callback_time = max(self._publish_times) if self._publish_times else 0
+            self.get_logger().info(
+                f"Performance: callback avg={avg_callback_time*1000:.1f}ms max={max_callback_time*1000:.1f}ms, "
+                f"queues={queue_info}, publish_count={self._publish_call_count}"
+            )
+            self._last_perf_log_time = current_time
+
         frame_data_by_camera: Dict[str, Dict] = {}
+        frames_published = 0
 
         for camera_name in self.pipelines.keys():
             try:
-                # Get latest frames from queue
-                if len(self.frame_queues[camera_name]) == 0:
+                # Check if queue exists
+                if camera_name not in self.frame_queues:
+                    self.get_logger().warn_throttle(5.0, f"Frame queue missing for {camera_name}")
                     continue
 
-                frame_data = self.frame_queues[camera_name][-1]  # Get most recent
+                # Get latest frames from queue (non-blocking)
+                if len(self.frame_queues[camera_name]) == 0:
+                    # Queue empty - this is normal if capture is slower than publish rate
+                    continue
+
+                # Get most recent frame (drop older frames if queue is full)
+                frame_data = self.frame_queues[camera_name][-1]
                 frame_data_by_camera[camera_name] = frame_data
                 color_frame = frame_data["color"]
                 depth_frame = frame_data["depth"]
 
                 # Publish color image
                 if color_frame and self.enable_color:
-                    # OPTIMIZATION: Use numpy view for RGB→BGR conversion (zero-copy)
-                    # RealSense provides RGB, OpenCV expects BGR
-                    color_image = np.asanyarray(color_frame.get_data())
-                    # Use view instead of copy for RGB→BGR conversion
-                    # Note: [:, :, ::-1] creates a view, not a copy, but cv2_to_imgmsg may copy anyway
-                    # However, this is still more efficient than explicit copy
-                    bgr_image = color_image[:, :, ::-1]  # View (zero-copy)
-                    ros_image = self.bridge.cv2_to_imgmsg(bgr_image, "bgr8")
-                    ros_image.header.frame_id = f"{camera_name}_color_optical_frame"
-                    ros_image.header.stamp = self.get_clock().now().to_msg()
-                    self.camera_publishers[camera_name]["color_image"].publish(ros_image)
+                    try:
+                        # OPTIMIZATION: Minimize copies
+                        # RealSense provides RGB, ROS expects BGR
+                        # Get numpy array (this may create a view, not always a copy)
+                        color_image = np.asanyarray(color_frame.get_data())
+                        # RGB→BGR conversion using view (no copy)
+                        bgr_image = color_image[:, :, ::-1]  # View, not copy
+                        # Convert to ROS message (this will copy, but necessary)
+                        ros_image = self.bridge.cv2_to_imgmsg(bgr_image, "bgr8")
+                        ros_image.header.frame_id = f"{camera_name}_color_optical_frame"
+                        ros_image.header.stamp = self.get_clock().now().to_msg()
 
-                    # Publish camera info
-                    if "color" in self.camera_infos.get(camera_name, {}):
-                        info = self.camera_infos[camera_name]["color"]
-                        info.header.stamp = ros_image.header.stamp
-                        self.camera_publishers[camera_name]["color_info"].publish(info)
+                        if (
+                            camera_name in self.camera_publishers
+                            and "color_image" in self.camera_publishers[camera_name]
+                        ):
+                            self.camera_publishers[camera_name]["color_image"].publish(ros_image)
+                            frames_published += 1
+
+                            # Publish camera info (reuse same timestamp)
+                            if "color" in self.camera_infos.get(camera_name, {}):
+                                info = self.camera_infos[camera_name]["color"]
+                                info.header.stamp = ros_image.header.stamp
+                                if "color_info" in self.camera_publishers[camera_name]:
+                                    self.camera_publishers[camera_name]["color_info"].publish(info)
+                        else:
+                            current_time = time.time()
+                            if not hasattr(self, "_last_color_pub_warn_time"):
+                                self._last_color_pub_warn_time = {}
+                            if camera_name not in self._last_color_pub_warn_time:
+                                self._last_color_pub_warn_time[camera_name] = 0.0
+                            if current_time - self._last_color_pub_warn_time[camera_name] > 5.0:
+                                self.get_logger().warn(
+                                    f"Color image publisher missing for {camera_name}"
+                                )
+                                self._last_color_pub_warn_time[camera_name] = current_time
+                    except Exception as e:
+                        self.get_logger().error(
+                            f"Error publishing color image for {camera_name}: {e}"
+                        )
 
                 # Publish depth image
                 if depth_frame and self.enable_depth:
-                    depth_image = np.asanyarray(depth_frame.get_data())
-                    ros_image = self.bridge.cv2_to_imgmsg(depth_image, "16UC1")
-                    ros_image.header.frame_id = f"{camera_name}_depth_optical_frame"
-                    ros_image.header.stamp = self.get_clock().now().to_msg()
-                    self.camera_publishers[camera_name]["depth_image"].publish(ros_image)
+                    try:
+                        # Get depth array (may be view or copy depending on RealSense implementation)
+                        depth_image = np.asanyarray(depth_frame.get_data())
+                        # Convert to ROS message
+                        ros_image = self.bridge.cv2_to_imgmsg(depth_image, "16UC1")
+                        ros_image.header.frame_id = f"{camera_name}_depth_optical_frame"
+                        ros_image.header.stamp = self.get_clock().now().to_msg()
 
-                    # Publish camera info
-                    if "depth" in self.camera_infos.get(camera_name, {}):
-                        info = self.camera_infos[camera_name]["depth"]
-                        info.header.stamp = ros_image.header.stamp
-                        self.camera_publishers[camera_name]["depth_info"].publish(info)
+                        if (
+                            camera_name in self.camera_publishers
+                            and "depth_image" in self.camera_publishers[camera_name]
+                        ):
+                            self.camera_publishers[camera_name]["depth_image"].publish(ros_image)
+                            frames_published += 1
 
-                    # Publish pointcloud if enabled
-                    if (
-                        self.enable_pointcloud
-                        and "pointcloud" in self.camera_publishers[camera_name]
-                        and depth_frame
-                    ):
-                        pointcloud = self._depth_to_pointcloud(
-                            depth_frame, color_frame, camera_name
+                            # Publish camera info (reuse same timestamp)
+                            if "depth" in self.camera_infos.get(camera_name, {}):
+                                info = self.camera_infos[camera_name]["depth"]
+                                info.header.stamp = ros_image.header.stamp
+                                if "depth_info" in self.camera_publishers[camera_name]:
+                                    self.camera_publishers[camera_name]["depth_info"].publish(info)
+
+                            # Publish pointcloud if enabled (WARNING: Very CPU-intensive!)
+                            if (
+                                self.enable_pointcloud
+                                and "pointcloud" in self.camera_publishers[camera_name]
+                                and depth_frame
+                            ):
+                                pointcloud_start = time.time()
+                                pointcloud = self._depth_to_pointcloud(
+                                    depth_frame, color_frame, camera_name
+                                )
+                                pointcloud_time = time.time() - pointcloud_start
+                                if pointcloud_time > 0.01:  # Log if taking >10ms
+                                    self.get_logger().warn(
+                                        f"Pointcloud generation took {pointcloud_time*1000:.1f}ms for {camera_name}"
+                                    )
+                                if pointcloud:
+                                    self.camera_publishers[camera_name]["pointcloud"].publish(
+                                        pointcloud
+                                    )
+                        else:
+                            current_time = time.time()
+                            if not hasattr(self, "_last_depth_pub_warn_time"):
+                                self._last_depth_pub_warn_time = {}
+                            if camera_name not in self._last_depth_pub_warn_time:
+                                self._last_depth_pub_warn_time[camera_name] = 0.0
+                            if current_time - self._last_depth_pub_warn_time[camera_name] > 5.0:
+                                self.get_logger().warn(
+                                    f"Depth image publisher missing for {camera_name}"
+                                )
+                                self._last_depth_pub_warn_time[camera_name] = current_time
+                    except Exception as e:
+                        self.get_logger().error(
+                            f"Error publishing depth image for {camera_name}: {e}"
                         )
-                        if pointcloud:
-                            self.camera_publishers[camera_name]["pointcloud"].publish(pointcloud)
-                        elif depth_frame:
-                            # Log warning if we have depth frame but couldn't create pointcloud
-                            self.get_logger().debug(
-                                f"Failed to create pointcloud for {camera_name} (depth frame available)"
-                            )
 
             except Exception as e:
                 self.get_logger().error(f"Error publishing frames for {camera_name}: {e}")
+                # Standard library
+                import traceback
+
+                self.get_logger().error(traceback.format_exc())
                 # Don't call publish_status here as it might cause recursion issues
+
+        # Track callback duration for performance monitoring
+        callback_duration = time.time() - callback_start_time
+        self._publish_times.append(callback_duration)
+
+        # Warn if callback is taking too long (should be < timer period)
+        timer_period = 1.0 / self.publish_rate
+        if callback_duration > timer_period * 0.8:  # Warn if >80% of timer period
+            self.get_logger().warn(
+                f"Publish callback took {callback_duration*1000:.1f}ms "
+                f"(timer period: {timer_period*1000:.1f}ms) - may cause frame drops!"
+            )
+
+        # Log publishing status periodically (throttled to avoid spam)
+        if frames_published > 0:
+            current_time = time.time()
+            if not hasattr(self, "_last_publish_log_time"):
+                self._last_publish_log_time = 0.0
+            if current_time - self._last_publish_log_time > 5.0:
+                self.get_logger().debug(
+                    f"Published {frames_published} frame(s) from {len(frame_data_by_camera)} camera(s)"
+                )
+                self._last_publish_log_time = current_time
 
         self._maybe_publish_sync_status(frame_data_by_camera)
 
@@ -596,17 +995,41 @@ class RealSenseCameraNode(Node):
         self.status_pub.publish(msg)
 
     def destroy_node(self):
-        """Cleanup on shutdown"""
+        """Cleanup on shutdown - ensures all camera resources are properly released"""
         self.get_logger().info("Shutting down RealSense cameras...")
         self.running = False
-        time.sleep(self.shutdown_delay)  # Give threads time to stop
 
-        for pipeline in self.pipelines.values():
-            try:
-                pipeline.stop()
-            except Exception:
-                pass
+        # Give capture threads time to stop
+        if self.camera_threads:
+            self.get_logger().info(
+                f"Waiting for {len(self.camera_threads)} capture thread(s) to stop..."
+            )
+            for thread in self.camera_threads:
+                if thread.is_alive():
+                    thread.join(timeout=self.shutdown_delay)
+                    if thread.is_alive():
+                        self.get_logger().warn(f"Capture thread {thread.name} did not stop in time")
 
+        # Stop all pipelines and ensure resources are released
+        if self.pipelines:
+            self.get_logger().info(f"Stopping {len(self.pipelines)} camera pipeline(s)...")
+            for camera_name, pipeline in self.pipelines.items():
+                try:
+                    pipeline.stop()
+                    self.get_logger().debug(f"✓ Stopped pipeline for {camera_name}")
+                except Exception as e:
+                    self.get_logger().warn(f"Error stopping pipeline for {camera_name}: {e}")
+
+            # Clear pipelines dict to ensure they're not reused
+            self.pipelines.clear()
+
+        # Clear frame queues
+        self.frame_queues.clear()
+
+        # Clear camera info
+        self.camera_infos.clear()
+
+        self.get_logger().info("✓ Camera resources released")
         super().destroy_node()
 
 

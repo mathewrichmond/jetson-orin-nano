@@ -11,12 +11,20 @@ Fixes "Not enough memory in the buffer stream" error by increasing resource limi
     <historyMemoryPolicy>DYNAMIC</historyMemoryPolicy>
     <qos>
       <!-- Enable Data Sharing for zero-copy shared memory transport -->
+      <!-- TEMPORARY: Changed from AUTOMATIC to OFF to debug blocking executor issues -->
+      <!-- AUTOMATIC can cause blocking during discovery/setup, preventing timely timer execution -->
       <data_sharing>
-        <kind>AUTOMATIC</kind>
+        <kind>OFF</kind>
       </data_sharing>
       <!-- Reliability: RELIABLE for critical data -->
       <reliability>
         <kind>RELIABLE</kind>
+        <!-- Set max_blocking_time to prevent infinite blocking on write() -->
+        <!-- This ensures spin_once() timeout is respected even during publish operations -->
+        <max_blocking_time>
+          <sec>0</sec>
+          <nanosec>100000000</nanosec>  <!-- 100ms max blocking time -->
+        </max_blocking_time>
       </reliability>
       <!-- Durability: VOLATILE (default) -->
       <durability>
@@ -48,12 +56,20 @@ Fixes "Not enough memory in the buffer stream" error by increasing resource limi
     <historyMemoryPolicy>DYNAMIC</historyMemoryPolicy>
     <qos>
       <!-- Enable Data Sharing for zero-copy shared memory transport -->
+      <!-- TEMPORARY: Changed from AUTOMATIC to OFF to debug blocking executor issues -->
+      <!-- AUTOMATIC can cause blocking during discovery/setup, preventing timely timer execution -->
       <data_sharing>
-        <kind>AUTOMATIC</kind>
+        <kind>OFF</kind>
       </data_sharing>
       <!-- Reliability: RELIABLE for critical data -->
       <reliability>
         <kind>RELIABLE</kind>
+        <!-- Set max_blocking_time to prevent infinite blocking on write() -->
+        <!-- This ensures spin_once() timeout is respected even during publish operations -->
+        <max_blocking_time>
+          <sec>0</sec>
+          <nanosec>100000000</nanosec>  <!-- 100ms max blocking time -->
+        </max_blocking_time>
       </reliability>
       <!-- Durability: VOLATILE (default) -->
       <durability>
