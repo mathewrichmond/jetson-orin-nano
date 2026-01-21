@@ -1,8 +1,35 @@
 #!/usr/bin/env python3
 """
 Sensor Fusion Node
-Synchronizes sensor data to camera frames, applies Kalman filtering to IMU data,
-downsamples 3D data (pointclouds, mesh, TSDF) and images for feature builder and visualization.
+
+Takes high-frequency, time-mismatched raw sensor data and applies post-processing
+and re-sampling to create fused, time-aligned data. This node is the single source
+of truth for all downstream consumers.
+
+Inputs (high-frequency, time-mismatched):
+- Raw sensor data (IMU ~50Hz, chassis ~10Hz)
+- Camera timestamps (for synchronization)
+- nvblox-processed camera/3D data (full quality)
+- System status (temperatures, CPU/GPU, etc.)
+
+Processing:
+- Time alignment: Synchronizes all data to camera frame timestamps
+- Post-processing: Kalman filtering (IMU), downsampling (images, 3D data)
+- Re-sampling: Converts high-frequency data to uniform camera frame rate (~15Hz)
+- Data fusion: Combines sensor, chassis, and system information
+
+Outputs (fused, time-aligned, ~15Hz):
+- Chassis information (battery, status)
+- Sensor information (IMU, cameras, 3D data)
+- System information (temperatures, CPU/GPU, memory, disk, power, alerts)
+- Visualization topics (aggressively downsampled for remote monitoring)
+
+Downstream consumers:
+- VLA Feature Builder: Consumes feature topics + control plan, applies history buffering
+- Visualization: Consumes viz topics for remote monitoring
+- Logging: Consumes feature topics for data recording
+
+Note: Control plan is NOT published by this node (comes from planner).
 """
 
 # Standard library
@@ -13,8 +40,6 @@ import time
 from typing import Dict, Optional
 
 # Third-party
-import cv2
-from cv_bridge import CvBridge
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -29,56 +54,17 @@ from std_msgs.msg import (
 )
 from visualization_msgs.msg import Marker, MarkerArray
 
-
-class KalmanFilter:
-    """Simple Kalman filter for IMU data smoothing"""
-
-    def __init__(self, process_noise: float = 0.01, measurement_noise: float = 0.1):
-        """
-        Initialize Kalman filter
-
-        Args:
-            process_noise: Process noise covariance (Q)
-            measurement_noise: Measurement noise covariance (R)
-        """
-        self.process_noise = process_noise
-        self.measurement_noise = measurement_noise
-
-        # State: [accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z]
-        self.state = np.zeros(6)
-        self.covariance = np.eye(6) * 1.0
-
-    def update(self, measurement: np.ndarray) -> np.ndarray:
-        """
-        Update filter with new measurement
-
-        Args:
-            measurement: 6D array [accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z]
-
-        Returns:
-            Filtered state estimate
-        """
-        # Prediction step
-        # Simple constant velocity model (state doesn't change)
-        predicted_state = self.state
-        predicted_cov = self.covariance + np.eye(6) * self.process_noise
-
-        # Update step
-        innovation = measurement - predicted_state
-        innovation_cov = predicted_cov + np.eye(6) * self.measurement_noise
-        kalman_gain = predicted_cov @ np.linalg.inv(innovation_cov)
-
-        self.state = predicted_state + kalman_gain @ innovation
-        self.covariance = (np.eye(6) - kalman_gain) @ predicted_cov
-
-        return self.state.copy()
+# Local imports - shared utilities
+from isaac_utils import KalmanFilter, downsample_image
 
 
 class SensorSyncNode(Node):
     """Synchronizes sensor data to camera frames with Kalman filtering and downsampling"""
 
-    def __init__(self):
-        super().__init__("sensor_sync_node")
+    def __init__(self, defer_init: bool = False, node_name: Optional[str] = None):
+        node_name = node_name if node_name else "sensor_sync_node"
+        super().__init__(node_name)
+        self._defer_init = defer_init
 
         # Parameters
         self.declare_parameter("sync_to_camera", True)
@@ -120,7 +106,7 @@ class SensorSyncNode(Node):
         self.declare_parameter("audio_sync_tolerance", 0.1)
 
         # Output topics
-        self.declare_parameter("output_namespace", "/sensor_sync")
+        self.declare_parameter("output_namespace", "/sensor_fusion")  # Default changed to match config
         self.declare_parameter("publish_vlm_features", True)
 
         # Feature topic downsampling (moderate)
@@ -178,8 +164,7 @@ class SensorSyncNode(Node):
         else:
             self.kalman_filter = None
 
-        # CV Bridge for image processing
-        self.bridge = CvBridge()
+        # Image processing now uses shared library (isaac_utils)
 
         # Buffers for sensor data (thread-safe with locks)
         self.imu_buffer: deque = deque(maxlen=self.max_buffer_size)
@@ -205,16 +190,13 @@ class SensorSyncNode(Node):
         self.camera_sync_status: Dict[str, any] = {}  # Track sync status per camera pair
         self.last_sync_check_time = 0.0
 
-        # Camera frame sync tracking (for multi-camera synchronization)
-        self.camera_frame_sync: Dict[str, Optional[Image]] = {}
+        # Camera timestamp tracking (raw camera topics ONLY for sync timestamps, not image data)
+        # Raw camera subscriptions are used only to get timestamps for synchronization
         self.camera_frame_timestamps: Dict[str, float] = {}
+        self.last_camera_frame_time: Dict[str, float] = {}  # Track when each camera last updated
 
-        # Latched camera frames (last received frame per camera, used when new frames don't arrive)
-        # NOTE: Raw camera frames are now only used for sync checking
-        self.latched_camera_frames: Dict[str, Optional[Image]] = {}
-        self.latched_camera_timestamps: Dict[str, float] = {}
-
-        # Latched nvblox images (used for downsampling - eliminates 4 copies per frame)
+        # Latched nvblox images (ONLY source for image processing - no fallbacks)
+        # Design: Raw cameras → nvblox → sensor_sync (single data path)
         self.latched_nvblox_images: Dict[str, Optional[Image]] = {}
         self.latched_nvblox_timestamps: Dict[str, float] = {}
 
@@ -306,18 +288,11 @@ class SensorSyncNode(Node):
             self.audio_sync_tolerance = float(self.get_parameter("audio_sync_tolerance").value)
         else:
             self.audio_sub = None
+            # Set default values for audio parameters (used for initialization even when disabled)
             self.audio_sample_rate = 16000
             self.audio_channels = 2
             self.audio_format = "S16_LE"
             self.audio_sync_tolerance = 0.1
-            self.system_cpu_temp_sub = None
-            self.system_gpu_temp_sub = None
-            self.system_cpu_usage_sub = None
-            self.system_gpu_usage_sub = None
-            self.system_memory_usage_sub = None
-            self.system_disk_usage_sub = None
-            self.system_power_sub = None
-            self.system_alerts_sub = None
 
         # Camera subscribers (for synchronization)
         # Use BEST_EFFORT QoS to match camera publishers (they use BEST_EFFORT to prevent blocking)
@@ -359,9 +334,7 @@ class SensorSyncNode(Node):
                 self.mesh_buffers[camera_name] = deque(maxlen=self.max_buffer_size)
                 self.tsdf_buffers[camera_name] = deque(maxlen=self.max_buffer_size)
                 self.last_viz_publish_time[camera_name] = 0.0
-                # Initialize latched frame storage
-                self.latched_camera_frames[camera_name] = None
-                self.latched_camera_timestamps[camera_name] = 0.0
+                # Initialize timestamp tracking (raw camera topics only for sync, not image data)
                 self.last_camera_frame_time[camera_name] = 0.0
 
         # nvblox subscribers (full quality 3D data)
@@ -396,7 +369,12 @@ class SensorSyncNode(Node):
             MarkerArray, "/nvblox/full/tsdf", self._nvblox_tsdf_callback, 10
         )
 
-        # Publishers
+        # Publishers - create after parameters are set (handled in _initialize if deferred)
+        if not self._defer_init:
+            self._create_publishers()
+
+    def _create_publishers(self):
+        """Create all publishers (called from __init__ or _initialize)"""
         output_ns = str(self.get_parameter("output_namespace").value)
 
         # Filtered/synchronized IMU
@@ -522,6 +500,11 @@ class SensorSyncNode(Node):
         # Status
         self.status_pub = self.create_publisher(String, f"{output_ns}/status", 10)
 
+        # If deferred initialization, don't start timer yet
+        if self._defer_init:
+            self.get_logger().info("Deferred initialization - publishers created, timer will start after _initialize()")
+            return
+
         # Timer for synchronized publishing
         # OPTIMIZATION: Use longer timer period to reduce CPU usage
         # Timer is fallback - camera callbacks trigger immediate publishing when frames arrive
@@ -540,6 +523,29 @@ class SensorSyncNode(Node):
         self.last_camera_frame_time = {}  # Track when each camera last updated
 
         self.get_logger().info("Sensor fusion node started")
+        self.get_logger().info(f"Sync to camera: {self.sync_to_camera}")
+        self.get_logger().info(f"Sync camera frames: {self.sync_camera_frames}")
+        self.get_logger().info(f"Target frequency: {self.target_frequency} Hz")
+        self.get_logger().info(f"IMU filtering: {self.imu_filter_enabled}")
+        self.get_logger().info(
+            f"Feature image size: {self.feature_image_width}x{self.feature_image_height}"
+        )
+        self.get_logger().info(
+            f"Viz image size: {self.viz_resolution_width}x{self.viz_resolution_height}"
+        )
+
+    def _initialize(self):
+        """Complete initialization after parameters are set (for deferred init)"""
+        if not self._defer_init:
+            return  # Already initialized
+        
+        # Create publishers now that parameters are set
+        self._create_publishers()
+        
+        # Start timer for synchronized publishing
+        self._start_timer()
+        
+        self.get_logger().info("Sensor fusion node initialization complete (deferred)")
         self.get_logger().info(f"Sync to camera: {self.sync_to_camera}")
         self.get_logger().info(f"Sync camera frames: {self.sync_camera_frames}")
         self.get_logger().info(f"Target frequency: {self.target_frequency} Hz")
@@ -664,19 +670,11 @@ class SensorSyncNode(Node):
             self.camera_timestamps.append(
                 {"timestamp": timestamp, "topic": topic, "header": msg.header}
             )
-            # Store latest frame for each camera (for frame sync)
-            self.camera_frame_sync[topic] = msg
+            # Store timestamp only (no image data - images come from nvblox)
             self.camera_frame_timestamps[topic] = timestamp
 
-            # Latch the frame (always keep the last frame for each camera)
-            self.latched_camera_frames[camera_name] = msg
-            self.latched_camera_timestamps[camera_name] = timestamp
-
-            # Debug: Log when rear camera is latched
-            if camera_name == "camera_rear":
-                self.get_logger().info(
-                    f"Rear camera frame latched. Total latched cameras: {list(self.latched_camera_frames.keys())}"
-                )
+            # NOTE: We don't store image data here - only timestamps
+            # Image data comes exclusively from nvblox
 
         # OPTIMIZATION: Don't trigger publishing from camera callbacks when sync_to_camera=True
         # The timer will handle publishing at the correct rate (15 Hz)
@@ -723,9 +721,9 @@ class SensorSyncNode(Node):
 
     def _check_camera_frame_sync(self) -> bool:
         """
-        Check if all cameras have frames within sync tolerance.
-        Always attempts to sync, but returns False if cameras aren't perfectly synced.
-        This allows the system to function with or without hardware sync.
+        Check if all cameras have timestamps within sync tolerance.
+        Uses timestamps from raw camera topics (not image data).
+        Returns True if cameras are synced, False otherwise.
         """
         if len(self.camera_frame_timestamps) < len(self.camera_subs):
             return False  # Not all cameras have frames yet
@@ -769,10 +767,10 @@ class SensorSyncNode(Node):
     def _downsample_image(
         self, img_msg: Image, width: int, height: int, camera_name: Optional[str] = None
     ) -> Image:
-        """Downsample image to target resolution with caching"""
-        # OPTIMIZATION: Cache downsampled images to avoid redundant processing
-        # This is critical since we downsample the same image for feature and viz topics
-
+        """
+        Downsample image to target resolution using shared library.
+        Uses caching to avoid redundant processing for same image.
+        """
         try:
             # Check if already correct size (avoid unnecessary processing)
             if img_msg.width == width and img_msg.height == height:
@@ -796,38 +794,9 @@ class SensorSyncNode(Node):
                             cached_img.header.stamp = self.get_clock().now().to_msg()
                             return cached_img
 
-            # Cache miss or no camera name - perform downsampling
-            # OPTIMIZATION: Use passthrough encoding to avoid unnecessary conversions
-            # Only convert encoding if absolutely necessary
-            try:
-                # Convert ROS Image to numpy array (one conversion)
-                # Use passthrough to preserve original encoding (faster)
-                cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="passthrough")
-
-                # OPTIMIZATION: Use INTER_AREA for downsampling (better quality + faster for downsampling)
-                # INTER_LINEAR is better for upsampling, INTER_AREA is better for downsampling
-                if width < img_msg.width or height < img_msg.height:
-                    interpolation = cv2.INTER_AREA  # Better for downsampling
-                else:
-                    interpolation = cv2.INTER_LINEAR  # Better for upsampling
-
-                # Resize (creates new array - necessary for resize operation)
-                resized = cv2.resize(cv_image, (width, height), interpolation=interpolation)
-
-                # Convert back to ROS Image (one conversion)
-                # Use same encoding to avoid extra conversion
-                downsampled_msg = self.bridge.cv2_to_imgmsg(resized, encoding=img_msg.encoding)
-            except Exception as e:
-                # Fallback: try with explicit encoding if passthrough fails
-                self.get_logger().warn(f"Image conversion failed with passthrough, retrying: {e}")
-                cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding=img_msg.encoding)
-                if width < img_msg.width or height < img_msg.height:
-                    interpolation = cv2.INTER_AREA
-                else:
-                    interpolation = cv2.INTER_LINEAR
-                resized = cv2.resize(cv_image, (width, height), interpolation=interpolation)
-                downsampled_msg = self.bridge.cv2_to_imgmsg(resized, encoding=img_msg.encoding)
-            downsampled_msg.header = img_msg.header
+            # Cache miss or no camera name - perform downsampling using shared library
+            downsampled_msg = downsample_image(img_msg, width, height)
+            downsampled_msg.header.stamp = self.get_clock().now().to_msg()
 
             # Cache the result if camera name provided
             if cache_key:
@@ -933,42 +902,13 @@ class SensorSyncNode(Node):
 
         current_time = time.time()
 
-        # OPTIMIZATION: Early exit if no new camera frames and recently processed
-        # Skip processing if no camera frames have arrived since last processing
-        # This reduces CPU usage when cameras aren't publishing
-        time_since_last_process = current_time - self.last_processing_time
-        if time_since_last_process < 0.05:  # Less than 50ms since last process
-            # Quick check if any camera frames have updated (minimal lock time)
-            has_new_frames = False
-            # Quick lock check - only check if we can acquire lock immediately
-            if self.buffer_lock.acquire(blocking=False):
-                try:
-                    for camera_name in ["camera_front", "camera_rear"]:
-                        latched_frame = self.latched_camera_frames.get(camera_name)
-                        if latched_frame is not None:
-                            frame_time = (
-                                latched_frame.header.stamp.sec
-                                + latched_frame.header.stamp.nanosec * 1e-9
-                            )
-                            last_frame_time = self.last_camera_frame_time.get(camera_name, 0.0)
-                            if frame_time > last_frame_time + 0.01:  # New frame (10ms tolerance)
-                                has_new_frames = True
-                                break
-                finally:
-                    self.buffer_lock.release()
-
-            if not has_new_frames:
-                # No new frames, skip processing to save CPU
-                return
-
-        self.last_processing_time = current_time
-
         with self.buffer_lock:
             # Find closest IMU data
             imu_data = self._find_closest_sensor_data(self.imu_buffer, sync_timestamp)
 
             # If no IMU data, still publish empty/placeholder messages for viz topics
             # to ensure topics exist for bridge discovery
+            # BUT: Continue processing cameras even if IMU is missing
             if imu_data is None:
                 # Publish placeholder messages for viz topics so bridge can discover them
                 if self.publish_viz_topics:
@@ -991,7 +931,7 @@ class SensorSyncNode(Node):
                     ) >= (1.0 / self.viz_frequency):
                         self.viz_chassis_pub.publish(empty_battery)
                         self.last_viz_publish_time["battery"] = current_time
-                return
+                # DON'T return here - continue to process cameras even without IMU
 
             # Apply Kalman filter if enabled
             if self.kalman_filter:
@@ -1077,33 +1017,11 @@ class SensorSyncNode(Node):
                 if nvblox_img is not None:
                     cameras_to_process[camera_name] = nvblox_img
 
-            # For cameras not provided by nvblox, use raw camera images
-            # Always check latched frames for any cameras missing from nvblox
-            for camera_name, latched_frame in self.latched_camera_frames.items():
-                if camera_name not in cameras_to_process and latched_frame is not None:
-                    cameras_to_process[camera_name] = latched_frame
-                    # Debug: Log when rear camera is added to cameras_to_process
-                    if camera_name == "camera_rear":
-                        self.get_logger().debug(
-                            f"Added rear camera to cameras_to_process from latched frames"
-                        )
+            # No fallback logic - cameras must come from nvblox
+            # If a camera is missing, it means nvblox isn't processing it
+            # This is intentional: nvblox is the single source of truth for processed camera data
 
-            # Also try synced frames if sync is enabled (may have more recent frames)
-            # OPTIMIZATION: Only check sync if we have multiple cameras and sync is enabled
-            # Skip expensive sync check if only one camera or sync disabled
-            if self.sync_camera_frames and len(self.latched_camera_frames) > 1:
-                # Only check sync if we have frames from multiple cameras
-                cameras_with_frames = [
-                    name for name, frame in self.latched_camera_frames.items() if frame is not None
-                ]
-                if len(cameras_with_frames) > 1 and self._check_camera_frame_sync():
-                    for topic, camera_msg in self.camera_frame_sync.items():
-                        camera_name = topic.split("/")[-3]
-                        # Use synced frame if available (overwrites latched frame)
-                        if camera_msg is not None:
-                            cameras_to_process[camera_name] = camera_msg
-
-            # Process each camera (prefer nvblox images, fallback to raw camera images)
+            # Process each camera (nvblox images only)
             for camera_name, camera_msg in cameras_to_process.items():
                 if camera_msg is None:
                     continue
@@ -1142,53 +1060,9 @@ class SensorSyncNode(Node):
                                 f"Failed to publish viz for {camera_name} from cameras_to_process: {e}"
                             )
 
-            # Also publish viz topics for cameras that are in latched frames but not in cameras_to_process
-            # This ensures rear camera publishes even if it's not synced with front camera
-            # CRITICAL: This handles cases where cameras aren't synced or nvblox only provides one camera
-            if self.publish_viz_topics:
-                for camera_name in ["camera_front", "camera_rear"]:
-                    # Skip if already processed above (in main cameras_to_process loop)
-                    if camera_name in cameras_to_process:
-                        if camera_name == "camera_rear":
-                            self.get_logger().debug(
-                                f"Rear camera already in cameras_to_process, skipping fallback"
-                            )
-                        continue
-                    # Check latched frames - this is the fallback for unsynced cameras
-                    latched_frame = self.latched_camera_frames.get(camera_name)
-                    if latched_frame is not None:
-                        if camera_name == "camera_rear":
-                            self.get_logger().debug(
-                                f"Found rear camera in latched frames, attempting to publish viz"
-                            )
-                        # Check if it's time to publish (respect viz_frequency)
-                        if camera_name not in self.last_viz_publish_time or (
-                            current_time - self.last_viz_publish_time[camera_name]
-                        ) >= (1.0 / self.viz_frequency):
-                            try:
-                                viz_img = self._downsample_image(
-                                    latched_frame,
-                                    self.viz_resolution_width,
-                                    self.viz_resolution_height,
-                                    camera_name,
-                                )
-                                viz_img.header.stamp = self.get_clock().now().to_msg()
-                                if camera_name == "camera_front":
-                                    self.viz_camera_front_pub.publish(viz_img)
-                                elif camera_name == "camera_rear":
-                                    self.viz_camera_rear_pub.publish(viz_img)
-                                    self.get_logger().info(
-                                        f"Published rear camera viz topic successfully"
-                                    )
-                                self.last_viz_publish_time[camera_name] = current_time
-                            except Exception as e:
-                                self.get_logger().warn(
-                                    f"Failed to publish viz for {camera_name}: {e}"
-                                )
-                    elif camera_name == "camera_rear":
-                        self.get_logger().warn(
-                            f"Rear camera not in latched frames! Available: {list(self.latched_camera_frames.keys())}"
-                        )
+            # No fallback logic - cameras must come from nvblox
+            # If a camera is missing, it means nvblox isn't processing it
+            # This is intentional: nvblox is the single source of truth for processed camera data
 
             # If no camera frames available, publish blank frames for viz topics
             if self.publish_viz_topics and len(cameras_to_process) == 0:
@@ -1291,9 +1165,12 @@ class SensorSyncNode(Node):
             self._publish_system_status(sync_timestamp, current_time)
 
             # Publish synchronized audio (raw for features, stats for viz)
-            self._publish_audio(sync_timestamp, current_time)
+            if self.synced_audio_pub is not None:
+                self._publish_audio(sync_timestamp, current_time)
 
-            # Prepare VLM features if enabled
+            # NOTE: VLA feature building is handled by a separate node that consumes
+            # the synchronized sensor data published here. The publish_vlm_features
+            # parameter is deprecated and will be removed in a future version.
             if self.get_parameter("publish_vlm_features").value:
                 self._publish_vlm_features(filtered_imu, sync_timestamp, battery_data, status_data)
 
@@ -1481,7 +1358,7 @@ class SensorSyncNode(Node):
         Find audio chunks that overlap with the camera frame timestamp.
         Returns list of audio chunks that cover the frame duration.
         """
-        if not self.audio_buffer:
+        if len(self.audio_buffer) == 0:
             return None
 
         frame_start = frame_timestamp - frame_duration
@@ -1532,41 +1409,46 @@ class SensorSyncNode(Node):
         if not chunks:
             return None
 
-        # Calculate target audio size for frame duration
-        # Bytes per second = sample_rate * channels * bytes_per_sample
-        bytes_per_second = self.audio_sample_rate * self.audio_channels * 2  # S16_LE = 2 bytes
-        target_bytes = int(frame_duration * bytes_per_second)
+        try:
+            # Calculate target audio size for frame duration
+            # Bytes per second = sample_rate * channels * bytes_per_sample
+            bytes_per_second = self.audio_sample_rate * self.audio_channels * 2  # S16_LE = 2 bytes
+            target_bytes = int(frame_duration * bytes_per_second)
 
-        # Concatenate chunks
-        audio_data_list = []
-        for chunk_data in chunks:
-            audio_data_list.extend(chunk_data["msg"].data)
+            # Concatenate chunks
+            audio_data_list = []
+            for chunk_data in chunks:
+                if "msg" in chunk_data and hasattr(chunk_data["msg"], "data"):
+                    audio_data_list.extend(chunk_data["msg"].data)
 
-        if not audio_data_list:
+            if not audio_data_list:
+                return None
+
+            # If we have more data than needed, truncate
+            if len(audio_data_list) > target_bytes:
+                audio_data_list = audio_data_list[:target_bytes]
+            # If we have less data than needed, pad with zeros
+            elif len(audio_data_list) < target_bytes:
+                audio_data_list.extend([0] * (target_bytes - len(audio_data_list)))
+
+            # Create synchronized audio message
+            synced_audio = UInt8MultiArray()
+            synced_audio.data = audio_data_list
+            # Set layout dimensions
+            # Third-party
+            from std_msgs.msg import MultiArrayDimension
+
+            dim = MultiArrayDimension()
+            dim.label = "audio"
+            dim.size = len(audio_data_list)
+            dim.stride = 1
+            synced_audio.layout.dim = [dim]
+            synced_audio.layout.data_offset = 0
+
+            return synced_audio
+        except Exception as e:
+            self.get_logger().warn(f"Error resampling audio chunks: {e}")
             return None
-
-        # If we have more data than needed, truncate
-        if len(audio_data_list) > target_bytes:
-            audio_data_list = audio_data_list[:target_bytes]
-        # If we have less data than needed, pad with zeros
-        elif len(audio_data_list) < target_bytes:
-            audio_data_list.extend([0] * (target_bytes - len(audio_data_list)))
-
-        # Create synchronized audio message
-        synced_audio = UInt8MultiArray()
-        synced_audio.data = audio_data_list
-        # Set layout dimensions
-        # Third-party
-        from std_msgs.msg import MultiArrayDimension
-
-        dim = MultiArrayDimension()
-        dim.label = "audio"
-        dim.size = len(audio_data_list)
-        dim.stride = 1
-        synced_audio.layout.dim = [dim]
-        synced_audio.layout.data_offset = 0
-
-        return synced_audio
 
     def _calculate_audio_stats(self, audio_msg: UInt8MultiArray) -> tuple:
         """
@@ -1607,45 +1489,52 @@ class SensorSyncNode(Node):
 
     def _publish_audio(self, sync_timestamp: float, current_time: float):
         """Publish synchronized audio (raw for features, stats for viz)"""
-        if not self.synced_audio_pub or not self.audio_buffer:
+        if not self.synced_audio_pub:
+            return
+        
+        # Check if audio buffer has data
+        if len(self.audio_buffer) == 0:
             return
 
-        # Calculate frame duration (inverse of target frequency)
-        frame_duration = 1.0 / self.target_frequency
+        try:
+            # Calculate frame duration (inverse of target frequency)
+            frame_duration = 1.0 / self.target_frequency
 
-        # Find overlapping audio chunks
-        overlapping_chunks = self._find_overlapping_audio_chunks(sync_timestamp, frame_duration)
+            # Find overlapping audio chunks
+            overlapping_chunks = self._find_overlapping_audio_chunks(sync_timestamp, frame_duration)
 
-        if not overlapping_chunks:
-            return
+            if not overlapping_chunks:
+                return
 
-        # Resample/concatenate chunks to match frame duration
-        synced_audio = self._resample_audio_chunks(
-            overlapping_chunks, sync_timestamp, frame_duration
-        )
+            # Resample/concatenate chunks to match frame duration
+            synced_audio = self._resample_audio_chunks(
+                overlapping_chunks, sync_timestamp, frame_duration
+            )
 
-        if not synced_audio:
-            return
+            if not synced_audio:
+                return
 
-        # Calculate stats from raw audio
-        max_volume_left, max_volume_right = self._calculate_audio_stats(synced_audio)
+            # Calculate stats from raw audio
+            max_volume_left, max_volume_right = self._calculate_audio_stats(synced_audio)
 
-        # Publish raw audio for features (synchronized to camera frame)
-        # Note: UInt8MultiArray doesn't have header, timestamp is implicit in sync
-        self.synced_audio_pub.publish(synced_audio)
+            # Publish raw audio for features (synchronized to camera frame)
+            # Note: UInt8MultiArray doesn't have header, timestamp is implicit in sync
+            self.synced_audio_pub.publish(synced_audio)
 
-        # Publish stats for visualization (same chunk, low-res stats)
-        if self.viz_audio_stats_pub and self.publish_viz_topics:
-            stats_msg = Float32MultiArray()
-            stats_msg.data = [max_volume_left, max_volume_right]
-            # Set layout dimensions
-            dim = MultiArrayDimension()
-            dim.label = "audio_stats"
-            dim.size = 2
-            dim.stride = 1
-            stats_msg.layout.dim = [dim]
-            stats_msg.layout.data_offset = 0
-            self.viz_audio_stats_pub.publish(stats_msg)
+            # Publish stats for visualization (same chunk, low-res stats)
+            if self.viz_audio_stats_pub and self.publish_viz_topics:
+                stats_msg = Float32MultiArray()
+                stats_msg.data = [max_volume_left, max_volume_right]
+                # Set layout dimensions
+                dim = MultiArrayDimension()
+                dim.label = "audio_stats"
+                dim.size = 2
+                dim.stride = 1
+                stats_msg.layout.dim.append(dim)
+                stats_msg.layout.data_offset = 0
+                self.viz_audio_stats_pub.publish(stats_msg)
+        except Exception as e:
+            self.get_logger().warn(f"Error publishing synchronized audio: {e}")
 
 
 def main(args=None):

@@ -269,7 +269,7 @@ robot:
       # System status integration
       enable_system_status: true  # Enable system status synchronization
       # Audio synchronization
-      enable_audio_sync: true  # Enable audio synchronization to camera frames
+      enable_audio_sync: true  # Audio sync enabled - synchronizes audio chunks to camera frames
       audio_topic: "/microphone/audio"
       audio_sample_rate: 16000
       audio_channels: 2
@@ -300,6 +300,8 @@ robot:
         - /sensor_fusion/system/power
         - /sensor_fusion/system/alerts
         - /sensor_fusion/system/hardware/camera_sync_status
+        # Audio topics (synchronized to camera frames)
+        - /sensor_fusion/audio/raw  # Synchronized raw audio chunks (for features)
         # Visualization topics (for bridge) - Aggressive downsampling
         - /viz/remote/imu/filtered
         - /viz/remote/chassis/battery
