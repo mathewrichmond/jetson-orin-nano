@@ -195,9 +195,9 @@ step_setup_ros2_workspace() {
             fi
         fi
 
-        # Link packages from src directory
+        # Link packages from src directory and hardware_drivers subdirectory
         cd ~/ros2_ws/src
-        for pkg_dir in "$SCRIPT_DIR/src"/*; do
+        for pkg_dir in "$SCRIPT_DIR/src"/* "$SCRIPT_DIR/src/hardware_drivers"/* "$SCRIPT_DIR/src/utils"/*; do
             if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.xml" ]; then
                 pkg_name=$(basename "$pkg_dir")
                 if [ ! -L "$pkg_name" ] && [ ! -d "$pkg_name" ]; then
@@ -552,8 +552,8 @@ step_build_ros2_packages() {
         fi
     fi
 
-    # Link other packages
-    for pkg_dir in "$SCRIPT_DIR/src"/*; do
+    # Link other packages (including hardware_drivers and utils subdirectories)
+    for pkg_dir in "$SCRIPT_DIR/src"/* "$SCRIPT_DIR/src/hardware_drivers"/* "$SCRIPT_DIR/src/utils"/*; do
         if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.xml" ]; then
             pkg_name=$(basename "$pkg_dir")
             cd ~/ros2_ws/src

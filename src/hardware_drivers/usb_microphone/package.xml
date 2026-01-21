@@ -12,6 +12,7 @@
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>numpy</depend>
 
   <exec_depend>alsa-utils</exec_depend>
 

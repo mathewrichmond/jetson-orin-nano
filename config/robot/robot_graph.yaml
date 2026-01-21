@@ -133,12 +133,38 @@ robot:
       format: 'S16_LE'
       chunk_size: 1024
       publish_rate: 10.0
+      status_topic: '/microphone/status'
       audio_topic: '/microphone/audio'
     topics:
       publish:
         - /microphone/status
         - /microphone/audio
       subscribe: []
+
+  # Audio Processor (processes raw audio for visualization)
+  audio_processor:
+    enabled: true
+    package: usb_microphone
+    node: audio_processor_node
+    namespace: /microphone
+    parameters:
+      audio_topic: '/microphone/audio'
+      sample_rate: 16000
+      channels: 2
+      format: 'S16_LE'
+      volume_history_size: 100
+      waveform_samples: 100
+    topics:
+      publish:
+        - /microphone/volume
+        - /microphone/volume_rms
+        - /microphone/volume_peak
+        - /microphone/volume_left
+        - /microphone/volume_right
+        - /microphone/waveform_left
+        - /microphone/waveform_right
+      subscribe:
+        - /microphone/audio
 
   # ODrive Motor Controller
   odrive_controller:
@@ -242,6 +268,13 @@ robot:
       viz_tsdf_fps: 2.0  # Lower frequency for TSDF mesh
       # System status integration
       enable_system_status: true  # Enable system status synchronization
+      # Audio synchronization
+      enable_audio_sync: true  # Enable audio synchronization to camera frames
+      audio_topic: "/microphone/audio"
+      audio_sample_rate: 16000
+      audio_channels: 2
+      audio_format: "S16_LE"
+      audio_sync_tolerance: 0.1  # seconds
     topics:
       publish:
         # Feature topics (for VLM/feature builder) - 15 Hz, moderate downsampling
@@ -282,6 +315,7 @@ robot:
         - /viz/remote/system/temperature/gpu
         - /viz/remote/system/cpu/usage
         - /viz/remote/system/memory/usage
+        - /viz/remote/audio/stats  # Audio stats (max volume per channel)
         - /viz/remote/system/alerts
         - /sensor_fusion/status
       subscribe:
@@ -391,6 +425,10 @@ robot:
         - "/hardware/camera_.*/color/camera_info"  # Camera calibration (small, needed for image display)
         - "/hardware/camera_.*/depth/camera_info"  # Depth camera calibration (small)
         - "/sensor_sync/system/hardware/camera_sync_status"  # Camera sync status (small)
+        - "/microphone/status"  # Microphone status messages (small)
+        - "/viz/remote/audio/stats"  # Synchronized audio stats (low-res, for viz)
+        # Note: /sensor_fusion/audio/raw is NOT bridged (consumed directly by model)
+        # Note: /microphone/audio, /microphone/volume.*, /microphone/waveform.* are NOT bridged (use audio_processor_node for debugging)
       # Force BEST_EFFORT QoS for viz topics (images use BEST_EFFORT to prevent blocking)
       best_effort_qos_topic_whitelist:
         - "/viz/remote/.*"  # All viz topics use BEST_EFFORT
@@ -427,6 +465,7 @@ groups:
     - realsense_camera
     - nvblox_processor
     - usb_microphone
+    - audio_processor
     - irobot_serial
     - phat_motor_controller
     - hardware_sync_generator
@@ -443,6 +482,7 @@ groups:
     - realsense_camera
     - nvblox_processor
     - usb_microphone
+    - audio_processor
     - irobot_serial
     - phat_motor_controller
 
@@ -451,6 +491,7 @@ groups:
     - realsense_camera
     - nvblox_processor
     - usb_microphone
+    - audio_processor
     - irobot_serial
     - phat_motor_controller
     - sensor_fusion

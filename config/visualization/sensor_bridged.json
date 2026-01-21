@@ -26,55 +26,31 @@
       "flipHorizontal": true,
       "flipVertical": false
     },
-    "3D!fused": {
+    "Image!rear": {
       "cameraState": {
-        "distance": 2.0,
+        "distance": 20,
         "perspective": true,
-        "phi": 1.0471975511965976,
-        "target": [0, 0, 0.5],
+        "phi": 60,
+        "target": [0, 0, 0],
         "targetOffset": [0, 0, 0],
         "targetOrientation": [0, 0, 0, 1],
-        "thetaOffset": 0.7853981633974483,
-        "fovy": 1.0471975511965976,
-        "near": 0.01,
-        "far": 10.0
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
       },
       "followMode": "follow-pose",
-      "scene": {
-        "enableStats": false
-      },
-      "transforms": {
-        "edges": {
-          "color": "#248eff",
-          "show": false
-        },
-        "showLabel": false,
-        "showValue": false,
-        "smooth": true
-      },
-      "topics": {
-        "/viz/remote/three_d/pointcloud": {
-          "visible": true,
-          "frameLocked": false
-        },
-        "/viz/remote/three_d/mesh": {
-          "visible": true,
-          "frameLocked": false
-        }
-      },
-      "layers": {
-        "/viz/remote/three_d/pointcloud": {
-          "visible": true,
-          "frameLocked": false
-        },
-        "/viz/remote/three_d/mesh": {
-          "visible": true,
-          "frameLocked": false
-        }
-      },
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
       "publish": {},
-      "customBackgroundColor": "#000000",
-      "customSceneBackgroundColor": "#000000"
+      "imageMode": {
+        "imageTopic": "/viz/remote/camera_rear/color/image_raw",
+        "calibrationTopic": "/hardware/camera_rear/color/camera_info"
+      },
+      "flipHorizontal": true,
+      "flipVertical": false
     },
     "Plot!system_stats": {
       "paths": [
@@ -180,6 +156,46 @@
       "minYValue": 0,
       "maxYValue": 15,
       "showLegend": true
+    },
+    "Plot!audio_volume": {
+      "paths": [
+        {
+          "value": "/viz/remote/audio/stats.data[0]",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Left Max"
+        },
+        {
+          "value": "/viz/remote/audio/stats.data[1]",
+          "enabled": true,
+          "color": "#ff8800",
+          "label": "Right Max"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1.0,
+      "showLegend": true,
+      "title": "Audio Max Volume (Synchronized)"
+    },
+    "Plot!audio_channels": {
+      "paths": [
+        {
+          "value": "/viz/remote/audio/stats.data[0]",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Left Channel (Max)"
+        },
+        {
+          "value": "/viz/remote/audio/stats.data[1]",
+          "enabled": true,
+          "color": "#ff8800",
+          "label": "Right Channel (Max)"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1.0,
+      "showLegend": true,
+      "title": "Audio Max Volume Per Channel"
     }
   },
   "globalVariables": {},
@@ -192,13 +208,15 @@
     "first": {
       "direction": "column",
       "first": "Image!front",
-      "second": "3D!fused"
+      "second": "Image!rear"
     },
     "second": {
       "direction": "column",
       "first": "Plot!system_stats",
       "second": "Plot!imu_filtered",
-      "third": "Plot!chassis_signals"
+      "third": "Plot!chassis_signals",
+      "fourth": "Plot!audio_volume",
+      "fifth": "Plot!audio_channels"
     }
   }
 }

@@ -27,6 +27,7 @@ setup(
     entry_points={
         "console_scripts": [
             "usb_microphone_node = usb_microphone.usb_microphone_node:main",
+            "audio_processor_node = usb_microphone.audio_processor_node:main",
         ],
     },
 )
