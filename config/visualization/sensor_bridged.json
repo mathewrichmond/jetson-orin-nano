@@ -79,31 +79,31 @@
     "Plot!system_stats": {
       "paths": [
         {
-          "value": "/system/temperature/cpu.temperature",
+          "value": "/viz/remote/system/temperature/cpu.temperature",
           "enabled": true,
           "color": "#ff0000",
           "label": "CPU Temp"
         },
         {
-          "value": "/system/temperature/gpu.temperature",
+          "value": "/viz/remote/system/temperature/gpu.temperature",
           "enabled": true,
           "color": "#00ff00",
           "label": "GPU Temp"
         },
         {
-          "value": "/system/cpu/usage.data",
+          "value": "/viz/remote/system/cpu/usage.data",
           "enabled": true,
           "color": "#0000ff",
           "label": "CPU Usage"
         },
         {
-          "value": "/system/gpu/usage.data",
+          "value": "/viz/remote/system/gpu/usage.data",
           "enabled": true,
           "color": "#ff8800",
           "label": "GPU Usage"
         },
         {
-          "value": "/system/memory/usage.data",
+          "value": "/viz/remote/system/memory/usage.data",
           "enabled": true,
           "color": "#ff00ff",
           "label": "Memory Usage"

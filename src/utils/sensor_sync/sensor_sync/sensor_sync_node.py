@@ -437,6 +437,9 @@ class SensorSyncNode(Node):
             self.viz_system_cpu_usage_pub = self.create_publisher(
                 Float32, "/viz/remote/system/cpu/usage", 10
             )
+            self.viz_system_gpu_usage_pub = self.create_publisher(
+                Float32, "/viz/remote/system/gpu/usage", 10
+            )
             self.viz_system_memory_usage_pub = self.create_publisher(
                 Float32, "/viz/remote/system/memory/usage", 10
             )
@@ -567,6 +570,12 @@ class SensorSyncNode(Node):
         timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         camera_name = topic.split("/")[-3]  # Extract camera name
 
+        # Debug: Log rear camera callbacks
+        if camera_name == "camera_rear":
+            self.get_logger().info(
+                f"Rear camera callback received: {msg.width}x{msg.height}, encoding={msg.encoding}"
+            )
+
         with self.buffer_lock:
             self.camera_timestamps.append(
                 {"timestamp": timestamp, "topic": topic, "header": msg.header}
@@ -578,6 +587,12 @@ class SensorSyncNode(Node):
             # Latch the frame (always keep the last frame for each camera)
             self.latched_camera_frames[camera_name] = msg
             self.latched_camera_timestamps[camera_name] = timestamp
+
+            # Debug: Log when rear camera is latched
+            if camera_name == "camera_rear":
+                self.get_logger().info(
+                    f"Rear camera frame latched. Total latched cameras: {list(self.latched_camera_frames.keys())}"
+                )
 
         # OPTIMIZATION: Don't trigger publishing from camera callbacks when sync_to_camera=True
         # The timer will handle publishing at the correct rate (15 Hz)
@@ -939,6 +954,11 @@ class SensorSyncNode(Node):
             for camera_name, latched_frame in self.latched_camera_frames.items():
                 if camera_name not in cameras_to_process and latched_frame is not None:
                     cameras_to_process[camera_name] = latched_frame
+                    # Debug: Log when rear camera is added to cameras_to_process
+                    if camera_name == "camera_rear":
+                        self.get_logger().debug(
+                            f"Added rear camera to cameras_to_process from latched frames"
+                        )
 
             # Also try synced frames if sync is enabled (may have more recent frames)
             if self.sync_camera_frames and self._check_camera_frame_sync():
@@ -953,6 +973,7 @@ class SensorSyncNode(Node):
                 if camera_msg is None:
                     continue
 
+                # Publish feature topics if camera is in feature_camera_pubs
                 if camera_name in self.feature_camera_pubs:
                     # OPTIMIZATION: Use caching to avoid redundant downsampling
                     # Downsample for feature topics (with caching)
@@ -962,11 +983,13 @@ class SensorSyncNode(Node):
                     feature_img.header.stamp = self.get_clock().now().to_msg()
                     self.feature_camera_pubs[camera_name].publish(feature_img)
 
-                    # Downsample for viz topics (with caching - reuses cache if same source image)
-                    if self.publish_viz_topics and camera_name in ["camera_front", "camera_rear"]:
-                        if camera_name not in self.last_viz_publish_time or (
-                            current_time - self.last_viz_publish_time[camera_name]
-                        ) >= (1.0 / self.viz_frequency):
+                # Publish viz topics for front/rear cameras (regardless of feature_camera_pubs)
+                # This ensures viz topics always publish even if feature topics don't
+                if self.publish_viz_topics and camera_name in ["camera_front", "camera_rear"]:
+                    if camera_name not in self.last_viz_publish_time or (
+                        current_time - self.last_viz_publish_time[camera_name]
+                    ) >= (1.0 / self.viz_frequency):
+                        try:
                             viz_img = self._downsample_image(
                                 camera_msg,
                                 self.viz_resolution_width,
@@ -979,32 +1002,58 @@ class SensorSyncNode(Node):
                             elif camera_name == "camera_rear":
                                 self.viz_camera_rear_pub.publish(viz_img)
                             self.last_viz_publish_time[camera_name] = current_time
+                        except Exception as e:
+                            self.get_logger().warn(
+                                f"Failed to publish viz for {camera_name} from cameras_to_process: {e}"
+                            )
 
             # Also publish viz topics for cameras that are in latched frames but not in cameras_to_process
             # This ensures rear camera publishes even if it's not synced with front camera
+            # CRITICAL: This handles cases where cameras aren't synced or nvblox only provides one camera
             if self.publish_viz_topics:
                 for camera_name in ["camera_front", "camera_rear"]:
-                    # Skip if already processed above
+                    # Skip if already processed above (in main cameras_to_process loop)
                     if camera_name in cameras_to_process:
+                        if camera_name == "camera_rear":
+                            self.get_logger().debug(
+                                f"Rear camera already in cameras_to_process, skipping fallback"
+                            )
                         continue
-                    # Check latched frames
+                    # Check latched frames - this is the fallback for unsynced cameras
                     latched_frame = self.latched_camera_frames.get(camera_name)
                     if latched_frame is not None:
+                        if camera_name == "camera_rear":
+                            self.get_logger().debug(
+                                f"Found rear camera in latched frames, attempting to publish viz"
+                            )
+                        # Check if it's time to publish (respect viz_frequency)
                         if camera_name not in self.last_viz_publish_time or (
                             current_time - self.last_viz_publish_time[camera_name]
                         ) >= (1.0 / self.viz_frequency):
-                            viz_img = self._downsample_image(
-                                latched_frame,
-                                self.viz_resolution_width,
-                                self.viz_resolution_height,
-                                camera_name,
-                            )
-                            viz_img.header.stamp = self.get_clock().now().to_msg()
-                            if camera_name == "camera_front":
-                                self.viz_camera_front_pub.publish(viz_img)
-                            elif camera_name == "camera_rear":
-                                self.viz_camera_rear_pub.publish(viz_img)
-                            self.last_viz_publish_time[camera_name] = current_time
+                            try:
+                                viz_img = self._downsample_image(
+                                    latched_frame,
+                                    self.viz_resolution_width,
+                                    self.viz_resolution_height,
+                                    camera_name,
+                                )
+                                viz_img.header.stamp = self.get_clock().now().to_msg()
+                                if camera_name == "camera_front":
+                                    self.viz_camera_front_pub.publish(viz_img)
+                                elif camera_name == "camera_rear":
+                                    self.viz_camera_rear_pub.publish(viz_img)
+                                    self.get_logger().info(
+                                        f"Published rear camera viz topic successfully"
+                                    )
+                                self.last_viz_publish_time[camera_name] = current_time
+                            except Exception as e:
+                                self.get_logger().warn(
+                                    f"Failed to publish viz for {camera_name}: {e}"
+                                )
+                    elif camera_name == "camera_rear":
+                        self.get_logger().warn(
+                            f"Rear camera not in latched frames! Available: {list(self.latched_camera_frames.keys())}"
+                        )
 
             # If no camera frames available, publish blank frames for viz topics
             if self.publish_viz_topics and len(cameras_to_process) == 0:
@@ -1273,6 +1322,11 @@ class SensorSyncNode(Node):
 
                 if cpu_usage_data:
                     self.viz_system_cpu_usage_pub.publish(synced_cpu_usage)
+
+                if gpu_usage_data:
+                    synced_gpu_usage = Float32()
+                    synced_gpu_usage.data = gpu_usage_data["msg"].data
+                    self.viz_system_gpu_usage_pub.publish(synced_gpu_usage)
 
                 if memory_usage_data:
                     self.viz_system_memory_usage_pub.publish(synced_memory_usage)
