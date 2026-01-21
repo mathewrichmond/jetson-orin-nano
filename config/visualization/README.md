@@ -11,7 +11,7 @@ This directory contains Foxglove Studio layout configurations for visualizing ro
 **Purpose**: Optimized for remote monitoring via Foxglove Bridge
 
 **Topics Used**:
-- `/viz/remote/camera_front/color/image_raw` - Downsampled camera (320×240 @ 10 Hz)
+- `/viz/remote/camera_front/color/image_raw` - Downsampled camera (320×240 @ 5 Hz)
 - `/viz/remote/imu/filtered` - Filtered IMU data
 - `/viz/remote/chassis/battery` - Synced battery data
 - `/viz/remote/three_d/mesh` - Decimated fused mesh (75% reduction @ 5 Hz)
@@ -54,8 +54,8 @@ This directory contains Foxglove Studio layout configurations for visualizing ro
 **Purpose**: Camera debugging and monitoring with frame rate visualization
 
 **Topics Used**:
-- `/viz/remote/camera_front/color/image_raw` - Downsampled front camera (320×240 @ 10 Hz)
-- `/viz/remote/camera_rear/color/image_raw` - Downsampled rear camera (320×240 @ 10 Hz)
+- `/viz/remote/camera_front/color/image_raw` - Downsampled front camera (320×240 @ 5 Hz)
+- `/viz/remote/camera_rear/color/image_raw` - Downsampled rear camera (320×240 @ 5 Hz)
 - `/hardware/camera_*/color/camera_info` - Camera calibration info
 - `/hardware/camera_*/depth/camera_info` - Depth camera calibration info
 - `/hardware/camera_*/color/image_raw.header.stamp.*` - Timestamp data for frame rate plots
@@ -140,7 +140,45 @@ Layouts use a nested structure with `direction`, `first`, `second`, `third`, etc
 - All layout nodes must have `"first"` property (required)
 - `"second"` is optional but recommended for `"row"` layouts
 
+## Important: Network Bandwidth
+
+**CRITICAL**: The bridge only forwards `/viz/remote/*` topics which are **downsampled** (320×240 @ 5 Hz).
+
+**DO NOT** subscribe to raw `/hardware/camera_*/color/image_raw` topics through the bridge - these are **640×480 @ 15 Hz** and will cause severe network lag.
+
+- ✅ **Use**: `/viz/remote/camera_*/color/image_raw` (downsampled, low bandwidth)
+- ❌ **Don't use**: `/hardware/camera_*/color/image_raw` (full resolution, high bandwidth)
+
+The bridge whitelist prevents raw camera topics from being forwarded. If you need full-resolution images, use a **direct ROS 2 connection** instead of the bridge.
+
 ## Troubleshooting
+
+### Messages Not Showing Up
+
+**Symptoms**: Connection works but panels show "Waiting for image messages..." or "No message path entered"
+
+**Check**:
+1. **Topics exist**: `ros2 topic list | grep "/viz/remote"`
+2. **Topics publishing**: `ros2 topic hz /viz/remote/camera_front/color/image_raw`
+3. **Bridge forwarding**: Check bridge logs for errors
+
+**Fix**:
+- Wait 10-15 seconds after connecting for topics to initialize
+- Reconnect in Foxglove Studio to refresh topic list
+- Verify topics appear in Foxglove's Topics panel (left sidebar)
+- For RawMessages panels: Right-click → Settings → Enter topic name manually
+
+### Network Lag / High Bandwidth
+
+**Symptoms**: Slow connection, laggy interface, connection drops
+
+**Cause**: High-resolution images being streamed
+
+**Fix**:
+1. **Verify using downsampled topics**: Check panel topic paths are `/viz/remote/*` not `/hardware/*`
+2. **Reduce frequency**: Already set to 5 Hz (very low)
+3. **Check bridge whitelist**: Only `/viz/remote/*` should be forwarded
+4. **Use direct connection**: If you need full resolution, connect directly to ROS 2 (not bridge)
 
 ### Layout Import Errors
 
@@ -151,7 +189,7 @@ This means the layout structure is invalid. Common causes:
 2. Invalid panel ID (not in `configById`)
 3. Incorrect nesting structure
 
-**Fix**: 
+**Fix**:
 - Validate JSON: `python3 -m json.tool config/visualization/your_layout.json`
 - Compare with working layouts (`sensor_bridged.json`, `sensor_raw.json`)
 - Ensure all layout nodes have `"direction"` and `"first"` properties

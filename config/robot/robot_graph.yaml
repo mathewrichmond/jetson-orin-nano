@@ -226,7 +226,7 @@ robot:
       publish_vlm_features: true
       # Visualization topics (downsampled for bridge)
       publish_viz_topics: true
-      viz_frequency: 10.0  # Lower frequency for visualization
+      viz_frequency: 5.0  # Very low frequency for visualization (reduces bandwidth)
       viz_resolution_width: 320  # Lower resolution for bridge
       viz_resolution_height: 240
       # Feature topic downsampling (moderate)
@@ -385,8 +385,15 @@ robot:
       # Topic whitelist: ONLY bridged visualization topics (within 5 MB/s budget)
       # Feature topics (/sensor_fusion/*) are NOT bridged (consumed directly by VLA controller)
       # Raw topics (/hardware/*, /nvblox/full/*) are NOT bridged (use direct connection)
+      # Exception: camera_info topics are small and needed for image calibration
       topic_whitelist:
         - "/viz/remote/.*"  # All remote visualization topics (aggressively downsampled)
+        - "/hardware/camera_.*/color/camera_info"  # Camera calibration (small, needed for image display)
+        - "/hardware/camera_.*/depth/camera_info"  # Depth camera calibration (small)
+        - "/sensor_sync/system/hardware/camera_sync_status"  # Camera sync status (small)
+      # Force BEST_EFFORT QoS for viz topics (images use BEST_EFFORT to prevent blocking)
+      best_effort_qos_topic_whitelist:
+        - "/viz/remote/.*"  # All viz topics use BEST_EFFORT
     topics:
       publish: []  # Bridge publishes/subscribes to all topics automatically
       subscribe: []
@@ -424,7 +431,7 @@ groups:
     - phat_motor_controller
     - hardware_sync_generator
     - sensor_fusion
-  
+
   # Composable pipeline (zero-copy intra-process communication)
   composable_pipeline:
     - realsense_camera

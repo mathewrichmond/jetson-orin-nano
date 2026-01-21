@@ -19,7 +19,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import BatteryState, Image, Imu, PointCloud2, PointField, Temperature
-from std_msgs.msg import Header, String, Float32
+from std_msgs.msg import Float32, Header, String
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -100,7 +100,9 @@ class SensorSyncNode(Node):
         self.declare_parameter("system_disk_usage_topic", "/system/disk/usage")
         self.declare_parameter("system_power_topic", "/system/power")
         self.declare_parameter("system_alerts_topic", "/system/alerts")
-        self.declare_parameter("enable_system_status", True)  # Allow disabling if system monitor not available
+        self.declare_parameter(
+            "enable_system_status", True
+        )  # Allow disabling if system monitor not available
 
         # Output topics
         self.declare_parameter("output_namespace", "/sensor_sync")
@@ -193,7 +195,7 @@ class SensorSyncNode(Node):
         # NOTE: Raw camera frames are now only used for sync checking
         self.latched_camera_frames: Dict[str, Optional[Image]] = {}
         self.latched_camera_timestamps: Dict[str, float] = {}
-        
+
         # Latched nvblox images (used for downsampling - eliminates 4 copies per frame)
         self.latched_nvblox_images: Dict[str, Optional[Image]] = {}
         self.latched_nvblox_timestamps: Dict[str, float] = {}
@@ -282,12 +284,22 @@ class SensorSyncNode(Node):
             self.system_alerts_sub = None
 
         # Camera subscribers (for synchronization)
+        # Use BEST_EFFORT QoS to match camera publishers (they use BEST_EFFORT to prevent blocking)
+        # Third-party
+        from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+
+        camera_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10
+        )
         camera_topics = self.get_parameter("camera_topics").value
         self.camera_subs = []
         if camera_topics:
             for topic in camera_topics:
                 sub = self.create_subscription(
-                    Image, str(topic), lambda msg, t=topic: self._camera_callback(msg, str(t)), 10
+                    Image,
+                    str(topic),
+                    lambda msg, t=topic: self._camera_callback(msg, str(t)),
+                    camera_qos,
                 )
                 self.camera_subs.append(sub)
                 camera_name = topic.split("/")[-3]  # Extract camera name
@@ -363,12 +375,8 @@ class SensorSyncNode(Node):
         self.system_disk_usage_pub = self.create_publisher(
             Float32, f"{output_ns}/system/disk/usage", 10
         )
-        self.system_power_pub = self.create_publisher(
-            Float32, f"{output_ns}/system/power", 10
-        )
-        self.system_alerts_pub = self.create_publisher(
-            String, f"{output_ns}/system/alerts", 10
-        )
+        self.system_power_pub = self.create_publisher(Float32, f"{output_ns}/system/power", 10)
+        self.system_alerts_pub = self.create_publisher(String, f"{output_ns}/system/alerts", 10)
         # Camera sync status
         self.system_camera_sync_status_pub = self.create_publisher(
             String, f"{output_ns}/system/hardware/camera_sync_status", 10
@@ -394,11 +402,20 @@ class SensorSyncNode(Node):
             self.viz_chassis_pub = self.create_publisher(
                 BatteryState, "/viz/remote/chassis/battery", 10
             )
+            # Use BEST_EFFORT QoS for viz images to prevent blocking and reduce latency
+            # Third-party
+            from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+
+            image_qos = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=5,  # Small queue for low-latency
+            )
             self.viz_camera_front_pub = self.create_publisher(
-                Image, "/viz/remote/camera_front/color/image_raw", 10
+                Image, "/viz/remote/camera_front/color/image_raw", image_qos
             )
             self.viz_camera_rear_pub = self.create_publisher(
-                Image, "/viz/remote/camera_rear/color/image_raw", 10
+                Image, "/viz/remote/camera_rear/color/image_raw", image_qos
             )
             self.viz_pointcloud_pub = self.create_publisher(
                 PointCloud2, "/viz/remote/three_d/pointcloud", 10
@@ -650,21 +667,23 @@ class SensorSyncNode(Node):
 
         return synced
 
-    def _downsample_image(self, img_msg: Image, width: int, height: int, camera_name: Optional[str] = None) -> Image:
+    def _downsample_image(
+        self, img_msg: Image, width: int, height: int, camera_name: Optional[str] = None
+    ) -> Image:
         """Downsample image to target resolution with caching"""
         # OPTIMIZATION: Cache downsampled images to avoid redundant processing
         # This is critical since we downsample the same image for feature and viz topics
-        
+
         try:
             # Check if already correct size (avoid unnecessary processing)
             if img_msg.width == width and img_msg.height == height:
                 # Already correct size, just update header and return
                 img_msg.header.stamp = self.get_clock().now().to_msg()
                 return img_msg
-            
+
             # Get source image timestamp for cache key
             source_timestamp = img_msg.header.stamp.sec + img_msg.header.stamp.nanosec * 1e-9
-            
+
             # Check cache if camera name provided
             cache_key = None
             if camera_name:
@@ -677,26 +696,26 @@ class SensorSyncNode(Node):
                             # Update timestamp and return cached image
                             cached_img.header.stamp = self.get_clock().now().to_msg()
                             return cached_img
-            
+
             # Cache miss or no camera name - perform downsampling
             # Convert ROS Image to numpy array (one conversion)
             cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="passthrough")
-            
+
             # OPTIMIZATION: Use INTER_AREA for downsampling (better quality + faster for downsampling)
             # INTER_LINEAR is better for upsampling, INTER_AREA is better for downsampling
             if width < img_msg.width or height < img_msg.height:
                 interpolation = cv2.INTER_AREA  # Better for downsampling
             else:
                 interpolation = cv2.INTER_LINEAR  # Better for upsampling
-            
+
             # Resize (creates new array - necessary for resize operation)
             resized = cv2.resize(cv_image, (width, height), interpolation=interpolation)
-            
+
             # Convert back to ROS Image (one conversion)
             # Use same encoding to avoid extra conversion
             downsampled_msg = self.bridge.cv2_to_imgmsg(resized, encoding=img_msg.encoding)
             downsampled_msg.header = img_msg.header
-            
+
             # Cache the result if camera name provided
             if cache_key:
                 with self.cache_lock:
@@ -706,7 +725,7 @@ class SensorSyncNode(Node):
                         oldest_key = next(iter(self.downsampled_image_cache))
                         del self.downsampled_image_cache[oldest_key]
                     self.downsampled_image_cache[cache_key] = (downsampled_msg, source_timestamp)
-            
+
             return downsampled_msg
         except Exception as e:
             self.get_logger().error(f"Error downsampling image: {e}")
@@ -905,30 +924,29 @@ class SensorSyncNode(Node):
             # OPTIMIZATION: Use nvblox images directly instead of raw camera images
             # This eliminates 4 memory copies per frame (nvblox → sensor fusion path)
             # Raw camera frames are still subscribed for sync checking only
-            
+
             # Use nvblox images for downsampling (more efficient - eliminates copies)
             cameras_to_process = {}
-            
+
             # Get nvblox images (prefer these over raw camera images)
             for camera_name in self.latched_nvblox_images.keys():
                 nvblox_img = self.latched_nvblox_images.get(camera_name)
                 if nvblox_img is not None:
                     cameras_to_process[camera_name] = nvblox_img
-            
-            # Fallback to raw camera images if nvblox images not available yet
-            # (during startup or if nvblox node not running)
-            if len(cameras_to_process) == 0:
-                # Try to get synced frames from camera_frame_sync
-                if self.sync_camera_frames and self._check_camera_frame_sync():
-                    # All cameras synced, use synced frames
-                    for topic, camera_msg in self.camera_frame_sync.items():
-                        camera_name = topic.split("/")[-3]
+
+            # For cameras not provided by nvblox, use raw camera images
+            # Always check latched frames for any cameras missing from nvblox
+            for camera_name, latched_frame in self.latched_camera_frames.items():
+                if camera_name not in cameras_to_process and latched_frame is not None:
+                    cameras_to_process[camera_name] = latched_frame
+
+            # Also try synced frames if sync is enabled (may have more recent frames)
+            if self.sync_camera_frames and self._check_camera_frame_sync():
+                for topic, camera_msg in self.camera_frame_sync.items():
+                    camera_name = topic.split("/")[-3]
+                    # Use synced frame if available (overwrites latched frame)
+                    if camera_msg is not None:
                         cameras_to_process[camera_name] = camera_msg
-                else:
-                    # Not synced or sync disabled, use latched frames
-                    cameras_to_process = {
-                        k: v for k, v in self.latched_camera_frames.items() if v is not None
-                    }
 
             # Process each camera (prefer nvblox images, fallback to raw camera images)
             for camera_name, camera_msg in cameras_to_process.items():
@@ -950,7 +968,36 @@ class SensorSyncNode(Node):
                             current_time - self.last_viz_publish_time[camera_name]
                         ) >= (1.0 / self.viz_frequency):
                             viz_img = self._downsample_image(
-                                camera_msg, self.viz_resolution_width, self.viz_resolution_height, camera_name
+                                camera_msg,
+                                self.viz_resolution_width,
+                                self.viz_resolution_height,
+                                camera_name,
+                            )
+                            viz_img.header.stamp = self.get_clock().now().to_msg()
+                            if camera_name == "camera_front":
+                                self.viz_camera_front_pub.publish(viz_img)
+                            elif camera_name == "camera_rear":
+                                self.viz_camera_rear_pub.publish(viz_img)
+                            self.last_viz_publish_time[camera_name] = current_time
+
+            # Also publish viz topics for cameras that are in latched frames but not in cameras_to_process
+            # This ensures rear camera publishes even if it's not synced with front camera
+            if self.publish_viz_topics:
+                for camera_name in ["camera_front", "camera_rear"]:
+                    # Skip if already processed above
+                    if camera_name in cameras_to_process:
+                        continue
+                    # Check latched frames
+                    latched_frame = self.latched_camera_frames.get(camera_name)
+                    if latched_frame is not None:
+                        if camera_name not in self.last_viz_publish_time or (
+                            current_time - self.last_viz_publish_time[camera_name]
+                        ) >= (1.0 / self.viz_frequency):
+                            viz_img = self._downsample_image(
+                                latched_frame,
+                                self.viz_resolution_width,
+                                self.viz_resolution_height,
+                                camera_name,
                             )
                             viz_img.header.stamp = self.get_clock().now().to_msg()
                             if camera_name == "camera_front":
@@ -1129,12 +1176,8 @@ class SensorSyncNode(Node):
         system_status_data = self._find_closest_sensor_data(
             self.system_status_buffer, sync_timestamp
         )
-        cpu_temp_data = self._find_closest_sensor_data(
-            self.system_cpu_temp_buffer, sync_timestamp
-        )
-        gpu_temp_data = self._find_closest_sensor_data(
-            self.system_gpu_temp_buffer, sync_timestamp
-        )
+        cpu_temp_data = self._find_closest_sensor_data(self.system_cpu_temp_buffer, sync_timestamp)
+        gpu_temp_data = self._find_closest_sensor_data(self.system_gpu_temp_buffer, sync_timestamp)
         cpu_usage_data = self._find_closest_sensor_data(
             self.system_cpu_usage_buffer, sync_timestamp
         )
@@ -1147,12 +1190,8 @@ class SensorSyncNode(Node):
         disk_usage_data = self._find_closest_sensor_data(
             self.system_disk_usage_buffer, sync_timestamp
         )
-        power_data = self._find_closest_sensor_data(
-            self.system_power_buffer, sync_timestamp
-        )
-        alerts_data = self._find_closest_sensor_data(
-            self.system_alerts_buffer, sync_timestamp
-        )
+        power_data = self._find_closest_sensor_data(self.system_power_buffer, sync_timestamp)
+        alerts_data = self._find_closest_sensor_data(self.system_alerts_buffer, sync_timestamp)
 
         # Publish feature topics (for controller) - synchronized with sensor data
         if system_status_data:
