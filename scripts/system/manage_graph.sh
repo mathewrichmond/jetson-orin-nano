@@ -668,11 +668,20 @@ show_container_logs() {
 
         if [ -n "$filter_node" ]; then
             # Filter by node name (case-insensitive)
-            $journal_cmd | grep --line-buffered -i "$filter_node" || {
-                echo "No logs found for '$filter_node'"
-                echo "Showing recent container logs instead:"
-                $journal_cmd | tail -20
-            }
+            # Use timeout to prevent hanging on grep with --line-buffered
+            if [ "$follow" = "true" ]; then
+                timeout 30 $journal_cmd | grep --line-buffered -i "$filter_node" || {
+                    echo "No logs found for '$filter_node'"
+                    echo "Showing recent container logs instead:"
+                    $journal_cmd | tail -20
+                }
+            else
+                $journal_cmd | grep -i "$filter_node" || {
+                    echo "No logs found for '$filter_node'"
+                    echo "Showing recent container logs instead:"
+                    $journal_cmd | tail -20
+                }
+            fi
         else
             $journal_cmd
         fi
@@ -884,8 +893,10 @@ case "${1:-}" in
         restart_container
         ;;
     container-logs)
-        # Handle --no-follow flag
-        if [ "${3:-}" = "--no-follow" ]; then
+        # Handle --no-follow flag (can be 2nd or 3rd arg)
+        if [ "${2:-}" = "--no-follow" ]; then
+            show_container_logs "" "false"
+        elif [ "${3:-}" = "--no-follow" ]; then
             show_container_logs "${2:-}" "false"
         else
             show_container_logs "${2:-}" "true"
