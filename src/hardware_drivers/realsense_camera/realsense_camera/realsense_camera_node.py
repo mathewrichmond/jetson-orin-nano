@@ -742,7 +742,7 @@ class RealSenseCameraNode(Node):
                 frame_data = self.frame_queues[camera_name][-1]
                 # Clear queue to prevent backlog
                 self.frame_queues[camera_name].clear()
-                
+
                 frame_data_by_camera[camera_name] = frame_data
                 color_frame = frame_data["color"]
                 depth_frame = frame_data["depth"]

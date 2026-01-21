@@ -168,10 +168,13 @@ class ComposableNodeContainer(Node):
                 self.get_logger().error(f"Error: {e}")
                 # Standard library
                 import traceback
+
                 self.get_logger().error("Traceback:")
                 self.get_logger().error(traceback.format_exc())
                 # Print to stderr for visibility
+                # Standard library
                 import sys
+
                 print(f"ERROR: Failed to load node '{node_name}': {e}", file=sys.stderr)
                 continue
 
@@ -319,9 +322,13 @@ class ComposableNodeContainer(Node):
                                 )
                                 try:
                                     node_instance._initialize_cameras()
-                                    self.get_logger().info(f"✓ {class_name} initialization complete")
+                                    self.get_logger().info(
+                                        f"✓ {class_name} initialization complete"
+                                    )
                                 except Exception as e:
-                                    self.get_logger().error(f"Failed to initialize {class_name}: {e}")
+                                    self.get_logger().error(
+                                        f"Failed to initialize {class_name}: {e}"
+                                    )
                                     # Standard library
                                     import traceback
 
@@ -333,9 +340,13 @@ class ComposableNodeContainer(Node):
                                 )
                                 try:
                                     node_instance._initialize()
-                                    self.get_logger().info(f"✓ {class_name} initialization complete")
+                                    self.get_logger().info(
+                                        f"✓ {class_name} initialization complete"
+                                    )
                                 except Exception as e:
-                                    self.get_logger().error(f"Failed to initialize {class_name}: {e}")
+                                    self.get_logger().error(
+                                        f"Failed to initialize {class_name}: {e}"
+                                    )
                                     # Standard library
                                     import traceback
 
@@ -367,8 +378,13 @@ class ComposableNodeContainer(Node):
             self.get_logger().error("Full traceback:")
             self.get_logger().error(traceback.format_exc())
             # Print to stderr for systemd/journalctl visibility
+            # Standard library
             import sys
-            print(f"ERROR: Failed to load component {package}.{module}.{class_name}: {e}", file=sys.stderr)
+
+            print(
+                f"ERROR: Failed to load component {package}.{module}.{class_name}: {e}",
+                file=sys.stderr,
+            )
             print(traceback.format_exc(), file=sys.stderr)
             raise
 
@@ -654,7 +670,7 @@ def main(args=None):
         container.get_logger().info("COMPOSABLE CONTAINER STARTING")
         container.get_logger().info("=" * 60)
         container.load_components_from_config()
-        
+
         if not container.nodes:
             container.get_logger().error("=" * 60)
             container.get_logger().error("ERROR: No nodes loaded!")
@@ -684,7 +700,9 @@ def main(args=None):
         container.get_logger().error("Full traceback:")
         container.get_logger().error(traceback.format_exc())
         # Also print to stderr for systemd/journalctl visibility
+        # Standard library
         import sys
+
         print(f"FATAL ERROR in composable_container: {e}", file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
         raise  # Re-raise to ensure systemd sees the failure

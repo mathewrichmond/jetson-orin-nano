@@ -348,9 +348,9 @@ class SensorSyncNode(Node):
         # OPTIMIZATION: Use nvblox images directly for downsampling (eliminates 4 copies per frame)
         for camera_name in ["camera_front", "camera_rear"]:
             # Use functools.partial to avoid lambda closure bug
-            # Third-party
+            # Standard library
             from functools import partial
-            
+
             self.nvblox_pointcloud_subs[camera_name] = self.create_subscription(
                 PointCloud2,
                 f"/nvblox/full/{camera_name}/pointcloud",
@@ -1140,7 +1140,7 @@ class SensorSyncNode(Node):
                         )
                         self.viz_camera_front_pub.publish(blank_img)
                         self.last_viz_publish_time["camera_front"] = current_time
-                
+
                 # Publish rear camera (blank if not in cameras_to_process)
                 if "camera_rear" not in cameras_to_process:
                     if "camera_rear" not in self.last_viz_publish_time or (

@@ -106,9 +106,9 @@ class NvbloxProcessorNode(Node):
         # Store callback counters for debugging
         self._callback_counts = {}
 
-        # Third-party
+        # Standard library
         from functools import partial
-        
+
         for camera_name in self.camera_names:
             # Subscribers
             depth_topic = f"/hardware/{camera_name}/depth/image_rect_raw"
@@ -116,10 +116,10 @@ class NvbloxProcessorNode(Node):
             self.get_logger().info(
                 f"[nvblox_processor_node] Creating subscription to {color_topic} with BEST_EFFORT QoS"
             )
-            
+
             # Initialize callback counter
             self._callback_counts[camera_name] = {"color": 0, "depth": 0}
-            
+
             # Use functools.partial to properly bind camera_name (avoids lambda closure bug)
             self.create_subscription(
                 Image,
@@ -197,7 +197,9 @@ class NvbloxProcessorNode(Node):
             self._callback_counts[camera_name]["depth"] += 1
             self._depth_callback(msg, camera_name)
         except Exception as e:
-            self.get_logger().error(f"[nvblox] Exception in depth callback wrapper for {camera_name}: {e}")
+            self.get_logger().error(
+                f"[nvblox] Exception in depth callback wrapper for {camera_name}: {e}"
+            )
 
     def _depth_callback(self, msg: Image, camera_name: str):
         """Callback for depth images"""
@@ -229,8 +231,12 @@ class NvbloxProcessorNode(Node):
                 self.get_logger().info(f"[nvblox] Color callback #{count} for {camera_name}")
             self._color_callback(msg, camera_name)
         except Exception as e:
-            self.get_logger().error(f"[nvblox] Exception in callback wrapper for {camera_name}: {e}")
+            self.get_logger().error(
+                f"[nvblox] Exception in callback wrapper for {camera_name}: {e}"
+            )
+            # Standard library
             import traceback
+
             self.get_logger().error(traceback.format_exc())
 
     def _color_callback(self, msg: Image, camera_name: str):
@@ -255,7 +261,9 @@ class NvbloxProcessorNode(Node):
                     )
         except Exception as e:
             self.get_logger().error(f"[nvblox] Error in color_callback for {camera_name}: {e}")
+            # Standard library
             import traceback
+
             self.get_logger().error(traceback.format_exc())
 
     def _camera_info_callback(self, msg: CameraInfo, camera_name: str):
@@ -272,7 +280,9 @@ class NvbloxProcessorNode(Node):
             # Convert depth image to numpy array
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
             # OPTIMIZATION: Use astype with copy=False to avoid unnecessary copy if possible
-            depth_array = depth_image.astype(np.float32, copy=False) / 1000.0  # Convert mm to meters
+            depth_array = (
+                depth_image.astype(np.float32, copy=False) / 1000.0
+            )  # Convert mm to meters
 
             # Get camera info
             cam_info = self.camera_infos[camera_name]
@@ -317,7 +327,9 @@ class NvbloxProcessorNode(Node):
             # Convert depth image to numpy array
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
             # OPTIMIZATION: Use astype with copy=False to avoid unnecessary copy if possible
-            depth_array = depth_image.astype(np.float32, copy=False) / 1000.0  # Convert mm to meters
+            depth_array = (
+                depth_image.astype(np.float32, copy=False) / 1000.0
+            )  # Convert mm to meters
 
             # Get camera info
             cam_info = self.camera_infos[camera_name]
@@ -496,7 +508,9 @@ class NvbloxProcessorNode(Node):
             # Convert depth image to numpy array
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
             # OPTIMIZATION: Use astype with copy=False to avoid unnecessary copy if possible
-            depth_array = depth_image.astype(np.float32, copy=False) / 1000.0  # Convert mm to meters
+            depth_array = (
+                depth_image.astype(np.float32, copy=False) / 1000.0
+            )  # Convert mm to meters
 
             # Get camera info
             cam_info = self.camera_infos[camera_name]

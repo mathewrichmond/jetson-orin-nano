@@ -670,7 +670,7 @@ show_container_logs() {
             # Filter by node name (case-insensitive)
             # Use timeout to prevent hanging on grep with --line-buffered
             if [ "$follow" = "true" ]; then
-                timeout 30 $journal_cmd | grep --line-buffered -i "$filter_node" || {
+                timeout 30 "$journal_cmd" | grep --line-buffered -i "$filter_node" || {
                     echo "No logs found for '$filter_node'"
                     echo "Showing recent container logs instead:"
                     $journal_cmd | tail -20

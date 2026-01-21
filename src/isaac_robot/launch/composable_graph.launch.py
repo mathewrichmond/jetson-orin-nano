@@ -19,6 +19,7 @@ import yaml
 
 # ROS 2 package utilities
 try:
+    # Third-party
     from ament_index_python.packages import get_package_share_directory
 except ImportError:
     get_package_share_directory = None
@@ -27,7 +28,9 @@ except ImportError:
 def load_composable_graph_config(context):
     """Load graph configuration and create composable node container"""
     graph_config = context.launch_configurations.get("graph_config", "robot_graph.yaml")
-    group = context.launch_configurations.get("group", "hardware")  # Default to hardware for composable
+    group = context.launch_configurations.get(
+        "group", "hardware"
+    )  # Default to hardware for composable
     use_composable = context.launch_configurations.get("use_composable", "true").lower() == "true"
 
     # Find config file (same logic as graph.launch.py)
@@ -171,16 +174,16 @@ def load_composable_graph_config(context):
                 node_name = node_item[0]
             else:
                 node_name = node_item
-            
+
             node_config = nodes_config.get(node_name, {})
             if not node_config:
                 print(f"DEBUG: Skipping {node_name} - no config found", file=sys.stderr)
                 continue
-                
+
             package = node_config.get("package")
             namespace = node_config.get("namespace", "")
             parameters = node_config.get("parameters", {})
-            
+
             # Get module and class from map
             class_info = node_class_map.get(node_name)
             if class_info is None:
@@ -189,25 +192,29 @@ def load_composable_graph_config(context):
                 class_name = "".join([w.capitalize() for w in node_name.split("_")]) + "Node"
             else:
                 module = class_info.get("module", node_config.get("node", "").replace("_node", ""))
-                class_name = class_info.get("class", "".join([w.capitalize() for w in node_name.split("_")]) + "Node")
+                class_name = class_info.get(
+                    "class", "".join([w.capitalize() for w in node_name.split("_")]) + "Node"
+                )
 
-            composable_configs.append({
-                "package": package,
-                "module": module,
-                "class": class_name,
-                "name": node_name,
-                "namespace": namespace,
-                "parameters": parameters,
-            })
+            composable_configs.append(
+                {
+                    "package": package,
+                    "module": module,
+                    "class": class_name,
+                    "name": node_name,
+                    "namespace": namespace,
+                    "parameters": parameters,
+                }
+            )
 
         # Create composable container node
         # ROS 2 parameters don't support nested lists/dicts, so serialize as JSON string
+        # Standard library
         import json
+
         composable_nodes_json = json.dumps(composable_configs)
 
-        container_params = {
-            "composable_nodes_json": composable_nodes_json
-        }
+        container_params = {"composable_nodes_json": composable_nodes_json}
 
         container_node = Node(
             package="isaac_robot",
@@ -217,9 +224,15 @@ def load_composable_graph_config(context):
             parameters=[container_params],
         )
         actions.append(container_node)
-        print(f"INFO: Created composable container with {len(composable_configs)} nodes", file=sys.stderr)
+        print(
+            f"INFO: Created composable container with {len(composable_configs)} nodes",
+            file=sys.stderr,
+        )
         for config in composable_configs:
-            print(f"  - {config['name']} ({config['package']}.{config['module']}.{config['class']})", file=sys.stderr)
+            print(
+                f"  - {config['name']} ({config['package']}.{config['module']}.{config['class']})",
+                file=sys.stderr,
+            )
     else:
         # Add composable nodes as regular nodes if composable mode disabled
         for _, node_action in composable_nodes:
