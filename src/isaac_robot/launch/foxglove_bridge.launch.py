@@ -46,11 +46,17 @@ def generate_launch_description():
                         # Default port (can be changed via command line args if needed)
                         "port": 8765,
                         "address": LaunchConfiguration("address"),
-                        # Topic whitelist: ONLY bridged visualization topics
+                        # Topic whitelist: ONLY visualization topics from sensor fusion node
                         # Feature topics (/sensor_fusion/*) are NOT bridged
+                        # (consumed directly by VLA controller)
                         # Raw topics (/hardware/*, /nvblox/full/*) are NOT bridged
+                        # (use direct connection)
+                        # Only sensor fusion viz topics are bridged: /viz/remote/*
+                        # (all topics under this namespace)
                         "topic_whitelist": [
-                            "/viz/remote/.*",  # All remote visualization topics (aggressively downsampled)
+                            # All remote visualization topics from sensor fusion node
+                            # (aggressively downsampled)
+                            "/viz/remote/.*",
                         ],
                     }
                 ],
