@@ -19,7 +19,14 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import BatteryState, Image, Imu, PointCloud2, PointField, Temperature
-from std_msgs.msg import Float32, Float32MultiArray, Header, MultiArrayDimension, String, UInt8MultiArray
+from std_msgs.msg import (
+    Float32,
+    Float32MultiArray,
+    Header,
+    MultiArrayDimension,
+    String,
+    UInt8MultiArray,
+)
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -103,6 +110,14 @@ class SensorSyncNode(Node):
         self.declare_parameter(
             "enable_system_status", True
         )  # Allow disabling if system monitor not available
+
+        # Audio synchronization parameters
+        self.declare_parameter("enable_audio_sync", False)  # Enable audio synchronization
+        self.declare_parameter("audio_topic", "/microphone/audio")
+        self.declare_parameter("audio_sample_rate", 16000)
+        self.declare_parameter("audio_channels", 2)
+        self.declare_parameter("audio_format", "S16_LE")
+        self.declare_parameter("audio_sync_tolerance", 0.1)
 
         # Output topics
         self.declare_parameter("output_namespace", "/sensor_sync")
@@ -319,13 +334,14 @@ class SensorSyncNode(Node):
             for topic in camera_topics:
                 topic_str = str(topic)
                 camera_name = topic_str.split("/")[-3]  # Extract camera name
-                
+
                 # Create callback with proper closure to avoid lambda issues
                 def make_callback(topic_path, cam_name):
                     def callback(msg):
                         self._camera_callback(msg, topic_path)
+
                     return callback
-                
+
                 callback_func = make_callback(topic_str, camera_name)
                 sub = self.create_subscription(
                     Image,
@@ -334,11 +350,11 @@ class SensorSyncNode(Node):
                     camera_qos,  # BEST_EFFORT QoS to match publisher
                 )
                 self.camera_subs.append(sub)
-                
+
                 self.get_logger().info(
                     f"Created subscription for {topic_str} (camera_name: {camera_name}) with BEST_EFFORT QoS"
                 )
-                
+
                 self.pointcloud_buffers[camera_name] = deque(maxlen=self.max_buffer_size)
                 self.mesh_buffers[camera_name] = deque(maxlen=self.max_buffer_size)
                 self.tsdf_buffers[camera_name] = deque(maxlen=self.max_buffer_size)
@@ -518,7 +534,7 @@ class SensorSyncNode(Node):
             # Fixed rate publishing
             timer_period = 1.0 / float(self.target_frequency)
             self.sync_timer = self.create_timer(timer_period, self._publish_synchronized_data)
-        
+
         # Track last processing time to skip redundant work
         self.last_processing_time = 0.0
         self.last_camera_frame_time = {}  # Track when each camera last updated
@@ -635,7 +651,10 @@ class SensorSyncNode(Node):
         camera_name = topic.split("/")[-3]  # Extract camera name
 
         # Debug: Log all camera callbacks (first few only)
-        if camera_name not in self.last_camera_frame_time or self.last_camera_frame_time[camera_name] == 0.0:
+        if (
+            camera_name not in self.last_camera_frame_time
+            or self.last_camera_frame_time[camera_name] == 0.0
+        ):
             self.get_logger().info(
                 f"Camera callback received: {camera_name} from {topic}, "
                 f"{msg.width}x{msg.height}, encoding={msg.encoding}"
@@ -913,7 +932,7 @@ class SensorSyncNode(Node):
             sync_timestamp = time.time()
 
         current_time = time.time()
-        
+
         # OPTIMIZATION: Early exit if no new camera frames and recently processed
         # Skip processing if no camera frames have arrived since last processing
         # This reduces CPU usage when cameras aren't publishing
@@ -927,18 +946,21 @@ class SensorSyncNode(Node):
                     for camera_name in ["camera_front", "camera_rear"]:
                         latched_frame = self.latched_camera_frames.get(camera_name)
                         if latched_frame is not None:
-                            frame_time = latched_frame.header.stamp.sec + latched_frame.header.stamp.nanosec * 1e-9
+                            frame_time = (
+                                latched_frame.header.stamp.sec
+                                + latched_frame.header.stamp.nanosec * 1e-9
+                            )
                             last_frame_time = self.last_camera_frame_time.get(camera_name, 0.0)
                             if frame_time > last_frame_time + 0.01:  # New frame (10ms tolerance)
                                 has_new_frames = True
                                 break
                 finally:
                     self.buffer_lock.release()
-            
+
             if not has_new_frames:
                 # No new frames, skip processing to save CPU
                 return
-        
+
         self.last_processing_time = current_time
 
         with self.buffer_lock:
@@ -1452,7 +1474,9 @@ class SensorSyncNode(Node):
 
                 self.last_viz_publish_time["system_status"] = current_time
 
-    def _find_overlapping_audio_chunks(self, frame_timestamp: float, frame_duration: float) -> Optional[list]:
+    def _find_overlapping_audio_chunks(
+        self, frame_timestamp: float, frame_duration: float
+    ) -> Optional[list]:
         """
         Find audio chunks that overlap with the camera frame timestamp.
         Returns list of audio chunks that cover the frame duration.
@@ -1471,18 +1495,24 @@ class SensorSyncNode(Node):
             # Duration = bytes / (sample_rate * channels * bytes_per_sample)
             # bytes_per_sample = 2 for S16_LE
             bytes_per_sample = 2
-            chunk_duration = 1024.0 / (self.audio_sample_rate * self.audio_channels * bytes_per_sample)
+            chunk_duration = 1024.0 / (
+                self.audio_sample_rate * self.audio_channels * bytes_per_sample
+            )
 
             for audio_data in self.audio_buffer:
                 chunk_timestamp = audio_data["timestamp"]
                 # Estimate chunk duration from actual data size
                 actual_chunk_size = len(audio_data["msg"].data)
-                actual_chunk_duration = actual_chunk_size / (self.audio_sample_rate * self.audio_channels * bytes_per_sample)
+                actual_chunk_duration = actual_chunk_size / (
+                    self.audio_sample_rate * self.audio_channels * bytes_per_sample
+                )
                 chunk_start = chunk_timestamp - actual_chunk_duration
                 chunk_end = chunk_timestamp
 
                 # Check if chunk overlaps with frame window (with tolerance)
-                if chunk_end >= (frame_start - self.audio_sync_tolerance) and chunk_start <= (frame_end + self.audio_sync_tolerance):
+                if chunk_end >= (frame_start - self.audio_sync_tolerance) and chunk_start <= (
+                    frame_end + self.audio_sync_tolerance
+                ):
                     overlapping_chunks.append(audio_data)
 
         if not overlapping_chunks:
@@ -1492,7 +1522,9 @@ class SensorSyncNode(Node):
         overlapping_chunks.sort(key=lambda x: x["timestamp"])
         return overlapping_chunks
 
-    def _resample_audio_chunks(self, chunks: list, frame_timestamp: float, frame_duration: float) -> Optional[UInt8MultiArray]:
+    def _resample_audio_chunks(
+        self, chunks: list, frame_timestamp: float, frame_duration: float
+    ) -> Optional[UInt8MultiArray]:
         """
         Resample/concatenate audio chunks to match camera frame duration.
         Returns synchronized audio chunk or None if no valid chunks.
@@ -1524,7 +1556,9 @@ class SensorSyncNode(Node):
         synced_audio = UInt8MultiArray()
         synced_audio.data = audio_data_list
         # Set layout dimensions
+        # Third-party
         from std_msgs.msg import MultiArrayDimension
+
         dim = MultiArrayDimension()
         dim.label = "audio"
         dim.size = len(audio_data_list)
@@ -1586,7 +1620,9 @@ class SensorSyncNode(Node):
             return
 
         # Resample/concatenate chunks to match frame duration
-        synced_audio = self._resample_audio_chunks(overlapping_chunks, sync_timestamp, frame_duration)
+        synced_audio = self._resample_audio_chunks(
+            overlapping_chunks, sync_timestamp, frame_duration
+        )
 
         if not synced_audio:
             return
