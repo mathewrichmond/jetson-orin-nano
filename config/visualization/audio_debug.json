@@ -1,0 +1,330 @@
+{
+  "configById": {
+    "RawMessages!microphone_status": {
+      "topicName": "/microphone/status",
+      "diffEnabled": false,
+      "diffMethod": "diff",
+      "diffTopicPath": "",
+      "expansion": "full",
+      "filter": {},
+      "minLogLevel": 1,
+      "searchTerms": [],
+      "timestampMethod": "receiveTime"
+    },
+    "Plot!audio_data_size": {
+      "paths": [
+        {
+          "value": "/microphone/audio.data.length",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Data Length (bytes)"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 5000,
+      "showLegend": true,
+      "title": "Audio Chunk Size Over Time"
+    },
+    "Plot!audio_sample_values": {
+      "paths": [
+        {
+          "value": "/microphone/audio.data[0]",
+          "enabled": true,
+          "color": "#ff0000",
+          "label": "Sample [0]"
+        },
+        {
+          "value": "/microphone/audio.data[100]",
+          "enabled": true,
+          "color": "#ff4400",
+          "label": "Sample [100]"
+        },
+        {
+          "value": "/microphone/audio.data[200]",
+          "enabled": true,
+          "color": "#ff8800",
+          "label": "Sample [200]"
+        },
+        {
+          "value": "/microphone/audio.data[300]",
+          "enabled": true,
+          "color": "#ffaa00",
+          "label": "Sample [300]"
+        },
+        {
+          "value": "/microphone/audio.data[400]",
+          "enabled": true,
+          "color": "#ffcc00",
+          "label": "Sample [400]"
+        },
+        {
+          "value": "/microphone/audio.data[500]",
+          "enabled": true,
+          "color": "#ffff00",
+          "label": "Sample [500]"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 255,
+      "showLegend": true,
+      "title": "Audio Sample Values (Multiple Indices)"
+    },
+    "Plot!audio_array_metadata": {
+      "paths": [
+        {
+          "value": "/microphone/audio.layout.dim[0].size",
+          "enabled": true,
+          "color": "#ff00ff",
+          "label": "Dim[0] Size"
+        },
+        {
+          "value": "/microphone/audio.layout.dim[0].stride",
+          "enabled": true,
+          "color": "#ff44ff",
+          "label": "Dim[0] Stride"
+        },
+        {
+          "value": "/microphone/audio.layout.data_offset",
+          "enabled": true,
+          "color": "#00ffff",
+          "label": "Data Offset"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 5000,
+      "showLegend": true,
+      "title": "Audio Array Metadata"
+    },
+    "TopicGraph!audio_topics": {
+      "topics": [
+        {
+          "topic": "/microphone/status",
+          "visible": true
+        },
+        {
+          "topic": "/microphone/audio",
+          "visible": true
+        }
+      ],
+      "diffEnabled": false,
+      "showHeader": true,
+      "showValue": true
+    },
+    "RawMessages!audio_raw": {
+      "topicName": "/microphone/audio",
+      "diffEnabled": false,
+      "diffMethod": "diff",
+      "diffTopicPath": "",
+      "expansion": "full",
+      "filter": {},
+      "minLogLevel": 1,
+      "searchTerms": [],
+      "timestampMethod": "receiveTime"
+    },
+    "StateTransitions!microphone_state": {
+      "topics": [
+        {
+          "topic": "/microphone/status",
+          "visible": true
+        }
+      ],
+      "diffEnabled": false
+    },
+    "Plot!volume_levels": {
+      "paths": [
+        {
+          "value": "/microphone/volume.data",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Volume (Average)"
+        },
+        {
+          "value": "/microphone/volume_rms.data",
+          "enabled": true,
+          "color": "#0088ff",
+          "label": "Volume RMS"
+        },
+        {
+          "value": "/microphone/volume_peak.data",
+          "enabled": true,
+          "color": "#ff0000",
+          "label": "Volume Peak"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1.0,
+      "showLegend": true,
+      "title": "Volume Levels (Normalized 0-1)"
+    },
+    "Plot!volume_per_channel": {
+      "paths": [
+        {
+          "value": "/microphone/volume_left.data",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Left Channel"
+        },
+        {
+          "value": "/microphone/volume_right.data",
+          "enabled": true,
+          "color": "#ff8800",
+          "label": "Right Channel"
+        }
+      ],
+      "minYValue": 0,
+      "maxYValue": 1.0,
+      "showLegend": true,
+      "title": "Volume Per Channel"
+    },
+    "Plot!waveform_left": {
+      "paths": [
+        {
+          "value": "/microphone/waveform_left.data[0]",
+          "enabled": true,
+          "color": "#00ff00",
+          "label": "Sample 0"
+        },
+        {
+          "value": "/microphone/waveform_left.data[10]",
+          "enabled": true,
+          "color": "#22ff22",
+          "label": "Sample 10"
+        },
+        {
+          "value": "/microphone/waveform_left.data[20]",
+          "enabled": true,
+          "color": "#44ff44",
+          "label": "Sample 20"
+        },
+        {
+          "value": "/microphone/waveform_left.data[30]",
+          "enabled": true,
+          "color": "#66ff66",
+          "label": "Sample 30"
+        },
+        {
+          "value": "/microphone/waveform_left.data[40]",
+          "enabled": true,
+          "color": "#88ff88",
+          "label": "Sample 40"
+        },
+        {
+          "value": "/microphone/waveform_left.data[50]",
+          "enabled": true,
+          "color": "#aaffaa",
+          "label": "Sample 50"
+        }
+      ],
+      "minYValue": -1.0,
+      "maxYValue": 1.0,
+      "showLegend": true,
+      "title": "Left Channel Waveform (Samples)"
+    },
+    "Plot!waveform_right": {
+      "paths": [
+        {
+          "value": "/microphone/waveform_right.data[0]",
+          "enabled": true,
+          "color": "#ff8800",
+          "label": "Sample 0"
+        },
+        {
+          "value": "/microphone/waveform_right.data[10]",
+          "enabled": true,
+          "color": "#ff9922",
+          "label": "Sample 10"
+        },
+        {
+          "value": "/microphone/waveform_right.data[20]",
+          "enabled": true,
+          "color": "#ffaa44",
+          "label": "Sample 20"
+        },
+        {
+          "value": "/microphone/waveform_right.data[30]",
+          "enabled": true,
+          "color": "#ffbb66",
+          "label": "Sample 30"
+        },
+        {
+          "value": "/microphone/waveform_right.data[40]",
+          "enabled": true,
+          "color": "#ffcc88",
+          "label": "Sample 40"
+        },
+        {
+          "value": "/microphone/waveform_right.data[50]",
+          "enabled": true,
+          "color": "#ffddaa",
+          "label": "Sample 50"
+        }
+      ],
+      "minYValue": -1.0,
+      "maxYValue": 1.0,
+      "showLegend": true,
+      "title": "Right Channel Waveform (Samples)"
+    },
+    "TopicGraph!audio_processed_topics": {
+      "topics": [
+        {
+          "topic": "/microphone/volume",
+          "visible": true
+        },
+        {
+          "topic": "/microphone/volume_rms",
+          "visible": true
+        },
+        {
+          "topic": "/microphone/volume_peak",
+          "visible": true
+        },
+        {
+          "topic": "/microphone/volume_left",
+          "visible": true
+        },
+        {
+          "topic": "/microphone/volume_right",
+          "visible": true
+        },
+        {
+          "topic": "/microphone/waveform_left",
+          "visible": true
+        },
+        {
+          "topic": "/microphone/waveform_right",
+          "visible": true
+        }
+      ],
+      "diffEnabled": false,
+      "showHeader": true,
+      "showValue": true
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": {
+      "direction": "column",
+      "first": "RawMessages!microphone_status",
+      "second": "StateTransitions!microphone_state",
+      "third": "TopicGraph!audio_topics",
+      "fourth": "TopicGraph!audio_processed_topics"
+    },
+    "second": {
+      "direction": "column",
+      "first": "Plot!volume_levels",
+      "second": "Plot!volume_per_channel",
+      "third": "Plot!waveform_left",
+      "fourth": "Plot!waveform_right"
+    },
+    "third": {
+      "direction": "column",
+      "first": "Plot!audio_data_size",
+      "second": "RawMessages!audio_raw"
+    }
+  }
+}
