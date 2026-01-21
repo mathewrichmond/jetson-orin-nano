@@ -14,7 +14,7 @@ setup(
     zip_safe=True,
     maintainer="Isaac Robot",
     maintainer_email="isaac@example.com",
-    description="Sensor synchronization and Kalman filtering for VLM feature preparation",
+    description="Sensor synchronization and Kalman filtering - publishes synchronized sensor data as single source of truth",
     license="MIT",
     tests_require=["pytest"],
     entry_points={

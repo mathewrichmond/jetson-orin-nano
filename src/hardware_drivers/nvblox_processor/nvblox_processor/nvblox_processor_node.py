@@ -91,19 +91,27 @@ class NvbloxProcessorNode(Node):
         self.fused_tsdf_publisher: Optional[rclpy.publisher.Publisher] = None
 
         # Initialize publishers and subscribers for each camera
+        # Use BEST_EFFORT QoS to match camera publishers (they use BEST_EFFORT to prevent blocking)
+        # Third-party
+        from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+
+        camera_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10
+        )
+
         for camera_name in self.camera_names:
             # Subscribers
             self.create_subscription(
                 Image,
                 f"/hardware/{camera_name}/depth/image_rect_raw",
                 lambda msg, name=camera_name: self._depth_callback(msg, name),
-                10,
+                camera_qos,  # BEST_EFFORT to match camera publisher
             )
             self.create_subscription(
                 Image,
                 f"/hardware/{camera_name}/color/image_raw",
                 lambda msg, name=camera_name: self._color_callback(msg, name),
-                10,
+                camera_qos,  # BEST_EFFORT to match camera publisher
             )
             self.create_subscription(
                 CameraInfo,

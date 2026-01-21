@@ -63,7 +63,7 @@
       "diffMethod": "char"
     },
     "RawMessages!camera_sync_status": {
-      "topicName": "/sensor_fusion/system/hardware/camera_sync_status",
+      "topicName": "/viz/remote/system/hardware/camera_sync_status",
       "diffEnabled": false,
       "diffMethod": "char"
     },
@@ -80,16 +80,10 @@
     "Plot!camera_front_timestamps": {
       "paths": [
         {
-          "value": "/hardware/camera_front/color/image_raw.header.stamp.nanosec",
+          "value": "/viz/remote/camera_front/color/image_raw.header.stamp.nanosec",
           "enabled": true,
           "color": "#00ff00",
-          "label": "Front Color (ns)"
-        },
-        {
-          "value": "/hardware/camera_front/depth/image_rect_raw.header.stamp.nanosec",
-          "enabled": true,
-          "color": "#0088ff",
-          "label": "Front Depth (ns)"
+          "label": "Front Viz (ns)"
         }
       ],
       "minYValue": 0,
@@ -99,16 +93,10 @@
     "Plot!camera_rear_timestamps": {
       "paths": [
         {
-          "value": "/hardware/camera_rear/color/image_raw.header.stamp.nanosec",
+          "value": "/viz/remote/camera_rear/color/image_raw.header.stamp.nanosec",
           "enabled": true,
           "color": "#ff8800",
-          "label": "Rear Color (ns)"
-        },
-        {
-          "value": "/hardware/camera_rear/depth/image_rect_raw.header.stamp.nanosec",
-          "enabled": true,
-          "color": "#ff0088",
-          "label": "Rear Depth (ns)"
+          "label": "Rear Viz (ns)"
         }
       ],
       "minYValue": 0,

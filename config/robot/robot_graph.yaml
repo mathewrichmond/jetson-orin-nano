@@ -422,8 +422,11 @@ robot:
       # Feature topics (/sensor_fusion/*) are NOT bridged (consumed directly by VLA controller)
       # Raw topics (/hardware/*, /nvblox/full/*) are NOT bridged (use direct connection)
       # Only sensor fusion viz topics are bridged: /viz/remote/* (all topics under this namespace)
+      # Exception: camera_info topics are small, static, and needed for image calibration in Foxglove
       topic_whitelist:
         - "/viz/remote/.*"  # All remote visualization topics from sensor fusion node (aggressively downsampled)
+        - "/hardware/camera_.*/color/camera_info"  # Camera calibration (small, static, needed for image display)
+        - "/hardware/camera_.*/depth/camera_info"  # Depth camera calibration (small, static)
         # Note: /sensor_fusion/audio/raw is NOT bridged (consumed directly by model)
         # Note: /microphone/audio, /microphone/volume.*, /microphone/waveform.* are NOT bridged (use audio_processor_node for debugging)
       # Force BEST_EFFORT QoS for viz topics (images use BEST_EFFORT to prevent blocking)

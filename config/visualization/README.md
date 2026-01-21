@@ -53,13 +53,13 @@ This directory contains Foxglove Studio layout configurations for visualizing ro
 
 **Purpose**: Camera debugging and monitoring with frame rate visualization
 
-**Topics Used**:
+**Topics Used** (all bridged via `/viz/remote/*` or small static topics):
 - `/viz/remote/camera_front/color/image_raw` - Downsampled front camera (320×240 @ 5 Hz)
 - `/viz/remote/camera_rear/color/image_raw` - Downsampled rear camera (320×240 @ 5 Hz)
-- `/hardware/camera_*/color/camera_info` - Camera calibration info
-- `/hardware/camera_*/depth/camera_info` - Depth camera calibration info
-- `/hardware/camera_*/color/image_raw.header.stamp.*` - Timestamp data for frame rate plots
-- `/sensor_fusion/system/hardware/camera_sync_status` - Camera synchronization status
+- `/hardware/camera_*/color/camera_info` - Camera calibration info (small, static, bridged)
+- `/hardware/camera_*/depth/camera_info` - Depth camera calibration info (small, static, bridged)
+- `/viz/remote/camera_*/color/image_raw.header.stamp.*` - Timestamp data for frame rate plots (from viz topics)
+- `/sensor_fusion/system/hardware/camera_sync_status` - Camera synchronization status (small, bridged)
 
 **Features**:
 - Two side-by-side camera views (front and rear)
@@ -142,14 +142,17 @@ Layouts use a nested structure with `direction`, `first`, `second`, `third`, etc
 
 ## Important: Network Bandwidth
 
-**CRITICAL**: The bridge only forwards `/viz/remote/*` topics which are **downsampled** (320×240 @ 5 Hz).
+**CRITICAL**: The bridge only forwards `/viz/remote/*` topics from sensor_fusion node which are **downsampled** (320×240 @ 5 Hz).
 
 **DO NOT** subscribe to raw `/hardware/camera_*/color/image_raw` topics through the bridge - these are **640×480 @ 15 Hz** and will cause severe network lag.
 
-- ✅ **Use**: `/viz/remote/camera_*/color/image_raw` (downsampled, low bandwidth)
-- ❌ **Don't use**: `/hardware/camera_*/color/image_raw` (full resolution, high bandwidth)
+- ✅ **Use**: `/viz/remote/camera_*/color/image_raw` (downsampled, low bandwidth, from sensor_fusion)
+- ✅ **Use**: `/hardware/camera_*/color/camera_info` (small, static, bridged for image calibration)
+- ❌ **Don't use**: `/hardware/camera_*/color/image_raw` (full resolution, high bandwidth, NOT bridged)
+- ❌ **Don't use**: `/nvblox/full/*` (full quality, NOT bridged)
+- ❌ **Don't use**: `/sensor_fusion/*` feature topics (NOT bridged, consumed directly by VLA controller)
 
-The bridge whitelist prevents raw camera topics from being forwarded. If you need full-resolution images, use a **direct ROS 2 connection** instead of the bridge.
+The bridge whitelist only includes `/viz/remote/*` topics (from sensor_fusion) and small static camera_info topics. If you need full-resolution images or feature topics, use a **direct ROS 2 connection** instead of the bridge.
 
 ## Troubleshooting
 

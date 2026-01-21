@@ -93,7 +93,7 @@ def load_composable_graph_config(context):
 
         # Check if node should be composable
         is_composable = node_config.get("composable", False)
-        
+
         # High-value pipeline nodes are composable by default
         if node_name in ["realsense_camera", "nvblox_processor", "sensor_fusion"]:
             is_composable = True
@@ -115,7 +115,7 @@ def load_composable_graph_config(context):
             # components aren't officially supported in Humble
             # We'll create a Node with use_intra_process_comms=True instead
             print(f"INFO: Creating composable node: {node_name}", file=sys.stderr)
-            
+
             # For now, we'll use regular Node with intra-process comms enabled
             # This still provides zero-copy benefits when nodes are in the same process
             # In the future, we can migrate to a true composable container
@@ -148,7 +148,7 @@ def load_composable_graph_config(context):
     if composable_nodes and use_composable:
         # Build composable node configurations
         composable_configs = []
-        
+
         # Map node names to their module/class names
         node_class_map = {
             "realsense_camera": {
@@ -164,18 +164,33 @@ def load_composable_graph_config(context):
                 "class": "SensorSyncNode",
             },
         }
-        
-        for node_name, _ in composable_nodes:
+
+        for node_item in composable_nodes:
+            # Handle both tuple and string formats
+            if isinstance(node_item, tuple):
+                node_name = node_item[0]
+            else:
+                node_name = node_item
+            
             node_config = nodes_config.get(node_name, {})
+            if not node_config:
+                print(f"DEBUG: Skipping {node_name} - no config found", file=sys.stderr)
+                continue
+                
             package = node_config.get("package")
             namespace = node_config.get("namespace", "")
             parameters = node_config.get("parameters", {})
             
             # Get module and class from map
-            class_info = node_class_map.get(node_name, {})
-            module = class_info.get("module", node_config.get("node", "").replace("_node", ""))
-            class_name = class_info.get("class", "".join([w.capitalize() for w in node_name.split("_")]) + "Node")
-            
+            class_info = node_class_map.get(node_name)
+            if class_info is None:
+                # Fallback: use node name from config
+                module = node_config.get("node", "").replace("_node", "")
+                class_name = "".join([w.capitalize() for w in node_name.split("_")]) + "Node"
+            else:
+                module = class_info.get("module", node_config.get("node", "").replace("_node", ""))
+                class_name = class_info.get("class", "".join([w.capitalize() for w in node_name.split("_")]) + "Node")
+
             composable_configs.append({
                 "package": package,
                 "module": module,
@@ -184,16 +199,16 @@ def load_composable_graph_config(context):
                 "namespace": namespace,
                 "parameters": parameters,
             })
-        
+
         # Create composable container node
         # ROS 2 parameters don't support nested lists/dicts, so serialize as JSON string
         import json
         composable_nodes_json = json.dumps(composable_configs)
-        
+
         container_params = {
             "composable_nodes_json": composable_nodes_json
         }
-        
+
         container_node = Node(
             package="isaac_robot",
             executable="composable_container",

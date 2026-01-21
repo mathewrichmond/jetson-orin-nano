@@ -2,6 +2,15 @@
 
 This document describes the sensor fusion architecture, bandwidth planning, and downsampling pipeline for the Isaac robot system.
 
+## Purpose
+
+The sensor fusion node takes **high-frequency, time-mismatched raw sensor data** and:
+- **Synchronizes** all data to camera frame timestamps (time alignment)
+- **Applies post-processing** (Kalman filtering, downsampling)
+- **Re-samples** high-frequency data to uniform rates
+- **Fuses** sensor, chassis, and system information
+- **Publishes** everything downstream consumers need (except control plan)
+
 ## Philosophy
 
 **Compute Once, Downsample for Consumers**
@@ -28,18 +37,44 @@ nvblox Processor (Full Quality Computation)
 ├── Complete TSDF (fused)
 └── Full Resolution Images
     ↓
-Fusion Node (Synchronization + Downsampling)
-├──→ Feature Topics (15 Hz, moderate downsampling)
-│   ├── Images (480×360)
-│   ├── Pointclouds (factor 2)
-│   ├── Mesh (50% decimation)
-│   └── TSDF (0.1m voxels)
+Sensor Fusion Node (Synchronization + Downsampling)
+├──→ Feature Topics (15 Hz, moderate downsampling) - Single Source of Truth
+│   ├── Images (480×360) - from nvblox images
+│   ├── Pointclouds (factor 2) - from nvblox pointclouds
+│   ├── Mesh (50% decimation) - from nvblox mesh
+│   ├── TSDF (0.1m voxels) - from nvblox TSDF
+│   ├── IMU (filtered, synchronized)
+│   ├── Chassis (battery, status, synchronized)
+│   └── System status (temperatures, CPU/GPU, etc.)
 │
-└──→ Viz Topics (5-10 Hz, aggressive downsampling)
-    ├── Images (320×240 @ 10 Hz)
-    ├── Pointclouds (factor 16 @ 5 Hz)
-    ├── Mesh (75% decimation @ 5 Hz)
-    └── TSDF Mesh (extracted @ 2 Hz)
+└──→ Viz Topics (5 Hz, aggressive downsampling) - For remote visualization
+    ├── Images (320×240 @ 5 Hz) - from nvblox images
+    ├── Pointclouds (factor 16 @ 5 Hz) - from nvblox pointclouds
+    ├── Mesh (75% decimation @ 5 Hz) - from nvblox mesh
+    └── TSDF Mesh (extracted @ 2 Hz) - from nvblox TSDF
+
+**Design: Single data path, no fallbacks**
+- Raw cameras → nvblox (processes all camera data)
+- nvblox → sensor_fusion (ONLY source for processed data)
+- Raw camera topics used ONLY for timestamp synchronization
+
+**Input Processing:**
+- High-frequency sensors (IMU ~50Hz, chassis ~10Hz) → Re-sampled to ~15Hz
+- Time-mismatched data → Synchronized to camera frame timestamps
+- Full quality data → Downsampled for bandwidth budgets
+
+**Outputs (Fused, Time-Aligned):**
+- **Chassis Information**: Battery, status
+- **Sensor Information**: IMU (filtered), cameras, 3D data
+- **System Information**: Temperatures, CPU/GPU, memory, disk, power, alerts
+- **Visualization Topics**: Aggressively downsampled for remote monitoring
+
+**Downstream Consumers:**
+- **VLA Feature Builder**: Consumes feature topics + control plan, applies history buffering
+- **Visualization**: Consumes viz topics
+- **Logging**: Consumes feature topics
+
+**Note**: Control plan is NOT published by sensor fusion (comes from planner).
 ```
 
 ## Bandwidth Budgets

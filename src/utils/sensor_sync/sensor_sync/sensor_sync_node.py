@@ -40,6 +40,8 @@ import time
 from typing import Dict, Optional
 
 # Third-party
+# Local imports - shared utilities
+from isaac_utils import KalmanFilter, downsample_image
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -53,9 +55,6 @@ from std_msgs.msg import (
     UInt8MultiArray,
 )
 from visualization_msgs.msg import Marker, MarkerArray
-
-# Local imports - shared utilities
-from isaac_utils import KalmanFilter, downsample_image
 
 
 class SensorSyncNode(Node):
@@ -414,6 +413,7 @@ class SensorSyncNode(Node):
         )
 
         # Audio publishers (feature topic - raw audio synchronized to camera frames)
+        enable_audio_sync = bool(self.get_parameter("enable_audio_sync").value)
         if enable_audio_sync:
             self.synced_audio_pub = self.create_publisher(
                 UInt8MultiArray, f"{output_ns}/audio/raw", 10
@@ -485,6 +485,10 @@ class SensorSyncNode(Node):
             self.viz_system_alerts_pub = self.create_publisher(
                 String, "/viz/remote/system/alerts", 10
             )
+            # Camera sync status for visualization
+            self.viz_system_camera_sync_status_pub = self.create_publisher(
+                String, "/viz/remote/system/hardware/camera_sync_status", 10
+            )
             # Audio stats for visualization (synchronized to camera frames)
             if enable_audio_sync:
                 self.viz_audio_stats_pub = self.create_publisher(
@@ -493,8 +497,13 @@ class SensorSyncNode(Node):
             else:
                 self.viz_audio_stats_pub = None
 
-        # Synchronized sensor data (for VLM)
-        if self.get_parameter("publish_vlm_features").value:
+        # Synchronized sensor data (for VLM) - deprecated
+        try:
+            publish_vlm_features = bool(self.get_parameter("publish_vlm_features").value)
+        except Exception:
+            publish_vlm_features = False
+        
+        if publish_vlm_features:
             self.vlm_features_pub = self.create_publisher(String, f"{output_ns}/vlm_features", 10)
 
         # Status
@@ -538,13 +547,13 @@ class SensorSyncNode(Node):
         """Complete initialization after parameters are set (for deferred init)"""
         if not self._defer_init:
             return  # Already initialized
-        
+
         # Create publishers now that parameters are set
         self._create_publishers()
-        
+
         # Start timer for synchronized publishing
         self._start_timer()
-        
+
         self.get_logger().info("Sensor fusion node initialization complete (deferred)")
         self.get_logger().info(f"Sync to camera: {self.sync_to_camera}")
         self.get_logger().info(f"Sync camera frames: {self.sync_camera_frames}")
@@ -556,6 +565,20 @@ class SensorSyncNode(Node):
         self.get_logger().info(
             f"Viz image size: {self.viz_resolution_width}x{self.viz_resolution_height}"
         )
+
+    def _start_timer(self):
+        """Start the synchronized publishing timer"""
+        # OPTIMIZATION: Use longer timer period to reduce CPU usage
+        # Timer is fallback - camera callbacks trigger immediate publishing when frames arrive
+        if self.sync_to_camera:
+            # Will be triggered by camera callbacks, but also use timer as fallback
+            # Use slower fallback timer (half frequency) since callbacks handle most publishing
+            timer_period = 2.0 / float(self.target_frequency)  # Half frequency fallback
+            self.sync_timer = self.create_timer(timer_period, self._publish_synchronized_data)
+        else:
+            # Fixed rate publishing
+            timer_period = 1.0 / float(self.target_frequency)
+            self.sync_timer = self.create_timer(timer_period, self._publish_synchronized_data)
 
     def _imu_callback(self, msg: Imu):
         """Store IMU data in buffer"""
@@ -932,50 +955,61 @@ class SensorSyncNode(Node):
                         self.viz_chassis_pub.publish(empty_battery)
                         self.last_viz_publish_time["battery"] = current_time
                 # DON'T return here - continue to process cameras even without IMU
+                # Skip IMU processing but continue with camera processing
+                imu_data = None  # Ensure it stays None for later checks
 
-            # Apply Kalman filter if enabled
-            if self.kalman_filter:
-                measurement = np.concatenate([imu_data["accel"], imu_data["gyro"]])
-                filtered_state = self.kalman_filter.update(measurement)
+            # Process IMU data if available
+            if imu_data is not None:
+                # Apply Kalman filter if enabled
+                if self.kalman_filter:
+                    measurement = np.concatenate([imu_data["accel"], imu_data["gyro"]])
+                    filtered_state = self.kalman_filter.update(measurement)
 
-                # Create filtered IMU message
-                filtered_imu = Imu()
-                filtered_imu.header = Header()
-                filtered_imu.header.stamp = self.get_clock().now().to_msg()
-                filtered_imu.header.frame_id = imu_data["msg"].header.frame_id
+                    # Create filtered IMU message
+                    filtered_imu = Imu()
+                    filtered_imu.header = Header()
+                    filtered_imu.header.stamp = self.get_clock().now().to_msg()
+                    filtered_imu.header.frame_id = imu_data["msg"].header.frame_id
 
-                filtered_imu.linear_acceleration.x = filtered_state[0]
-                filtered_imu.linear_acceleration.y = filtered_state[1]
-                filtered_imu.linear_acceleration.z = filtered_state[2]
-                filtered_imu.angular_velocity.x = filtered_state[3]
-                filtered_imu.angular_velocity.y = filtered_state[4]
-                filtered_imu.angular_velocity.z = filtered_state[5]
+                    filtered_imu.linear_acceleration.x = filtered_state[0]
+                    filtered_imu.linear_acceleration.y = filtered_state[1]
+                    filtered_imu.linear_acceleration.z = filtered_state[2]
+                    filtered_imu.angular_velocity.x = filtered_state[3]
+                    filtered_imu.angular_velocity.y = filtered_state[4]
+                    filtered_imu.angular_velocity.z = filtered_state[5]
 
-                # Copy covariance from original
-                filtered_imu.linear_acceleration_covariance = imu_data[
-                    "msg"
-                ].linear_acceleration_covariance
-                filtered_imu.angular_velocity_covariance = imu_data[
-                    "msg"
-                ].angular_velocity_covariance
-            else:
-                filtered_imu = imu_data["msg"]
-                filtered_imu.header.stamp = self.get_clock().now().to_msg()
+                    # Copy covariance from original
+                    filtered_imu.linear_acceleration_covariance = imu_data[
+                        "msg"
+                    ].linear_acceleration_covariance
+                    filtered_imu.angular_velocity_covariance = imu_data[
+                        "msg"
+                    ].angular_velocity_covariance
+                else:
+                    filtered_imu = Imu()
+                    filtered_imu.header = Header()
+                    filtered_imu.header.stamp = self.get_clock().now().to_msg()
+                    filtered_imu.header.frame_id = imu_data["msg"].header.frame_id
+                    filtered_imu.linear_acceleration = imu_data["msg"].linear_acceleration
+                    filtered_imu.angular_velocity = imu_data["msg"].angular_velocity
+                    filtered_imu.linear_acceleration_covariance = imu_data["msg"].linear_acceleration_covariance
+                    filtered_imu.angular_velocity_covariance = imu_data["msg"].angular_velocity_covariance
+
+                # Publish filtered IMU (feature topic)
+                self.filtered_imu_pub.publish(filtered_imu)
+
+                # Publish viz IMU (if enabled and time for viz publish)
+                if self.publish_viz_topics:
+                    if "imu" not in self.last_viz_publish_time or (
+                        current_time - self.last_viz_publish_time["imu"]
+                    ) >= (1.0 / self.viz_frequency):
+                        self.viz_imu_pub.publish(filtered_imu)
+                        self.last_viz_publish_time["imu"] = current_time
+            # If no IMU data, skip IMU publishing (already published empty placeholder above if viz enabled)
 
             # Find closest chassis data
             battery_data = self._find_closest_sensor_data(self.battery_buffer, sync_timestamp)
             status_data = self._find_closest_sensor_data(self.status_buffer, sync_timestamp)
-
-            # Publish filtered IMU (feature topic)
-            self.filtered_imu_pub.publish(filtered_imu)
-
-            # Publish viz IMU (if enabled and time for viz publish)
-            if self.publish_viz_topics:
-                if "imu" not in self.last_viz_publish_time or (
-                    current_time - self.last_viz_publish_time["imu"]
-                ) >= (1.0 / self.viz_frequency):
-                    self.viz_imu_pub.publish(filtered_imu)
-                    self.last_viz_publish_time["imu"] = current_time
 
             # Publish synchronized chassis data
             if battery_data:
@@ -1020,6 +1054,15 @@ class SensorSyncNode(Node):
             # No fallback logic - cameras must come from nvblox
             # If a camera is missing, it means nvblox isn't processing it
             # This is intentional: nvblox is the single source of truth for processed camera data
+            if not cameras_to_process:
+                # Warn if no nvblox images available (but don't crash)
+                if current_time - getattr(self, '_last_nvblox_warning_time', 0) > 5.0:
+                    self.get_logger().warn(
+                        f"No nvblox images available for processing. "
+                        f"Latched images: {list(self.latched_nvblox_images.keys())}, "
+                        f"Values: {[k for k, v in self.latched_nvblox_images.items() if v is not None]}"
+                    )
+                    self._last_nvblox_warning_time = current_time
 
             # Process each camera (nvblox images only)
             for camera_name, camera_msg in cameras_to_process.items():
@@ -1172,7 +1215,9 @@ class SensorSyncNode(Node):
             # the synchronized sensor data published here. The publish_vlm_features
             # parameter is deprecated and will be removed in a future version.
             if self.get_parameter("publish_vlm_features").value:
-                self._publish_vlm_features(filtered_imu, sync_timestamp, battery_data, status_data)
+                # Only publish VLM features if we have IMU data
+                if imu_data is not None:
+                    self._publish_vlm_features(filtered_imu, sync_timestamp, battery_data, status_data)
 
     def _find_closest_sensor_data(self, buffer: deque, target_timestamp: float) -> Optional[Dict]:
         """Find sensor data closest to target timestamp"""
@@ -1322,6 +1367,12 @@ class SensorSyncNode(Node):
 
         # Publish viz topics (lower frequency, same data)
         if self.publish_viz_topics:
+            # Publish camera sync status to viz topic
+            if "camera_sync_status" not in self.last_viz_publish_time or (
+                current_time - self.last_viz_publish_time.get("camera_sync_status", 0)
+            ) >= (1.0 / self.viz_frequency):
+                self.viz_system_camera_sync_status_pub.publish(sync_status_msg)
+                self.last_viz_publish_time["camera_sync_status"] = current_time
             # Check if it's time to publish viz system status
             if "system_status" not in self.last_viz_publish_time or (
                 current_time - self.last_viz_publish_time["system_status"]
@@ -1491,7 +1542,7 @@ class SensorSyncNode(Node):
         """Publish synchronized audio (raw for features, stats for viz)"""
         if not self.synced_audio_pub:
             return
-        
+
         # Check if audio buffer has data
         if len(self.audio_buffer) == 0:
             return

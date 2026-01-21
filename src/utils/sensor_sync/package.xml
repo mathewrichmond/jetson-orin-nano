@@ -3,7 +3,7 @@
 <package format="3">
   <name>sensor_sync</name>
   <version>0.0.0</version>
-  <description>Sensor synchronization and Kalman filtering for VLM feature preparation</description>
+  <description>Sensor synchronization and Kalman filtering - publishes synchronized sensor data as single source of truth</description>
   <maintainer email="isaac@example.com">Isaac Robot</maintainer>
   <license>MIT</license>
 
@@ -14,6 +14,7 @@
   <depend>std_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>isaac_utils</depend>
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
 
