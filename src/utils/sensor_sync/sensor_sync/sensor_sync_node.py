@@ -105,7 +105,9 @@ class SensorSyncNode(Node):
         self.declare_parameter("audio_sync_tolerance", 0.1)
 
         # Output topics
-        self.declare_parameter("output_namespace", "/sensor_fusion")  # Default changed to match config
+        self.declare_parameter(
+            "output_namespace", "/sensor_fusion"
+        )  # Default changed to match config
         self.declare_parameter("publish_vlm_features", True)
 
         # Feature topic downsampling (moderate)
@@ -345,10 +347,14 @@ class SensorSyncNode(Node):
         # Subscribe to nvblox full quality outputs
         # OPTIMIZATION: Use nvblox images directly for downsampling (eliminates 4 copies per frame)
         for camera_name in ["camera_front", "camera_rear"]:
+            # Use functools.partial to avoid lambda closure bug
+            # Third-party
+            from functools import partial
+            
             self.nvblox_pointcloud_subs[camera_name] = self.create_subscription(
                 PointCloud2,
                 f"/nvblox/full/{camera_name}/pointcloud",
-                lambda msg, name=camera_name: self._nvblox_pointcloud_callback(msg, name),
+                partial(self._nvblox_pointcloud_callback, camera_name=camera_name),
                 10,
             )
             self.nvblox_image_subs[camera_name] = self.create_subscription(
@@ -502,7 +508,7 @@ class SensorSyncNode(Node):
             publish_vlm_features = bool(self.get_parameter("publish_vlm_features").value)
         except Exception:
             publish_vlm_features = False
-        
+
         if publish_vlm_features:
             self.vlm_features_pub = self.create_publisher(String, f"{output_ns}/vlm_features", 10)
 
@@ -511,7 +517,9 @@ class SensorSyncNode(Node):
 
         # If deferred initialization, don't start timer yet
         if self._defer_init:
-            self.get_logger().info("Deferred initialization - publishers created, timer will start after _initialize()")
+            self.get_logger().info(
+                "Deferred initialization - publishers created, timer will start after _initialize()"
+            )
             return
 
         # Timer for synchronized publishing
@@ -992,8 +1000,12 @@ class SensorSyncNode(Node):
                     filtered_imu.header.frame_id = imu_data["msg"].header.frame_id
                     filtered_imu.linear_acceleration = imu_data["msg"].linear_acceleration
                     filtered_imu.angular_velocity = imu_data["msg"].angular_velocity
-                    filtered_imu.linear_acceleration_covariance = imu_data["msg"].linear_acceleration_covariance
-                    filtered_imu.angular_velocity_covariance = imu_data["msg"].angular_velocity_covariance
+                    filtered_imu.linear_acceleration_covariance = imu_data[
+                        "msg"
+                    ].linear_acceleration_covariance
+                    filtered_imu.angular_velocity_covariance = imu_data[
+                        "msg"
+                    ].angular_velocity_covariance
 
                 # Publish filtered IMU (feature topic)
                 self.filtered_imu_pub.publish(filtered_imu)
@@ -1056,7 +1068,7 @@ class SensorSyncNode(Node):
             # This is intentional: nvblox is the single source of truth for processed camera data
             if not cameras_to_process:
                 # Warn if no nvblox images available (but don't crash)
-                if current_time - getattr(self, '_last_nvblox_warning_time', 0) > 5.0:
+                if current_time - getattr(self, "_last_nvblox_warning_time", 0) > 5.0:
                     self.get_logger().warn(
                         f"No nvblox images available for processing. "
                         f"Latched images: {list(self.latched_nvblox_images.keys())}, "
@@ -1107,25 +1119,46 @@ class SensorSyncNode(Node):
             # If a camera is missing, it means nvblox isn't processing it
             # This is intentional: nvblox is the single source of truth for processed camera data
 
-            # If no camera frames available, publish blank frames for viz topics
-            if self.publish_viz_topics and len(cameras_to_process) == 0:
-                if "camera_front" not in self.last_viz_publish_time or (
-                    current_time - self.last_viz_publish_time.get("camera_front", 0)
-                ) >= (1.0 / self.viz_frequency):
-                    # Create blank image
-                    blank_img = Image()
-                    blank_img.header.stamp = self.get_clock().now().to_msg()
-                    blank_img.header.frame_id = "camera_front_optical_frame"
-                    blank_img.height = self.viz_resolution_height
-                    blank_img.width = self.viz_resolution_width
-                    blank_img.encoding = "rgb8"
-                    blank_img.is_bigendian = False
-                    blank_img.step = self.viz_resolution_width * 3
-                    blank_img.data = bytes(
-                        self.viz_resolution_width * self.viz_resolution_height * 3
-                    )
-                    self.viz_camera_front_pub.publish(blank_img)
-                    self.last_viz_publish_time["camera_front"] = current_time
+            # Always publish viz topics for both cameras, even if blank
+            # This ensures downstream consumers always receive data on schedule
+            if self.publish_viz_topics:
+                # Publish front camera (blank if not in cameras_to_process)
+                if "camera_front" not in cameras_to_process:
+                    if "camera_front" not in self.last_viz_publish_time or (
+                        current_time - self.last_viz_publish_time.get("camera_front", 0)
+                    ) >= (1.0 / self.viz_frequency):
+                        blank_img = Image()
+                        blank_img.header.stamp = self.get_clock().now().to_msg()
+                        blank_img.header.frame_id = "camera_front_optical_frame"
+                        blank_img.height = self.viz_resolution_height
+                        blank_img.width = self.viz_resolution_width
+                        blank_img.encoding = "rgb8"
+                        blank_img.is_bigendian = False
+                        blank_img.step = self.viz_resolution_width * 3
+                        blank_img.data = bytes(
+                            self.viz_resolution_width * self.viz_resolution_height * 3
+                        )
+                        self.viz_camera_front_pub.publish(blank_img)
+                        self.last_viz_publish_time["camera_front"] = current_time
+                
+                # Publish rear camera (blank if not in cameras_to_process)
+                if "camera_rear" not in cameras_to_process:
+                    if "camera_rear" not in self.last_viz_publish_time or (
+                        current_time - self.last_viz_publish_time.get("camera_rear", 0)
+                    ) >= (1.0 / self.viz_frequency):
+                        blank_img = Image()
+                        blank_img.header.stamp = self.get_clock().now().to_msg()
+                        blank_img.header.frame_id = "camera_rear_optical_frame"
+                        blank_img.height = self.viz_resolution_height
+                        blank_img.width = self.viz_resolution_width
+                        blank_img.encoding = "rgb8"
+                        blank_img.is_bigendian = False
+                        blank_img.step = self.viz_resolution_width * 3
+                        blank_img.data = bytes(
+                            self.viz_resolution_width * self.viz_resolution_height * 3
+                        )
+                        self.viz_camera_rear_pub.publish(blank_img)
+                        self.last_viz_publish_time["camera_rear"] = current_time
 
             # Process 3D data (pointclouds, mesh, TSDF)
             for camera_name in self.pointcloud_buffers.keys():
@@ -1217,7 +1250,9 @@ class SensorSyncNode(Node):
             if self.get_parameter("publish_vlm_features").value:
                 # Only publish VLM features if we have IMU data
                 if imu_data is not None:
-                    self._publish_vlm_features(filtered_imu, sync_timestamp, battery_data, status_data)
+                    self._publish_vlm_features(
+                        filtered_imu, sync_timestamp, battery_data, status_data
+                    )
 
     def _find_closest_sensor_data(self, buffer: deque, target_timestamp: float) -> Optional[Dict]:
         """Find sensor data closest to target timestamp"""

@@ -671,14 +671,6 @@ class RealSenseCameraNode(Node):
         """Publish frames from all cameras (runs on main thread)"""
         callback_start_time = time.time()
         self._publish_call_count = getattr(self, "_publish_call_count", 0) + 1
-
-        # Track actual timer firing rate
-        if hasattr(self, "_last_publish_time"):
-            time_since_last = callback_start_time - self._last_publish_time
-            if time_since_last > 0.2:  # Warn if timer fired >200ms late
-                self.get_logger().warn(
-                    f"Timer fired {time_since_last*1000:.1f}ms late (expected {1.0/self.publish_rate*1000:.1f}ms)"
-                )
         self._last_publish_time = callback_start_time
 
         # Performance tracking
@@ -746,8 +738,11 @@ class RealSenseCameraNode(Node):
                     # Queue empty - this is normal if capture is slower than publish rate
                     continue
 
-                # Get most recent frame (drop older frames if queue is full)
+                # Get most recent frame and CLEAR old frames (drop late data)
                 frame_data = self.frame_queues[camera_name][-1]
+                # Clear queue to prevent backlog
+                self.frame_queues[camera_name].clear()
+                
                 frame_data_by_camera[camera_name] = frame_data
                 color_frame = frame_data["color"]
                 depth_frame = frame_data["depth"]
@@ -755,13 +750,10 @@ class RealSenseCameraNode(Node):
                 # Publish color image
                 if color_frame and self.enable_color:
                     try:
-                        # OPTIMIZATION: Minimize copies
-                        # RealSense provides RGB, ROS expects BGR
-                        # Get numpy array (this may create a view, not always a copy)
+                        # Get color image and convert RGB→BGR
                         color_image = np.asanyarray(color_frame.get_data())
-                        # RGB→BGR conversion using view (no copy)
-                        bgr_image = color_image[:, :, ::-1]  # View, not copy
-                        # Convert to ROS message (this will copy, but necessary)
+                        bgr_image = color_image[:, :, ::-1]
+                        # Convert to ROS message
                         ros_image = self.bridge.cv2_to_imgmsg(bgr_image, "bgr8")
                         ros_image.header.frame_id = f"{camera_name}_color_optical_frame"
                         ros_image.header.stamp = self.get_clock().now().to_msg()
@@ -779,17 +771,6 @@ class RealSenseCameraNode(Node):
                                 info.header.stamp = ros_image.header.stamp
                                 if "color_info" in self.camera_publishers[camera_name]:
                                     self.camera_publishers[camera_name]["color_info"].publish(info)
-                        else:
-                            current_time = time.time()
-                            if not hasattr(self, "_last_color_pub_warn_time"):
-                                self._last_color_pub_warn_time = {}
-                            if camera_name not in self._last_color_pub_warn_time:
-                                self._last_color_pub_warn_time[camera_name] = 0.0
-                            if current_time - self._last_color_pub_warn_time[camera_name] > 5.0:
-                                self.get_logger().warn(
-                                    f"Color image publisher missing for {camera_name}"
-                                )
-                                self._last_color_pub_warn_time[camera_name] = current_time
                     except Exception as e:
                         self.get_logger().error(
                             f"Error publishing color image for {camera_name}: {e}"
@@ -798,7 +779,7 @@ class RealSenseCameraNode(Node):
                 # Publish depth image
                 if depth_frame and self.enable_depth:
                     try:
-                        # Get depth array (may be view or copy depending on RealSense implementation)
+                        # Get depth array
                         depth_image = np.asanyarray(depth_frame.get_data())
                         # Convert to ROS message
                         ros_image = self.bridge.cv2_to_imgmsg(depth_image, "16UC1")

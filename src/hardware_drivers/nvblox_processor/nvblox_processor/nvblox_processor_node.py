@@ -99,24 +99,47 @@ class NvbloxProcessorNode(Node):
             reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10
         )
 
+        self.get_logger().info(
+            f"[nvblox_processor_node] Initializing with camera_names={self.camera_names}"
+        )
+
+        # Store callback counters for debugging
+        self._callback_counts = {}
+
+        # Third-party
+        from functools import partial
+        
         for camera_name in self.camera_names:
             # Subscribers
+            depth_topic = f"/hardware/{camera_name}/depth/image_rect_raw"
+            color_topic = f"/hardware/{camera_name}/color/image_raw"
+            self.get_logger().info(
+                f"[nvblox_processor_node] Creating subscription to {color_topic} with BEST_EFFORT QoS"
+            )
+            
+            # Initialize callback counter
+            self._callback_counts[camera_name] = {"color": 0, "depth": 0}
+            
+            # Use functools.partial to properly bind camera_name (avoids lambda closure bug)
             self.create_subscription(
                 Image,
-                f"/hardware/{camera_name}/depth/image_rect_raw",
-                lambda msg, name=camera_name: self._depth_callback(msg, name),
-                camera_qos,  # BEST_EFFORT to match camera publisher
+                depth_topic,
+                partial(self._depth_callback_wrapper, camera_name=camera_name),
+                camera_qos,
             )
             self.create_subscription(
                 Image,
-                f"/hardware/{camera_name}/color/image_raw",
-                lambda msg, name=camera_name: self._color_callback(msg, name),
-                camera_qos,  # BEST_EFFORT to match camera publisher
+                color_topic,
+                partial(self._color_callback_wrapper, camera_name=camera_name),
+                camera_qos,
+            )
+            self.get_logger().info(
+                f"[nvblox_processor_node] ✓ Created subscriptions for {camera_name}"
             )
             self.create_subscription(
                 CameraInfo,
                 f"/hardware/{camera_name}/depth/camera_info",
-                lambda msg, name=camera_name: self._camera_info_callback(msg, name),
+                partial(self._camera_info_callback, camera_name=camera_name),
                 10,
             )
 
@@ -164,6 +187,18 @@ class NvbloxProcessorNode(Node):
 
         self.get_logger().info("nvblox processor node started")
 
+    def _depth_callback_wrapper(self, msg: Image, camera_name: str):
+        """Wrapper to log callback invocation"""
+        try:
+            if not hasattr(self, "_callback_counts"):
+                self._callback_counts = {}
+            if camera_name not in self._callback_counts:
+                self._callback_counts[camera_name] = {"color": 0, "depth": 0}
+            self._callback_counts[camera_name]["depth"] += 1
+            self._depth_callback(msg, camera_name)
+        except Exception as e:
+            self.get_logger().error(f"[nvblox] Exception in depth callback wrapper for {camera_name}: {e}")
+
     def _depth_callback(self, msg: Image, camera_name: str):
         """Callback for depth images"""
         with self.lock:
@@ -181,18 +216,47 @@ class NvbloxProcessorNode(Node):
             ):
                 self._process_and_publish_downsampled_points(msg, camera_name)
 
+    def _color_callback_wrapper(self, msg: Image, camera_name: str):
+        """Wrapper to log callback invocation"""
+        try:
+            if not hasattr(self, "_callback_counts"):
+                self._callback_counts = {}
+            if camera_name not in self._callback_counts:
+                self._callback_counts[camera_name] = {"color": 0, "depth": 0}
+            self._callback_counts[camera_name]["color"] += 1
+            count = self._callback_counts[camera_name]["color"]
+            if count <= 10 or count % 30 == 0:  # Log first 10, then every 30
+                self.get_logger().info(f"[nvblox] Color callback #{count} for {camera_name}")
+            self._color_callback(msg, camera_name)
+        except Exception as e:
+            self.get_logger().error(f"[nvblox] Exception in callback wrapper for {camera_name}: {e}")
+            import traceback
+            self.get_logger().error(traceback.format_exc())
+
     def _color_callback(self, msg: Image, camera_name: str):
         """Callback for color images"""
-        # OPTIMIZATION: Store message reference (no copy) and republish directly
-        # This avoids unnecessary conversions - just update timestamp and republish
-        with self.lock:
-            self.latest_color_images[camera_name] = msg
+        try:
+            with self.lock:
+                self.latest_color_images[camera_name] = msg
 
-            # Publish full quality image (fusion node will downsample)
-            # OPTIMIZATION: Republish message directly without conversion (zero-copy)
-            if camera_name in self.full_image_publishers:
-                msg.header.stamp = self.get_clock().now().to_msg()
-                self.full_image_publishers[camera_name].publish(msg)
+                # Publish full quality image (fusion node will downsample)
+                if camera_name in self.full_image_publishers:
+                    msg.header.stamp = self.get_clock().now().to_msg()
+                    self.full_image_publishers[camera_name].publish(msg)
+                    # Log first few publishes
+                    count = self._callback_counts[camera_name]["color"]
+                    if count <= 3:
+                        self.get_logger().info(
+                            f"[nvblox] Published {camera_name} to {self.namespace}/{camera_name}/image"
+                        )
+                else:
+                    self.get_logger().error(
+                        f"[nvblox] MISSING PUBLISHER for {camera_name}! Have: {list(self.full_image_publishers.keys())}"
+                    )
+        except Exception as e:
+            self.get_logger().error(f"[nvblox] Error in color_callback for {camera_name}: {e}")
+            import traceback
+            self.get_logger().error(traceback.format_exc())
 
     def _camera_info_callback(self, msg: CameraInfo, camera_name: str):
         """Callback for camera info"""

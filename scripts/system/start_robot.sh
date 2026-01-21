@@ -63,10 +63,11 @@ fi
 echo "Launching robot system with graph: $GRAPH_SELECTION"
 case "$GRAPH_SELECTION" in
     robot)
-        # Target/production graph - use composable mode for hardware pipeline
-        # This enables zero-copy communication between camera, nvblox, and sensor_fusion nodes
-        echo "Using composable mode for hardware pipeline (zero-copy enabled)"
-        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=all use_composable:=true
+        # Target/production graph - use composable pipeline for cameras
+        # TEMPORARY: Only launching camera pipeline until executor starvation is resolved
+        echo "Launching camera pipeline in composable mode (camera+nvblox+sensor_fusion)"
+        echo "NOTE: Other nodes disabled temporarily due to executor starvation"
+        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=composable_pipeline use_composable:=true
         ;;
     composable)
         # Composable-only mode - just the hardware pipeline in composable mode
@@ -75,7 +76,7 @@ case "$GRAPH_SELECTION" in
         ;;
     *)
         # Default: robot graph with composable mode
-        echo "Warning: Unknown graph '$GRAPH_SELECTION', using robot graph with composable mode"
-        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=all use_composable:=true
+        echo "Warning: Unknown graph '$GRAPH_SELECTION', using composable pipeline"
+        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=composable_pipeline use_composable:=true
         ;;
 esac
