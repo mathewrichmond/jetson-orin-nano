@@ -630,6 +630,7 @@ class RealSenseCameraNode(Node):
         last_frame_time = time.time()
         timeout_count = 0
         last_watchdog_log = 0.0
+        last_recovery_log = 0.0
 
         while self.running:
             try:
@@ -637,6 +638,14 @@ class RealSenseCameraNode(Node):
                 frames = pipeline.wait_for_frames(timeout_ms=self.frame_timeout_ms)
                 consecutive_errors = 0  # Reset error counter on success
                 last_frame_time = time.time()
+                if timeout_count > 0:
+                    now = time.time()
+                    if now - last_recovery_log > 1.0:
+                        last_recovery_log = now
+                        self.get_logger().info(
+                            f"[watchdog] {camera_name} recovered after {timeout_count} timeouts"
+                        )
+                    timeout_count = 0
 
                 # Align depth to color if requested
                 if align:
