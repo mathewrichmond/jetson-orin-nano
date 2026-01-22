@@ -62,15 +62,16 @@ robot:
       gyro_fps: 200  # Gyroscope frequency (200 or 400 Hz supported)
       color_width: 640  # 640x480 supported at 6/15/30 Hz on D435
       color_height: 480
-      color_fps: 6  # Using 6Hz
+      color_fps: 6  # Lowest stable mode on D435 (6 Hz)
       depth_width: 640
       depth_height: 480
-      depth_fps: 6  # Using 6Hz
-      publish_rate: 6.0  # Hz
+      depth_fps: 6  # Lowest stable mode on D435 (6 Hz)
+      publish_rate: 3.0  # Hz (publish half-rate for stability)
+      frame_timeout_ms: 3000  # Allow longer stalls before errors
       enable_inter_cam_sync: true  # Enable firmware-based inter-camera sync (requires sync cables)
       inter_cam_sync_mode: 0  # 0=None, 1=Master, 2=Slave (auto-assigned: first=master, others=slaves)
       sync_status_interval_sec: 5.0
-      sync_status_tolerance_ms: 5.0
+      sync_status_tolerance_ms: 50.0
     topics:
       publish:
         - /camera_front/color/image_raw
@@ -238,8 +239,8 @@ robot:
     parameters:
       sync_to_camera: true
       sync_camera_frames: true  # Sync multiple cameras together (software sync)
-      camera_frame_sync_tolerance: 0.05  # Max time diff between cameras (50ms)
-      target_frequency: 15.0  # Match camera FPS for features
+      camera_frame_sync_tolerance: 0.1  # Max time diff between cameras (100ms)
+      target_frequency: 3.0  # Match publish rate for stability
       # IMU topic - Single IMU from phat motor controller (D435 cameras lack IMU hardware)
       imu_topic: "/hardware/phat/imu"
       imu_filter_enabled: true
@@ -257,7 +258,7 @@ robot:
       publish_vlm_features: true
       # Visualization topics (downsampled for bridge)
       publish_viz_topics: true
-      viz_frequency: 2.0  # Very low frequency for visualization (2 Hz reduces lag)
+      viz_frequency: 1.0  # Minimal viz rate for stability
       viz_resolution_width: 320  # Lower resolution for bridge
       viz_resolution_height: 240
       # Feature topic downsampling (moderate)
