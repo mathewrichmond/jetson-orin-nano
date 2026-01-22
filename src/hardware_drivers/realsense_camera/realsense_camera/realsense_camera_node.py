@@ -21,6 +21,9 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import String
 
+# Local
+from isaac_utils import CameraFrameBuffer
+
 
 class RealSenseCameraNode(Node):
     """ROS 2 node for Intel RealSense depth cameras"""
@@ -80,6 +83,10 @@ class RealSenseCameraNode(Node):
         self.timer = None
         self.status_pub = None
         self._initialized = False
+        
+        # Shared memory buffer for zero-copy frame passing
+        self.frame_buffer = CameraFrameBuffer.get_instance()
+        self.get_logger().info("Using shared CameraFrameBuffer for zero-copy frame passing")
 
         # If defer_init is False (normal case), initialize immediately
         # If True (composable container case), wait for parameters to be set
@@ -599,6 +606,11 @@ class RealSenseCameraNode(Node):
                     PointCloud2, f"{camera_name}/points", image_qos
                 )
 
+            if self.enable_imu:
+                self.camera_publishers[camera_name]["imu"] = self.create_publisher(
+                    Imu, f"{camera_name}/imu", info_qos  # Use reliable QoS for IMU (small, important data)
+                )
+
     def _camera_capture_loop(self, camera_name: str):
         """Capture loop for a single camera (runs in background thread)"""
         pipeline = self.pipelines[camera_name]
@@ -747,93 +759,66 @@ class RealSenseCameraNode(Node):
                 color_frame = frame_data["color"]
                 depth_frame = frame_data["depth"]
 
-                # Publish color image
-                if color_frame and self.enable_color:
+                # Write color and depth to shared buffer (zero-copy)
+                if color_frame and depth_frame and self.enable_color and self.enable_depth:
                     try:
-                        # Get color image and convert RGB→BGR
-                        color_image = np.asanyarray(color_frame.get_data())
-                        bgr_image = color_image[:, :, ::-1]
-                        # Convert to ROS message
-                        ros_image = self.bridge.cv2_to_imgmsg(bgr_image, "bgr8")
-                        ros_image.header.frame_id = f"{camera_name}_color_optical_frame"
-                        ros_image.header.stamp = self.get_clock().now().to_msg()
-
-                        if (
-                            camera_name in self.camera_publishers
-                            and "color_image" in self.camera_publishers[camera_name]
-                        ):
-                            self.camera_publishers[camera_name]["color_image"].publish(ros_image)
-                            frames_published += 1
-
-                            # Publish camera info (reuse same timestamp)
-                            if "color" in self.camera_infos.get(camera_name, {}):
-                                info = self.camera_infos[camera_name]["color"]
-                                info.header.stamp = ros_image.header.stamp
-                                if "color_info" in self.camera_publishers[camera_name]:
-                                    self.camera_publishers[camera_name]["color_info"].publish(info)
+                        # Get numpy arrays directly from frames (no conversion needed)
+                        color_image = np.asanyarray(color_frame.get_data())  # RGB
+                        depth_image = np.asanyarray(depth_frame.get_data())  # uint16 mm
+                        
+                        # Get timestamp
+                        timestamp = self.get_clock().now().seconds_nanoseconds()
+                        timestamp_sec = timestamp[0] + timestamp[1] / 1e9
+                        
+                        # Get camera info as dict
+                        camera_info_dict = None
+                        if "color" in self.camera_infos.get(camera_name, {}):
+                            info = self.camera_infos[camera_name]["color"]
+                            camera_info_dict = {
+                                "width": info.width,
+                                "height": info.height,
+                                "fx": info.k[0],
+                                "fy": info.k[4],
+                                "cx": info.k[2],
+                                "cy": info.k[5],
+                            }
+                        
+                        # Write to shared buffer (zero-copy - just stores references)
+                        self.frame_buffer.write_raw_frame(
+                            camera_name,
+                            color_image,
+                            depth_image,
+                            timestamp_sec,
+                            camera_info_dict,
+                        )
+                        frames_published += 1
+                        
                     except Exception as e:
                         self.get_logger().error(
-                            f"Error publishing color image for {camera_name}: {e}"
+                            f"Error writing frame to buffer for {camera_name}: {e}"
                         )
 
-                # Publish depth image
-                if depth_frame and self.enable_depth:
-                    try:
-                        # Get depth array
-                        depth_image = np.asanyarray(depth_frame.get_data())
-                        # Convert to ROS message
-                        ros_image = self.bridge.cv2_to_imgmsg(depth_image, "16UC1")
-                        ros_image.header.frame_id = f"{camera_name}_depth_optical_frame"
-                        ros_image.header.stamp = self.get_clock().now().to_msg()
+                # Publish camera_info topics whenever frames are available
+                if color_frame and self.enable_color and "color" in self.camera_infos.get(camera_name, {}):
+                    info = self.camera_infos[camera_name]["color"]
+                    info.header.stamp = self.get_clock().now().to_msg()
+                    if (
+                        camera_name in self.camera_publishers
+                        and "color_info" in self.camera_publishers[camera_name]
+                    ):
+                        self.camera_publishers[camera_name]["color_info"].publish(info)
 
-                        if (
-                            camera_name in self.camera_publishers
-                            and "depth_image" in self.camera_publishers[camera_name]
-                        ):
-                            self.camera_publishers[camera_name]["depth_image"].publish(ros_image)
-                            frames_published += 1
+                if depth_frame and self.enable_depth and "depth" in self.camera_infos.get(camera_name, {}):
+                    info = self.camera_infos[camera_name]["depth"]
+                    info.header.stamp = self.get_clock().now().to_msg()
+                    if (
+                        camera_name in self.camera_publishers
+                        and "depth_info" in self.camera_publishers[camera_name]
+                    ):
+                        self.camera_publishers[camera_name]["depth_info"].publish(info)
 
-                            # Publish camera info (reuse same timestamp)
-                            if "depth" in self.camera_infos.get(camera_name, {}):
-                                info = self.camera_infos[camera_name]["depth"]
-                                info.header.stamp = ros_image.header.stamp
-                                if "depth_info" in self.camera_publishers[camera_name]:
-                                    self.camera_publishers[camera_name]["depth_info"].publish(info)
-
-                            # Publish pointcloud if enabled (WARNING: Very CPU-intensive!)
-                            if (
-                                self.enable_pointcloud
-                                and "pointcloud" in self.camera_publishers[camera_name]
-                                and depth_frame
-                            ):
-                                pointcloud_start = time.time()
-                                pointcloud = self._depth_to_pointcloud(
-                                    depth_frame, color_frame, camera_name
-                                )
-                                pointcloud_time = time.time() - pointcloud_start
-                                if pointcloud_time > 0.01:  # Log if taking >10ms
-                                    self.get_logger().warn(
-                                        f"Pointcloud generation took {pointcloud_time*1000:.1f}ms for {camera_name}"
-                                    )
-                                if pointcloud:
-                                    self.camera_publishers[camera_name]["pointcloud"].publish(
-                                        pointcloud
-                                    )
-                        else:
-                            current_time = time.time()
-                            if not hasattr(self, "_last_depth_pub_warn_time"):
-                                self._last_depth_pub_warn_time = {}
-                            if camera_name not in self._last_depth_pub_warn_time:
-                                self._last_depth_pub_warn_time[camera_name] = 0.0
-                            if current_time - self._last_depth_pub_warn_time[camera_name] > 5.0:
-                                self.get_logger().warn(
-                                    f"Depth image publisher missing for {camera_name}"
-                                )
-                                self._last_depth_pub_warn_time[camera_name] = current_time
-                    except Exception as e:
-                        self.get_logger().error(
-                            f"Error publishing depth image for {camera_name}: {e}"
-                        )
+                # Note: Depth is now written to shared buffer together with color above
+                # No separate depth/pointcloud publishing - nvblox will handle that
 
             except Exception as e:
                 self.get_logger().error(f"Error publishing frames for {camera_name}: {e}")

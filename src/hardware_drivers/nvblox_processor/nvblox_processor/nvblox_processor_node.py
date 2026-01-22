@@ -20,6 +20,9 @@ from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import Header, String
 from visualization_msgs.msg import Marker, MarkerArray
 
+# Local
+from isaac_utils import CameraFrameBuffer
+
 
 class NvbloxProcessorNode(Node):
     """ROS 2 node for processing RealSense data with nvblox"""
@@ -61,20 +64,21 @@ class NvbloxProcessorNode(Node):
 
         # CV Bridge
         self.bridge = CvBridge()
+        
+        # Shared memory buffer for zero-copy frame access
+        self.frame_buffer = CameraFrameBuffer.get_instance()
+        self.get_logger().info("Using shared CameraFrameBuffer for zero-copy frame access")
 
-        # Storage for camera info and latest frames
-        self.camera_infos: Dict[str, CameraInfo] = {}
-        self.latest_depth_images: Dict[str, Optional[Image]] = {}
-        self.latest_color_images: Dict[str, Optional[Image]] = {}
-        self.latest_timestamps: Dict[str, float] = {}
+        # Storage for camera info and processing state
+        self.camera_infos: Dict[str, Dict] = {}  # Now stores dict instead of CameraInfo
+        self.last_processed_frame: Dict[str, int] = {}  # Track last processed frame number
 
         # Thread safety
         self.lock = threading.Lock()
 
-        # Subscribers for each camera
-        self.depth_subscribers: Dict[str, rclpy.subscription.Subscription] = {}
-        self.color_subscribers: Dict[str, rclpy.subscription.Subscription] = {}
-        self.camera_info_subscribers: Dict[str, rclpy.subscription.Subscription] = {}
+        # Processing timer (poll buffer instead of subscriptions)
+        self.process_timer = None
+        self.process_rate_hz = 10.0  # Process buffer at 10Hz (adjust as needed)
 
         # Publishers
         self.status_publisher = self.create_publisher(String, self.status_topic, 10)
@@ -90,58 +94,18 @@ class NvbloxProcessorNode(Node):
         self.fused_mesh_publisher: Optional[rclpy.publisher.Publisher] = None
         self.fused_tsdf_publisher: Optional[rclpy.publisher.Publisher] = None
 
-        # Initialize publishers and subscribers for each camera
-        # Use BEST_EFFORT QoS to match camera publishers (they use BEST_EFFORT to prevent blocking)
-        # Third-party
-        from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-
-        camera_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10
-        )
-
+        # Initialize publishers for each camera (no subscriptions - using shared buffer)
         self.get_logger().info(
-            f"[nvblox_processor_node] Initializing with camera_names={self.camera_names}"
+            f"[nvblox_processor_node] Initializing with camera_names={self.camera_names} (buffer mode)"
         )
-
-        # Store callback counters for debugging
-        self._callback_counts = {}
-
-        # Standard library
-        from functools import partial
+        
+        # Initialize processing counters
+        self._process_counts = {}
 
         for camera_name in self.camera_names:
-            # Subscribers
-            depth_topic = f"/hardware/{camera_name}/depth/image_rect_raw"
-            color_topic = f"/hardware/{camera_name}/color/image_raw"
-            self.get_logger().info(
-                f"[nvblox_processor_node] Creating subscription to {color_topic} with BEST_EFFORT QoS"
-            )
-
-            # Initialize callback counter
-            self._callback_counts[camera_name] = {"color": 0, "depth": 0}
-
-            # Use functools.partial to properly bind camera_name (avoids lambda closure bug)
-            self.create_subscription(
-                Image,
-                depth_topic,
-                partial(self._depth_callback_wrapper, camera_name=camera_name),
-                camera_qos,
-            )
-            self.create_subscription(
-                Image,
-                color_topic,
-                partial(self._color_callback_wrapper, camera_name=camera_name),
-                camera_qos,
-            )
-            self.get_logger().info(
-                f"[nvblox_processor_node] ✓ Created subscriptions for {camera_name}"
-            )
-            self.create_subscription(
-                CameraInfo,
-                f"/hardware/{camera_name}/depth/camera_info",
-                partial(self._camera_info_callback, camera_name=camera_name),
-                10,
-            )
+            # Initialize processing state
+            self.last_processed_frame[camera_name] = 0
+            self._process_counts[camera_name] = 0
 
             # Publishers (full quality for fusion node)
             self.full_pointcloud_publishers[camera_name] = self.create_publisher(
@@ -174,18 +138,77 @@ class NvbloxProcessorNode(Node):
                 MarkerArray, f"{self.namespace}/tsdf", 10
             )
 
-            # Initialize storage
-            self.latest_depth_images[camera_name] = None
-            self.latest_color_images[camera_name] = None
-            self.latest_timestamps[camera_name] = 0.0
+        # Timer for processing frames from buffer
+        self.process_timer = self.create_timer(1.0 / self.process_rate_hz, self._process_buffer_frames)
 
         # Timer for mesh updates
         self.mesh_timer = self.create_timer(1.0 / self.mesh_update_rate, self._update_meshes)
 
         # Status
-        self.publish_status("initialized", "nvblox processor node initialized")
+        self.publish_status("initialized", "nvblox processor node initialized (buffer mode)")
 
-        self.get_logger().info("nvblox processor node started")
+        self.get_logger().info("nvblox processor node started (reading from shared buffer)")
+
+    def _process_buffer_frames(self):
+        """Process frames from shared buffer (replaces subscription callbacks)"""
+        try:
+            for camera_name in self.camera_names:
+                # Read raw frame from buffer
+                raw_frame = self.frame_buffer.read_raw_frame(camera_name)
+                
+                if raw_frame is None:
+                    continue
+                
+                # Skip if already processed
+                if raw_frame.frame_number <= self.last_processed_frame[camera_name]:
+                    continue
+                
+                # Update last processed
+                self.last_processed_frame[camera_name] = raw_frame.frame_number
+                self._process_counts[camera_name] += 1
+                
+                # Store camera info if available
+                if raw_frame.camera_info and camera_name not in self.camera_infos:
+                    self.camera_infos[camera_name] = raw_frame.camera_info
+                    self.get_logger().info(f"[nvblox] Received camera info for {camera_name}")
+                
+                # Log first few processes
+                count = self._process_counts[camera_name]
+                if count <= 3:
+                    self.get_logger().info(
+                        f"[nvblox] Processing frame #{raw_frame.frame_number} for {camera_name}"
+                    )
+                
+                # Process the frame: raw_frame.color is RGB numpy array, raw_frame.depth is uint16 depth in mm
+                # For now, just pass through the color image to the buffer
+                # (in full implementation, this would do actual nvblox processing)
+                
+                # Write processed frame to buffer for sensor_fusion to consume
+                self.frame_buffer.write_processed_frame(
+                    camera_name,
+                    raw_frame.color,  # For now, just pass through color
+                    raw_frame.timestamp,
+                    pointcloud=None,  # TODO: Generate pointcloud from depth
+                    frame_number=raw_frame.frame_number,
+                )
+                
+                # Also publish to topics for backward compatibility (sensor_fusion subscribes)
+                if camera_name in self.full_image_publishers:
+                    # Convert numpy to ROS message
+                    ros_msg = self.bridge.cv2_to_imgmsg(raw_frame.color, encoding="rgb8")
+                    ros_msg.header.stamp = self.get_clock().now().to_msg()
+                    ros_msg.header.frame_id = f"{camera_name}_color_optical_frame"
+                    self.full_image_publishers[camera_name].publish(ros_msg)
+                    
+                    if count <= 3:
+                        self.get_logger().info(
+                            f"[nvblox] Published processed frame to {self.namespace}/{camera_name}/image"
+                        )
+                        
+        except Exception as e:
+            self.get_logger().error(f"[nvblox] Error processing buffer frames: {e}")
+            import traceback
+            self.get_logger().error(traceback.format_exc())
 
     def _depth_callback_wrapper(self, msg: Image, camera_name: str):
         """Wrapper to log callback invocation"""
@@ -388,47 +411,10 @@ class NvbloxProcessorNode(Node):
         return msg
 
     def _update_meshes(self):
-        """Periodic update of mesh and TSDF markers"""
-        with self.lock:
-            # Process per-camera meshes/TSDF (legacy, for backward compatibility)
-            for camera_name in self.camera_names:
-                if camera_name not in self.latest_depth_images:
-                    continue
-                if self.latest_depth_images[camera_name] is None:
-                    continue
-                if camera_name not in self.camera_infos:
-                    continue
-
-                try:
-                    # Process TSDF markers
-                    if self.publish_tsdf_markers and camera_name in self.tsdf_marker_publishers:
-                        self._publish_tsdf_markers(camera_name)
-
-                    # Process mesh markers
-                    if self.publish_mesh_markers and camera_name in self.mesh_publishers:
-                        self._publish_mesh_markers(camera_name)
-
-                except Exception as e:
-                    self.get_logger().error(f"Error updating meshes for {camera_name}: {e}")
-
-            # Process fused mesh/TSDF (multi-camera fusion)
-            if self.fuse_cameras and len(self.camera_names) > 1:
-                try:
-                    # Check if all cameras have valid data
-                    all_cameras_ready = all(
-                        camera_name in self.latest_depth_images
-                        and self.latest_depth_images[camera_name] is not None
-                        and camera_name in self.camera_infos
-                        for camera_name in self.camera_names
-                    )
-
-                    if all_cameras_ready:
-                        if self.fused_tsdf_publisher:
-                            self._publish_fused_tsdf()
-                        if self.fused_mesh_publisher:
-                            self._publish_fused_mesh()
-                except Exception as e:
-                    self.get_logger().error(f"Error updating fused meshes: {e}")
+        """Periodic update of mesh and TSDF markers (placeholder - using buffer now)"""
+        # TODO: Implement mesh generation from buffer data
+        # For now, mesh generation is disabled while using shared buffer
+        pass
 
     def _publish_tsdf_markers(self, camera_name: str):
         """Publish TSDF visualization markers"""

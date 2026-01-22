@@ -57,13 +57,16 @@ robot:
       enable_color: true
       enable_depth: true
       enable_pointcloud: false  # Disabled - using nvblox downsampled point clouds instead
-      color_width: 640  # 320x240 @ 10 Hz is not supported on D435
+      enable_imu: false  # Disabled temporarily - causes "Couldn't resolve requests" with current config
+      accel_fps: 250  # Accelerometer frequency (63 or 250 Hz supported)
+      gyro_fps: 200  # Gyroscope frequency (200 or 400 Hz supported)
+      color_width: 640  # 640x480 supported at 6/15/30 Hz on D435
       color_height: 480
-      color_fps: 10
+      color_fps: 6  # Using 6Hz
       depth_width: 640
       depth_height: 480
-      depth_fps: 10
-      publish_rate: 10.0  # Hz
+      depth_fps: 6  # Using 6Hz
+      publish_rate: 6.0  # Hz
       enable_inter_cam_sync: true  # Enable firmware-based inter-camera sync (requires sync cables)
       inter_cam_sync_mode: 0  # 0=None, 1=Master, 2=Slave (auto-assigned: first=master, others=slaves)
       sync_status_interval_sec: 5.0
@@ -237,6 +240,8 @@ robot:
       sync_camera_frames: true  # Sync multiple cameras together (software sync)
       camera_frame_sync_tolerance: 0.05  # Max time diff between cameras (50ms)
       target_frequency: 15.0  # Match camera FPS for features
+      # IMU topic - Single IMU from phat motor controller (D435 cameras lack IMU hardware)
+      imu_topic: "/hardware/phat/imu"
       imu_filter_enabled: true
       imu_process_noise: 0.01
       imu_measurement_noise: 0.1
@@ -245,14 +250,14 @@ robot:
       camera_topics:
         - "/hardware/camera_front/color/image_raw"
         - "/hardware/camera_rear/color/image_raw"
-      imu_topic: "/phat/imu"
+      imu_topic: "/hardware/phat/imu"
       battery_topic: "/irobot/battery"
       status_topic: "/irobot/status"
       output_namespace: "/sensor_fusion"
       publish_vlm_features: true
       # Visualization topics (downsampled for bridge)
       publish_viz_topics: true
-      viz_frequency: 5.0  # Very low frequency for visualization (reduces bandwidth)
+      viz_frequency: 2.0  # Very low frequency for visualization (2 Hz reduces lag)
       viz_resolution_width: 320  # Lower resolution for bridge
       viz_resolution_height: 240
       # Feature topic downsampling (moderate)
@@ -347,6 +352,7 @@ robot:
   # PHAT Motor Controller (GPIO + Accelerometer)
   phat_motor_controller:
     enabled: true
+    composable: false  # Cannot be composable (uses GPIO/I2C hardware)
     package: phat_motor_controller
     node: phat_motor_controller_node
     namespace: /hardware
@@ -391,16 +397,16 @@ robot:
       wheelbase: 0.2
       max_speed: 1.0
       gpio_mode: 'BOARD'
-      status_topic: '/phat/status'
-      imu_topic: '/phat/imu'
-      magnetometer_topic: '/phat/magnetometer'
+      status_topic: 'phat/status'
+      imu_topic: 'phat/imu'
+      magnetometer_topic: 'phat/magnetometer'
       cmd_vel_topic: '/cmd_vel'
       imu_frame_id: 'phat_imu'
     topics:
       publish:
-        - /phat/status
-        - /phat/imu
-        - /phat/magnetometer
+        - phat/status
+        - phat/imu
+        - phat/magnetometer
       subscribe:
         - /cmd_vel
         - /phat/camera_pan
@@ -471,11 +477,14 @@ groups:
     - hardware_sync_generator
     - sensor_fusion
 
-  # Composable pipeline (zero-copy intra-process communication)
-  composable_pipeline:
+  # Sensor pipeline (zero-copy intra-process communication for camera/IMU/sensor processing)
+  sensor_pipeline:
+    - system_monitor
+    - phat_motor_controller
     - realsense_camera
     - nvblox_processor
     - sensor_fusion
+    - foxglove_bridge
 
   bench_test:
     - system_monitor
@@ -485,10 +494,18 @@ groups:
     - audio_processor
     - irobot_serial
     - phat_motor_controller
+    - sensor_fusion
 
   all:
     - system_monitor
     - realsense_camera
+    - nvblox_processor
+    - usb_microphone
+    - audio_processor
+    - irobot_serial
+    - phat_motor_controller
+    - sensor_fusion
+    - foxglove_bridge
     - nvblox_processor
     - usb_microphone
     - audio_processor

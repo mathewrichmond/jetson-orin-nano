@@ -67,16 +67,16 @@ case "$GRAPH_SELECTION" in
         # TEMPORARY: Only launching camera pipeline until executor starvation is resolved
         echo "Launching camera pipeline in composable mode (camera+nvblox+sensor_fusion)"
         echo "NOTE: Other nodes disabled temporarily due to executor starvation"
-        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=composable_pipeline use_composable:=true
+        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=sensor_pipeline use_composable:=true
         ;;
     composable)
         # Composable-only mode - just the hardware pipeline in composable mode
         echo "Launching composable pipeline only"
-        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=composable_pipeline use_composable:=true
+        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=sensor_pipeline use_composable:=true
         ;;
     *)
         # Default: robot graph with composable mode
         echo "Warning: Unknown graph '$GRAPH_SELECTION', using composable pipeline"
-        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=composable_pipeline use_composable:=true
+        ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=sensor_pipeline use_composable:=true
         ;;
 esac

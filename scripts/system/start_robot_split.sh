@@ -38,7 +38,7 @@ export RMW_FASTRTPS_PUBLICATION_MODE=ASYNCHRONOUS
 cd "$ISAAC_ROOT"
 
 echo "Launching camera pipeline in composable container (background)..."
-ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=composable_pipeline use_composable:=true &
+ros2 launch isaac_robot composable_graph.launch.py graph_config:=robot_graph.yaml group:=sensor_pipeline use_composable:=true &
 PIPELINE_PID=$!
 
 sleep 3
