@@ -69,5 +69,5 @@ The microphone node would need to be modified to publish audio data. Options:
 
 **Restart After Changes**:
 ```bash
-./scripts/system/manage_graph.sh restart robot
+systemctl --user restart isaac-robot.service
 ```

@@ -97,7 +97,7 @@ Camera pan/tilt servos are controlled by the PHAT node using degree commands.
 
 **Start the hardware graph** (required):
 ```bash
-./scripts/system/manage_graph.sh start robot
+systemctl --user start isaac-robot.service
 ```
 
 **Send a test command**:

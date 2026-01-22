@@ -13,7 +13,7 @@ ros2 node list | grep realsense
 
 If not running, start the graph:
 ```bash
-./scripts/system/manage_graph.sh start robot
+systemctl --user start isaac-robot.service
 ```
 
 ## Step 2: Check if Camera Topics Exist
@@ -98,7 +98,7 @@ If your topics have different names (e.g., `/hardware/camera_front/...`), you'll
 **Solutions**:
 1. Check camera power/USB connection
 2. Check camera permissions: `ls -l /dev/video*`
-3. Restart camera node: `./scripts/system/manage_graph.sh restart robot`
+3. Restart camera node: `systemctl --user restart isaac-robot.service`
 
 ### Issue: Cameras Not Detected
 
@@ -124,8 +124,8 @@ If your topics have different names (e.g., `/hardware/camera_front/...`), you'll
 **Symptoms**: Topics exist and publishing, but Foxglove Studio doesn't see them
 
 **Solutions**:
-1. Restart bridge: `./scripts/system/manage_graph.sh restart robot`
-2. Check bridge logs: `./scripts/system/manage_graph.sh logs | grep foxglove`
+1. Restart bridge: `systemctl --user restart isaac-robot.service`
+2. Check bridge logs: `journalctl --user -u isaac-robot.service -f | grep foxglove`
 3. Verify connection: Check connection indicator in Foxglove Studio
 
 ## Quick Diagnostic Command

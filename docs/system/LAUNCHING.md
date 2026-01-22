@@ -1,27 +1,25 @@
 # Launching the Robot System
 
-**IMPORTANT**: Always use centralized graph management. Do NOT launch nodes ad hoc with `ros2 launch` or `ros2 run`. Use the graph management script instead.
+**IMPORTANT**: Use systemd for production and ROS 2 launch for development. Avoid multiple instances.
 
-## Centralized Graph Management (Required)
+## Primary Launch Methods
 
-The Isaac robot system uses **centralized graph management** through the `manage_graph.sh` script. This is the ONLY way to launch nodes in production.
+The Isaac robot system uses systemd for production and ROS 2 launch for development.
 
 ### Quick Start
 
 ```bash
-cd ~/src/jetson-orin-nano
+# Production (systemd user service)
+systemctl --user start isaac-robot.service
+systemctl --user status isaac-robot.service
+journalctl --user -u isaac-robot.service -f
 
-# Start robot graph (production)
-./scripts/system/manage_graph.sh start robot
-
-# Start monitor graph (viewing/logging)
-./scripts/system/manage_graph.sh start monitor
-
-# Check status
-./scripts/system/manage_graph.sh status
-
-# Verify data streams
-./scripts/system/manage_graph.sh verify
+# Development (direct launch)
+systemctl --user stop isaac-robot.service
+ros2 launch isaac_robot composable_graph.launch.py \
+  graph_config:=robot_graph.yaml \
+  group:=sensor_pipeline \
+  use_composable:=true
 ```
 
 ## Why Centralized Management?
@@ -39,30 +37,26 @@ cd ~/src/jetson-orin-nano
 
 See [Graph Configurations](GRAPH_CONFIGURATIONS.md) for details.
 
-## Graph Management Commands
+## Graph Management Commands (systemd)
 
 ```bash
 # Select graph
-./scripts/system/manage_graph.sh select robot
-./scripts/system/manage_graph.sh select monitor
+echo "robot" > config/robot/selected_graph.txt
 
 # Start graph
-./scripts/system/manage_graph.sh start [robot|monitor]
+systemctl --user start isaac-robot.service
 
 # Stop graph
-./scripts/system/manage_graph.sh stop
+systemctl --user stop isaac-robot.service
 
 # Restart graph
-./scripts/system/manage_graph.sh restart [robot|monitor]
+systemctl --user restart isaac-robot.service
 
 # Check status
-./scripts/system/manage_graph.sh status
-
-# Verify data streams
-./scripts/system/manage_graph.sh verify
+systemctl --user status isaac-robot.service
 
 # View logs
-./scripts/system/manage_graph.sh logs
+journalctl --user -u isaac-robot.service -f
 ```
 
 ## Launch File Structure
@@ -70,7 +64,7 @@ See [Graph Configurations](GRAPH_CONFIGURATIONS.md) for details.
 The launch system uses:
 
 1. **Graph Configuration** (`config/robot/robot_graph.yaml`) - Defines all nodes, parameters, and groups
-2. **Launch File** (`src/isaac_robot/launch/graph.launch.py`) - Standard ROS 2 launch file that reads the graph config
+2. **Launch File** (`src/isaac_robot/launch/composable_graph.launch.py`) - Standard ROS 2 launch file that reads the graph config
 3. **Node Entry Points** - Each node has an entry point defined in its `setup.py`
 
 ## How It Works
@@ -126,7 +120,7 @@ ros2 topic echo /realsense/status
 
 3. **Check launch file output**:
    ```bash
-   ros2 launch isaac_robot graph.launch.py group:=bench_test
+   ros2 launch isaac_robot composable_graph.launch.py group:=bench_test
    # Look for error messages in the output
    ```
 
@@ -154,12 +148,11 @@ colcon build --packages-select isaac_robot
 source install/setup.bash
 ```
 
-## ⚠️ Do NOT Launch Nodes Ad Hoc
+## ⚠️ Avoid Multiple Instances
 
-**Never use these commands in production:**
-- ❌ `ros2 launch isaac_robot graph.launch.py` (use manage_graph.sh instead)
-- ❌ `ros2 run <package> <node>` (nodes should be in graph config)
-- ❌ `ros2 launch <package> <launch_file>` (use graph management)
+**Never run these concurrently in production:**
+- ❌ `systemctl --user start isaac-robot.service` and a manual `ros2 launch`
+- ❌ multiple `ros2 launch` instances of the same graph
 
 **Why?**
 - Nodes won't have correct namespaces
@@ -173,7 +166,7 @@ If you need to test a single node for development:
 
 1. **Add node to graph config** (`config/robot/robot_graph.yaml`)
 2. **Enable it** in the graph
-3. **Use graph management** to start it: `./scripts/system/manage_graph.sh start robot`
+3. **Use systemd** to start it: `systemctl --user start isaac-robot.service`
 
 Only use `ros2 run` for initial node development/testing before adding to graph.
 

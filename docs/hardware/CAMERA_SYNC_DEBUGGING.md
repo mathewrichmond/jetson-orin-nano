@@ -66,7 +66,7 @@ for dev in devices:
 ### Step 1: Stop Camera Node
 
 ```bash
-./scripts/system/manage_graph.sh stop robot
+systemctl --user stop isaac-robot.service
 ```
 
 ### Step 2: Check Current Firmware
@@ -113,7 +113,7 @@ Both cameras should show the same firmware version.
 ### Step 6: Restart Camera Node
 
 ```bash
-./scripts/system/manage_graph.sh start robot
+systemctl --user start isaac-robot.service
 ```
 
 ### Step 7: Verify Sync

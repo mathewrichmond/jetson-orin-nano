@@ -1,6 +1,6 @@
 # Graph Management via Systemd
 
-This guide covers the complete systemd integration for managing the robot's graph of nodes. All graph management should be done through the systemd daemon scripts.
+This guide covers systemd integration for managing the robot's graph of nodes. In production, the systemd user service is the single source of truth.
 
 ## Overview
 
@@ -8,7 +8,7 @@ The Isaac robot system uses **systemd services** for full graph management:
 
 1. **Systemd Service** (`isaac-robot.service`) - Manages the robot system lifecycle
 2. **Graph Selection** - Configurable via file or environment variable
-3. **Management Scripts** - Unified interface for graph operations
+3. **Launch Entry Point** - `scripts/system/start_robot.sh` used by systemd
 4. **Automatic Restart** - Service restarts on failure with exponential backoff
 
 ## Quick Start
@@ -16,29 +16,20 @@ The Isaac robot system uses **systemd services** for full graph management:
 ### Start Robot System (via systemd)
 
 ```bash
-# Use the unified graph management script (recommended)
-./scripts/system/manage_graph.sh start bench_test
-
-# Or use systemctl directly
-sudo systemctl start isaac-robot.service
+# Start via systemd user service (recommended)
+systemctl --user start isaac-robot.service
 ```
 
 ### Stop Robot System
 
 ```bash
-./scripts/system/manage_graph.sh stop
-
-# Or
-sudo systemctl stop isaac-robot.service
+systemctl --user stop isaac-robot.service
 ```
 
 ### Check Status
 
 ```bash
-./scripts/system/manage_graph.sh status
-
-# Or
-sudo systemctl status isaac-robot.service
+systemctl --user status isaac-robot.service
 ```
 
 ## Graph Selection
@@ -54,10 +45,10 @@ sudo systemctl status isaac-robot.service
 
 ```bash
 # Select graph configuration
-./scripts/system/manage_graph.sh select bench_test
+echo "bench_test" > config/robot/selected_graph.txt
 
 # Restart to apply
-./scripts/system/manage_graph.sh restart bench_test
+systemctl --user restart isaac-robot.service
 ```
 
 This updates `config/robot/selected_graph.txt` which the systemd service reads on startup.
@@ -73,83 +64,61 @@ This updates `config/robot/selected_graph.txt` which the systemd service reads o
 ### Enable Service (Start on Boot)
 
 ```bash
-sudo systemctl enable isaac-robot.service
+systemctl --user enable isaac-robot.service
 ```
 
 ### Start/Stop/Restart
 
 ```bash
 # Start
-sudo systemctl start isaac-robot.service
+systemctl --user start isaac-robot.service
 
 # Stop
-sudo systemctl stop isaac-robot.service
+systemctl --user stop isaac-robot.service
 
 # Restart
-sudo systemctl restart isaac-robot.service
+systemctl --user restart isaac-robot.service
 ```
 
 ### View Logs
 
 ```bash
 # Follow logs
-sudo journalctl -u isaac-robot.service -f
+journalctl --user -u isaac-robot.service -f
 
 # Last 100 lines
-sudo journalctl -u isaac-robot.service -n 100
+journalctl --user -u isaac-robot.service -n 100
 
 # Since boot
-sudo journalctl -u isaac-robot.service -b
+journalctl --user -u isaac-robot.service -b
 ```
 
 ### Service Status
 
 ```bash
 # Check if running
-sudo systemctl is-active isaac-robot.service
+systemctl --user is-active isaac-robot.service
 
 # Check if enabled
-sudo systemctl is-enabled isaac-robot.service
+systemctl --user is-enabled isaac-robot.service
 
 # Detailed status
-sudo systemctl status isaac-robot.service
+systemctl --user status isaac-robot.service
 ```
 
-## Unified Management Script
+## Launching Without systemd (Development)
 
-The `manage_graph.sh` script provides a unified interface:
-
-```bash
-./scripts/system/manage_graph.sh <command> [options]
-```
-
-### Commands
-
-- `start [graph]` - Start robot system with graph (via systemd)
-- `stop` - Stop robot system
-- `restart [graph]` - Restart robot system
-- `status` - Show system status
-- `select [graph]` - Select graph configuration
-- `logs` - Show system logs
-- `verify` - Verify data streams from all sensors
-
-### Examples
+Use direct ROS 2 launch for development and debugging, but avoid running it alongside the systemd service.
 
 ```bash
-# Start with bench_test graph
-./scripts/system/manage_graph.sh start bench_test
+# Stop systemd instance first (prevents duplicate graphs)
+systemctl --user stop isaac-robot.service
 
-# Check status
-./scripts/system/manage_graph.sh status
-
-# Select different graph
-./scripts/system/manage_graph.sh select minimal
-
-# Restart with new graph
-./scripts/system/manage_graph.sh restart minimal
-
-# Verify all sensors are publishing
-./scripts/system/manage_graph.sh verify
+# Launch the graph directly
+ros2 launch isaac_robot composable_graph.launch.py \
+  graph_config:=robot_graph.yaml \
+  group:=sensor_pipeline \
+  use_composable:=true
 ```
 
 ## Service Configuration
@@ -159,7 +128,7 @@ The `manage_graph.sh` script provides a unified interface:
 Edit the service to override graph selection:
 
 ```bash
-sudo systemctl edit isaac-robot.service
+systemctl --user edit isaac-robot.service
 ```
 
 Add:
@@ -170,15 +139,15 @@ Environment="ROBOT_GRAPH=bench_test"
 
 Then reload and restart:
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl restart isaac-robot.service
+systemctl --user daemon-reload
+systemctl --user restart isaac-robot.service
 ```
 
 ### Service File Location
 
 The service file is at:
 - Dev: `config/systemd/isaac-robot.service`
-- Installed: `/etc/systemd/system/isaac-robot.service`
+- Installed: `~/.config/systemd/user/isaac-robot.service`
 
 ### Install Service
 
@@ -186,9 +155,10 @@ To install the service file:
 
 ```bash
 cd ~/src/jetson-orin-nano
-sudo cp config/systemd/isaac-robot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable isaac-robot.service
+mkdir -p ~/.config/systemd/user
+cp config/systemd/isaac-robot.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable isaac-robot.service
 ```
 
 ## How It Works
@@ -200,8 +170,8 @@ sudo systemctl enable isaac-robot.service
 3. **Service** reads graph selection from `config/robot/selected_graph.txt` or `ROBOT_GRAPH` env var
 4. **Service** calls `scripts/system/start_robot.sh`
 5. **start_robot.sh** sources ROS 2 environment
-6. **start_robot.sh** launches graph using `ros2 launch isaac_robot graph.launch.py`
-7. **graph.launch.py** reads graph config and starts all enabled nodes
+6. **start_robot.sh** launches graph using `ros2 launch isaac_robot composable_graph.launch.py`
+7. **composable_graph.launch.py** reads graph config and starts all enabled nodes
 
 ### Graph Configuration
 
@@ -219,7 +189,7 @@ The launch file reads this config and creates ROS 2 `Node` actions for each enab
 
 ```bash
 # Check systemd service
-sudo systemctl status isaac-robot.service
+systemctl --user status isaac-robot.service
 
 # Check ROS 2 nodes
 ros2 node list
@@ -231,8 +201,8 @@ ros2 topic list
 ### Verify Data Streams
 
 ```bash
-# Use the verify command
-./scripts/system/manage_graph.sh verify
+# Verify expected topics
+ros2 topic list
 ```
 
 This checks that all expected topics are publishing data.
@@ -243,7 +213,7 @@ This checks that all expected topics are publishing data.
 
 1. **Check logs**:
    ```bash
-   sudo journalctl -u isaac-robot.service -n 50
+   journalctl --user -u isaac-robot.service -n 50
    ```
 
 2. **Check graph selection**:
@@ -272,9 +242,9 @@ This checks that all expected topics are publishing data.
    source install/setup.bash
    ```
 
-3. **Check graph config**:
+3. **Check service status**:
    ```bash
-   ./scripts/system/manage_graph.sh status
+   systemctl --user status isaac-robot.service
    ```
 
 ### Service Keeps Restarting
@@ -286,11 +256,10 @@ This checks that all expected topics are publishing data.
 
 ## Best Practices
 
-1. **Always use `manage_graph.sh`** for graph operations
-2. **Select graph before starting** - use `select` command
-3. **Check status regularly** - use `status` command
-4. **Monitor logs** - use `logs` command or `journalctl`
-5. **Verify after changes** - use `verify` command
+1. **Use systemd for production** - avoid manual `ros2 launch`
+2. **Avoid multiple instances** - never run systemd and manual launch at the same time
+3. **Monitor logs** - use `journalctl --user -u isaac-robot.service -f`
+4. **Verify after changes** - use `ros2 topic list` / `ros2 node list`
 
 ## Integration with Other Services
 

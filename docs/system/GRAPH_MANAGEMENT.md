@@ -1,20 +1,17 @@
 # Graph Management
 
-**IMPORTANT**: Full graph management should be done through systemd daemon scripts. See [Graph Management via Systemd](GRAPH_MANAGEMENT_SYSTEMD.md) for the recommended production approach.
+**IMPORTANT**: Full graph management should be done through the systemd user service. See [Graph Management via Systemd](GRAPH_MANAGEMENT_SYSTEMD.md) for the recommended production approach.
 
 This document covers graph management concepts and manual operations. Guide
 
 ## Overview
 
-The Isaac robot system uses a unified graph management system that integrates with systemd for runtime management. All graph operations go through the unified management script.
+The Isaac robot system uses ROS 2 launch integrated with systemd for runtime management. In production, use the systemd user service.
 
-## Unified Management Script
+## Primary Interfaces
 
-All graph operations use the unified script:
-
-```bash
-./scripts/system/manage_graph.sh <command> [options]
-```
+- **Production**: `systemctl --user start|stop|restart isaac-robot.service`
+- **Development**: `ros2 launch isaac_robot composable_graph.launch.py ...`
 
 ## Commands
 
@@ -24,27 +21,19 @@ Start the robot system with a specific graph:
 
 ```bash
 # Start with selected graph (from config)
-./scripts/system/manage_graph.sh start
-
-# Start with specific graph
-./scripts/system/manage_graph.sh start bench_test
-./scripts/system/manage_graph.sh start full
+systemctl --user start isaac-robot.service
 ```
 
 ### Stop Robot System
 
 ```bash
-./scripts/system/manage_graph.sh stop
+systemctl --user stop isaac-robot.service
 ```
 
 ### Restart Robot System
 
 ```bash
-# Restart with current graph
-./scripts/system/manage_graph.sh restart
-
-# Restart with specific graph
-./scripts/system/manage_graph.sh restart bench_test
+systemctl --user restart isaac-robot.service
 ```
 
 ### Select Graph Configuration
@@ -52,15 +41,14 @@ Start the robot system with a specific graph:
 Select which graph to use (applies on next start):
 
 ```bash
-./scripts/system/manage_graph.sh select bench_test
-./scripts/system/manage_graph.sh select full
-./scripts/system/manage_graph.sh select minimal
+echo "bench_test" > config/robot/selected_graph.txt
+systemctl --user restart isaac-robot.service
 ```
 
 ### Check Status
 
 ```bash
-./scripts/system/manage_graph.sh status
+systemctl --user status isaac-robot.service
 ```
 
 Shows:
@@ -72,7 +60,7 @@ Shows:
 ### View Logs
 
 ```bash
-./scripts/system/manage_graph.sh logs
+journalctl --user -u isaac-robot.service -f
 ```
 
 ### Verify Data Streams
@@ -80,7 +68,7 @@ Shows:
 Verify all sensor data streams are publishing:
 
 ```bash
-./scripts/system/manage_graph.sh verify
+ros2 topic list
 ```
 
 ## Available Graphs
@@ -95,27 +83,26 @@ Verify all sensor data streams are publishing:
 The graph runtime is managed through systemd:
 
 ```bash
-# Enable auto-start on boot
-sudo systemctl enable isaac-robot.service
+# Enable auto-start on login
+systemctl --user enable isaac-robot.service
 
 # Start service
-sudo systemctl start isaac-robot.service
+systemctl --user start isaac-robot.service
 
 # Check status
-sudo systemctl status isaac-robot.service
+systemctl --user status isaac-robot.service
 
 # View logs
-sudo journalctl -u isaac-robot.service -f
+journalctl --user -u isaac-robot.service -f
 ```
 
 The service automatically uses the selected graph from `config/robot/selected_graph.txt`.
 
 ## Graph Selection Priority
 
-1. **Command argument** - Highest priority (e.g., `manage_graph.sh start bench_test`)
-2. **Environment variable** - `ROBOT_GRAPH=bench_test`
-3. **Config file** - `config/robot/selected_graph.txt`
-4. **Default** - `minimal`
+1. **Environment variable** - `ROBOT_GRAPH=bench_test`
+2. **Config file** - `config/robot/selected_graph.txt`
+3. **Default** - `minimal`
 
 ## Examples
 
@@ -123,43 +110,43 @@ The service automatically uses the selected graph from `config/robot/selected_gr
 
 ```bash
 # Select bench test graph
-./scripts/system/manage_graph.sh select bench_test
+echo "bench_test" > config/robot/selected_graph.txt
 
 # Start system
-./scripts/system/manage_graph.sh start
+systemctl --user start isaac-robot.service
 
 # Verify all sensors are streaming
-./scripts/system/manage_graph.sh verify
+ros2 topic list
 
 # View logs
-./scripts/system/manage_graph.sh logs
+journalctl --user -u isaac-robot.service -f
 ```
 
 ### Production Deployment
 
 ```bash
 # Select full graph
-./scripts/system/manage_graph.sh select full
+echo "full" > config/robot/selected_graph.txt
 
 # Enable and start service
-sudo systemctl enable isaac-robot.service
-sudo systemctl start isaac-robot.service
+systemctl --user enable isaac-robot.service
+systemctl --user start isaac-robot.service
 
 # Check status
-./scripts/system/manage_graph.sh status
+systemctl --user status isaac-robot.service
 ```
 
 ### Development Testing
 
 ```bash
 # Select minimal graph for testing
-./scripts/system/manage_graph.sh select minimal
+echo "minimal" > config/robot/selected_graph.txt
 
-# Start directly (not via systemd)
-./scripts/system/manage_graph.sh start
+# Start via systemd
+systemctl --user start isaac-robot.service
 
 # Test changes, then restart
-./scripts/system/manage_graph.sh restart
+systemctl --user restart isaac-robot.service
 ```
 
 ## Integration with Hardware Setup
@@ -174,7 +161,7 @@ Hardware setup and verification is separate:
 ./scripts/hardware/setup_hardware.sh verify
 
 # Then start graph
-./scripts/system/manage_graph.sh start bench_test
+systemctl --user start isaac-robot.service
 ```
 
 ## Troubleshooting
@@ -183,13 +170,13 @@ Hardware setup and verification is separate:
 
 ```bash
 # Check service status
-sudo systemctl status isaac-robot.service
+systemctl --user status isaac-robot.service
 
 # Check logs
-sudo journalctl -u isaac-robot.service -n 50
+journalctl --user -u isaac-robot.service -n 50
 
 # Check graph selection
-./scripts/system/manage_graph.sh status
+cat config/robot/selected_graph.txt
 ```
 
 ### No Data Streams
@@ -197,9 +184,6 @@ sudo journalctl -u isaac-robot.service -n 50
 ```bash
 # Verify hardware is connected
 ./scripts/hardware/setup_hardware.sh verify
-
-# Verify data streams
-./scripts/system/manage_graph.sh verify
 
 # Check ROS 2 topics
 ros2 topic list
@@ -212,7 +196,7 @@ ros2 topic list
 ls config/robot/*_graph.yaml
 
 # Select valid graph
-./scripts/system/manage_graph.sh select <graph_name>
+echo "<graph_name>" > config/robot/selected_graph.txt
 ```
 
 ## See Also

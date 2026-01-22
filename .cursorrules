@@ -95,20 +95,23 @@ This is a **robot control system** repository that:
 
 ## Node and Graph Management
 
-**CRITICAL**: Always use centralized graph management. Never launch nodes ad hoc.
+**CRITICAL**: Use ROS 2 launch + systemd as the single source of truth. Avoid multiple instances.
 
-- **ALWAYS use**: `./scripts/system/manage_graph.sh` for all node operations
-- **NEVER use**: `ros2 launch` or `ros2 run` directly (except for initial development/testing)
-- **Graph configurations**: Only two graphs exist: `robot` (production) and `monitor` (viewing/logging)
-- **Graph selection**: Use `./scripts/system/manage_graph.sh select [robot|monitor]`
-- **Starting nodes**: Use `./scripts/system/manage_graph.sh start [robot|monitor]`
-- **Adding nodes**: Add to `config/robot/robot_graph.yaml` or `config/robot/monitor_graph.yaml`, then use graph management
-- **Systemd integration**: All graph management goes through systemd service (`isaac-robot.service`)
+- **Primary method (production)**: systemd user service `isaac-robot.service`
+  - Start: `systemctl --user start isaac-robot.service`
+  - Stop: `systemctl --user stop isaac-robot.service`
+  - Logs: `journalctl --user -u isaac-robot.service -f`
+- **Primary method (development)**: `ros2 launch isaac_robot composable_graph.launch.py`
+  - Use the graph config + group parameters from `config/robot/robot_graph.yaml`
+- **Avoid multiple instances**:
+  - Before launching, stop systemd service and ensure no `ros2 launch`/container processes are running.
+  - Never run both systemd and a manual `ros2 launch` concurrently.
+- **Adding nodes**: Add to `config/robot/robot_graph.yaml` (or other graph configs) and launch via systemd/launch.
+- **Systemd integration**: `scripts/system/start_robot.sh` is the entry point used by systemd.
 
 When writing code or documentation:
-- Always reference `manage_graph.sh` commands, not `ros2 launch` or `ros2 run`
-- Show graph management as the primary method
-- Only mention `ros2 run` for initial node development before adding to graph
+- Reference **systemd + `ros2 launch`** as the primary management method.
+- Only mention `ros2 run` for initial node development before adding to the graph.
 
 ## Common Tasks
 
@@ -116,7 +119,7 @@ When writing code or documentation:
 - **Adding control mode**: Implement in `src/control_modes/`, add config in `config/control/`, add to graph config, document switching logic
 - **System changes**: Update `scripts/system/` and document in `docs/setup/`
 - **Monitoring**: Add checks to `scripts/monitoring/` and infrastructure in `monitoring/`
-- **Launching nodes**: Use `./scripts/system/manage_graph.sh start [robot|monitor]` - never use `ros2 launch` or `ros2 run` directly
+- **Launching nodes**: Use systemd (`isaac-robot.service`) or `ros2 launch` for development. Avoid ad hoc `ros2 run` for production.
 
 ## File Naming Conventions
 

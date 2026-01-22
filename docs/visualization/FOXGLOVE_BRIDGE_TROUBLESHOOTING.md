@@ -27,7 +27,7 @@ The bridge subscribes to all topics, including high-frequency camera streams. Re
 
 Then restart the graph:
 ```bash
-./scripts/system/manage_graph.sh restart robot
+systemctl --user restart isaac-robot.service
 ```
 
 ### Solution 2: Use Topic Filtering (Advanced)
@@ -43,7 +43,7 @@ Monitor CPU and memory usage:
 htop
 
 # Check if bridge is crashing
-./scripts/system/manage_graph.sh logs | grep foxglove
+journalctl --user -u isaac-robot.service -f | grep foxglove
 
 # Check systemd service status
 systemctl --user status isaac-robot.service
@@ -61,8 +61,8 @@ If using WiFi:
 The `monitor` graph includes fewer nodes and may be more stable:
 
 ```bash
-./scripts/system/manage_graph.sh select monitor
-./scripts/system/manage_graph.sh start monitor
+echo "monitor" > config/robot/selected_graph.txt
+systemctl --user restart isaac-robot.service
 ```
 
 ## Verification
@@ -91,7 +91,7 @@ After applying fixes:
 
 ## If Issues Persist
 
-1. Check bridge logs: `./scripts/system/manage_graph.sh logs`
+1. Check bridge logs: `journalctl --user -u isaac-robot.service -f`
 2. Verify camera nodes are stable: `ros2 node list`
 3. Check system resources: `htop` or `top`
-4. Try restarting the bridge: `./scripts/system/manage_graph.sh restart robot`
+4. Try restarting the bridge: `systemctl --user restart isaac-robot.service`

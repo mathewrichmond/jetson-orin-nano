@@ -2,79 +2,75 @@
 
 Quick reference for managing ROS 2 nodes in the Isaac robot system.
 
-## Centralized Graph Management (Required)
+## Primary Management (Required)
 
-**ALWAYS use graph management. Never launch nodes ad hoc.**
+**Use systemd for production, ROS 2 launch for development. Avoid multiple instances.**
 
 ### Start Nodes
 
 ```bash
 # Start robot graph (production)
-./scripts/system/manage_graph.sh start robot
-
-# Start monitor graph (viewing/logging)
-./scripts/system/manage_graph.sh start monitor
+systemctl --user start isaac-robot.service
 
 # Check status
-./scripts/system/manage_graph.sh status
+systemctl --user status isaac-robot.service
 
 # Verify data streams
-./scripts/system/manage_graph.sh verify
+ros2 topic list
 ```
 
-### ⚠️ Do NOT Use These
+### ⚠️ Avoid Multiple Instances
 
-- ❌ `ros2 launch` - Use `manage_graph.sh` instead
-- ❌ `ros2 run` - Nodes should be in graph config
-- ❌ Individual node launch - Use graph management
+- ❌ Running systemd and manual `ros2 launch` concurrently
+- ❌ Multiple `ros2 launch` instances of the same graph
 
 ### Available Graphs
 
 - `robot` - Target/production graph (all robot nodes)
 - `monitor` - Viewer/logger graph (monitoring tools)
 
-## Graph Management Commands
+## Graph Management Commands (systemd)
 
 ```bash
 # Select graph
-./scripts/system/manage_graph.sh select [robot|monitor]
+echo "robot" > config/robot/selected_graph.txt
 
 # Start graph
-./scripts/system/manage_graph.sh start [robot|monitor]
+systemctl --user start isaac-robot.service
 
 # Stop graph
-./scripts/system/manage_graph.sh stop
+systemctl --user stop isaac-robot.service
 
 # Restart graph
-./scripts/system/manage_graph.sh restart [robot|monitor]
+systemctl --user restart isaac-robot.service
 
 # Check status
-./scripts/system/manage_graph.sh status
+systemctl --user status isaac-robot.service
 
 # Verify data streams
-./scripts/system/manage_graph.sh verify
+ros2 topic list
 
 # View logs
-./scripts/system/manage_graph.sh logs
+journalctl --user -u isaac-robot.service -f
 ```
 
 ## Systemd Service
 
 ```bash
-# Enable (start on boot)
-sudo systemctl enable isaac-robot.service
+# Enable (start on login)
+systemctl --user enable isaac-robot.service
 
 # Start
-sudo systemctl start isaac-robot.service
+systemctl --user start isaac-robot.service
 
 # Stop
-sudo systemctl stop isaac-robot.service
+systemctl --user stop isaac-robot.service
 
 # Status
-sudo systemctl status isaac-robot.service
+systemctl --user status isaac-robot.service
 
 # Logs
-sudo journalctl -u isaac-robot.service -f
+journalctl --user -u isaac-robot.service -f
 ```
 
 ## Verification
@@ -99,7 +95,7 @@ ros2 pkg executables
 2. Add entry point script to `CMakeLists.txt`
 3. **Add to graph config** (`config/robot/robot_graph.yaml` or `config/robot/monitor_graph.yaml`)
 4. Rebuild: `colcon build --packages-select package_name`
-5. **Use graph management** to start: `./scripts/system/manage_graph.sh start robot`
+5. **Use systemd** to start: `systemctl --user start isaac-robot.service`
 
 **Never use `ros2 run` in production** - always add to graph config and use graph management.
 5. Test: `ros2 run package_name node_name`

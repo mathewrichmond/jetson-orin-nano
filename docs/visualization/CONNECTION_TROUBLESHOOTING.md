@@ -17,7 +17,7 @@ ss -tlnp | grep 8765
 
 If not running:
 ```bash
-./scripts/system/manage_graph.sh restart robot
+systemctl --user restart isaac-robot.service
 ```
 
 ### Step 2: Set Up Port Forwarding (If Connecting from Laptop)
@@ -89,7 +89,7 @@ ros2 topic list | grep "/viz/remote"
 ```
 
 **Fix**:
-- Restart robot graph: `./scripts/system/manage_graph.sh restart robot`
+- Restart robot graph: `systemctl --user restart isaac-robot.service`
 - Wait 10-15 seconds for topics to initialize
 - Refresh connection in Foxglove Studio
 
@@ -101,7 +101,7 @@ ros2 topic list | grep "/viz/remote"
 1. Verify connection is green (not red)
 2. Check Topics panel shows the topics
 3. If topics missing, check bridge topic whitelist in `config/robot/robot_graph.yaml`
-4. Restart bridge: `./scripts/system/manage_graph.sh restart robot`
+4. Restart bridge: `systemctl --user restart isaac-robot.service`
 
 ### RawMessages Panels Show "No Message Path Entered"
 

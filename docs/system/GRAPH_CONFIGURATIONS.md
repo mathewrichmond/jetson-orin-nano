@@ -25,7 +25,7 @@ The robot graph is the default and only graph:
 
 ```bash
 # Select robot graph (default)
-./scripts/system/manage_graph.sh select robot
+echo "robot" > config/robot/selected_graph.txt
 
 # View current selection
 cat config/robot/selected_graph.txt
@@ -37,11 +37,11 @@ cat config/robot/selected_graph.txt
 
 ```bash
 # Select and start robot graph
-./scripts/system/manage_graph.sh select robot
-./scripts/system/manage_graph.sh start
+echo "robot" > config/robot/selected_graph.txt
+systemctl --user start isaac-robot.service
 
 # Or start directly (robot is default)
-./scripts/system/manage_graph.sh start robot
+systemctl --user start isaac-robot.service
 ```
 
 ## Default Graph

@@ -54,10 +54,10 @@ The script will:
 - See [WiFi Setup](system/WIFI_SETUP.md) for details
 
 ### Robot System
-- **Start robot graph**: `./scripts/system/manage_graph.sh start robot`
-- **Select graph**: `./scripts/system/manage_graph.sh select robot`
-- **Check status**: `./scripts/system/manage_graph.sh status`
-- **Verify streams**: `./scripts/system/manage_graph.sh verify`
+- **Start robot**: `systemctl --user start isaac-robot.service`
+- **Select graph**: `echo "robot" > config/robot/selected_graph.txt`
+- **Check status**: `systemctl --user status isaac-robot.service`
+- **Verify streams**: `ros2 topic list`
 - See [Graph Management](system/GRAPH_MANAGEMENT_SYSTEMD.md) for details
 
 ### Deployment

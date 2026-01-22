@@ -262,31 +262,31 @@ Graph configurations define which sub-graphs are enabled and how they're configu
 
 ```bash
 # Select robot graph (full system)
-./scripts/system/manage_graph.sh select robot
+echo "robot" > config/robot/selected_graph.txt
 
 # Select minimal graph (production)
-./scripts/system/manage_graph.sh select minimal
+echo "minimal" > config/robot/selected_graph.txt
 
 # Select bench test graph (hardware validation)
-./scripts/system/manage_graph.sh select bench_test
+echo "bench_test" > config/robot/selected_graph.txt
 ```
 
 ### Start Graph
 
 ```bash
 # Start selected graph
-./scripts/system/manage_graph.sh start
+systemctl --user start isaac-robot.service
 
 # Or start specific graph
-./scripts/system/manage_graph.sh start robot
-./scripts/system/manage_graph.sh start minimal
-./scripts/system/manage_graph.sh start bench_test
+ROBOT_GRAPH=robot systemctl --user start isaac-robot.service
+ROBOT_GRAPH=minimal systemctl --user start isaac-robot.service
+ROBOT_GRAPH=bench_test systemctl --user start isaac-robot.service
 ```
 
 ### Stop Graph
 
 ```bash
-./scripts/system/manage_graph.sh stop
+systemctl --user stop isaac-robot.service
 ```
 
 ## Interface Stability Guarantees

@@ -64,6 +64,7 @@ start_graph() {
     # Start via systemd user service (no sudo required)
     if systemctl --user is-enabled isaac-robot.service &>/dev/null 2>&1; then
         echo "Starting robot system via systemd (graph: $graph)..."
+        systemctl --user reset-failed isaac-robot.service 2>/dev/null || true
         systemctl --user start isaac-robot.service
         systemctl --user status isaac-robot.service --no-pager -l || true
     else
@@ -80,11 +81,18 @@ stop_graph() {
     if systemctl --user is-active --quiet isaac-robot.service 2>/dev/null; then
         echo "Stopping systemd service..."
         systemctl --user stop isaac-robot.service
+        systemctl --user reset-failed isaac-robot.service 2>/dev/null || true
     fi
 
     # Also stop any direct ROS 2 processes (in case started directly)
     pkill -f "ros2 launch" || true
     pkill -f "ros2 run" || true
+    pkill -f "isaac_robot/composable_container" || true
+    pkill -f "composable_container" || true
+    pkill -f "foxglove_bridge" || true
+    pkill -f "realsense_camera" || true
+    pkill -f "nvblox_processor" || true
+    pkill -f "sensor_sync" || true
     pkill -f "realsense_camera_node" || true
     pkill -f "system_monitor_node" || true
     pkill -f "usb_microphone_node" || true

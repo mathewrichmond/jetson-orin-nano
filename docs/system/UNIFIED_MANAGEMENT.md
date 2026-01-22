@@ -6,7 +6,7 @@ The Isaac robot system uses a **unified management approach** that eliminates ad
 
 ## Key Principles
 
-1. **Single Entry Points** - All operations go through unified scripts
+1. **Single Entry Point** - Systemd user service for production
 2. **Systemd Integration** - Runtime managed through systemd services
 3. **State Tracking** - Setup state is tracked and idempotent
 4. **Consistent Interface** - Same commands work across all environments
@@ -40,29 +40,20 @@ The Isaac robot system uses a **unified management approach** that eliminates ad
 
 ### Graph Management
 
+**Production (systemd user service):**
 ```bash
-./scripts/system/manage_graph.sh <command> [options]
+systemctl --user start isaac-robot.service
+systemctl --user status isaac-robot.service
+journalctl --user -u isaac-robot.service -f
 ```
 
-**Commands:**
-- `start [graph]` - Start robot system with graph
-- `stop` - Stop robot system
-- `restart [graph]` - Restart robot system
-- `status` - Show system status
-- `select [graph]` - Select graph configuration
-- `logs` - Show system logs
-- `verify` - Verify data streams
-
-**Examples:**
+**Development (direct launch):**
 ```bash
-# Start bench test
-./scripts/system/manage_graph.sh start bench_test
-
-# Check status
-./scripts/system/manage_graph.sh status
-
-# Verify data streams
-./scripts/system/manage_graph.sh verify
+systemctl --user stop isaac-robot.service
+ros2 launch isaac_robot composable_graph.launch.py \
+  graph_config:=robot_graph.yaml \
+  group:=sensor_pipeline \
+  use_composable:=true
 ```
 
 ## Unified Setup
@@ -89,32 +80,26 @@ Runtime is managed through systemd:
 
 ```bash
 # Enable auto-start
-sudo systemctl enable isaac-robot.service
+systemctl --user enable isaac-robot.service
 
 # Start service
-sudo systemctl start isaac-robot.service
+systemctl --user start isaac-robot.service
 
 # Check status
-sudo systemctl status isaac-robot.service
+systemctl --user status isaac-robot.service
 
 # View logs
-sudo journalctl -u isaac-robot.service -f
+journalctl --user -u isaac-robot.service -f
 ```
 
 The service automatically uses the selected graph from `config/robot/selected_graph.txt`.
 
 ## Graph Selection
 
-Select graphs using the unified script:
+Select graphs by setting the selection file:
 
 ```bash
-./scripts/system/manage_graph.sh select bench_test
-```
-
-Or use the utility script:
-
-```bash
-./scripts/utils/select_graph.sh bench_test
+echo "bench_test" > config/robot/selected_graph.txt
 ```
 
 Available graphs:
@@ -142,36 +127,36 @@ Available graphs:
 
 ```bash
 # 1. Select bench test graph
-./scripts/system/manage_graph.sh select bench_test
+echo "bench_test" > config/robot/selected_graph.txt
 
 # 2. Start system
-./scripts/system/manage_graph.sh start
+systemctl --user start isaac-robot.service
 
 # 3. Verify data streams
-./scripts/system/manage_graph.sh verify
+ros2 topic list
 ```
 
 ### Production Deployment
 
 ```bash
 # 1. Select production graph
-./scripts/system/manage_graph.sh select full
+echo "full" > config/robot/selected_graph.txt
 
 # 2. Enable and start service
-sudo systemctl enable isaac-robot.service
-sudo systemctl start isaac-robot.service
+systemctl --user enable isaac-robot.service
+systemctl --user start isaac-robot.service
 
 # 3. Monitor
-./scripts/system/manage_graph.sh status
+systemctl --user status isaac-robot.service
 ```
 
 ## Removed Ad-Hoc Scripts
 
 The following ad-hoc scripts have been removed and integrated:
 
-- ❌ `scripts/hardware/launch_bench_test.sh` → Use `manage_graph.sh start bench_test`
-- ❌ `scripts/hardware/launch_bench_test_direct.sh` → Use `manage_graph.sh start bench_test`
-- ❌ `scripts/hardware/verify_data_streams.sh` → Use `manage_graph.sh verify`
+- ❌ `scripts/hardware/launch_bench_test.sh` → Use `systemctl --user start isaac-robot.service`
+- ❌ `scripts/hardware/launch_bench_test_direct.sh` → Use `systemctl --user start isaac-robot.service`
+- ❌ `scripts/hardware/verify_data_streams.sh` → Use `ros2 topic list`
 
 All functionality is now available through unified scripts.
 
