@@ -21,7 +21,7 @@ import pyrealsense2 as rs
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
+from sensor_msgs.msg import CameraInfo, Image, Imu, PointCloud2, PointField
 from std_msgs.msg import String
 
 
@@ -48,6 +48,9 @@ class RealSenseCameraNode(Node):
         self.declare_parameter("enable_color", True)
         self.declare_parameter("enable_depth", True)
         self.declare_parameter("enable_pointcloud", False)
+        self.declare_parameter("enable_imu", False)
+        self.declare_parameter("accel_fps", 250)
+        self.declare_parameter("gyro_fps", 200)
         self.declare_parameter("color_width", 640)
         self.declare_parameter("color_height", 480)
         self.declare_parameter("color_fps", 30)
@@ -112,6 +115,9 @@ class RealSenseCameraNode(Node):
         self.enable_color = self.get_parameter("enable_color").value
         self.enable_depth = self.get_parameter("enable_depth").value
         self.enable_pointcloud = self.get_parameter("enable_pointcloud").value
+        self.enable_imu = self.get_parameter("enable_imu").value
+        self.accel_fps = self.get_parameter("accel_fps").value
+        self.gyro_fps = self.get_parameter("gyro_fps").value
         self.color_width = self.get_parameter("color_width").value
         self.color_height = self.get_parameter("color_height").value
         self.color_fps = self.get_parameter("color_fps").value
@@ -577,9 +583,11 @@ class RealSenseCameraNode(Node):
             depth=5,  # Smaller queue for faster throughput
         )
 
-        # Use RELIABLE QoS for camera info (small messages)
+        # Use BEST_EFFORT QoS for camera info to match viz defaults
         info_qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST, depth=10
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
         )
 
         for camera_name in self.pipelines.keys():

@@ -41,13 +41,21 @@ from typing import Dict, Optional
 
 # Third-party
 from cv_bridge import CvBridge
-import numpy as np
 
 # Local imports - shared utilities
 from isaac_utils import CameraFrameBuffer, KalmanFilter, downsample_image
+import numpy as np
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import BatteryState, CameraInfo, Image, Imu, PointCloud2, PointField, Temperature
+from sensor_msgs.msg import (
+    BatteryState,
+    CameraInfo,
+    Image,
+    Imu,
+    PointCloud2,
+    PointField,
+    Temperature,
+)
 from std_msgs.msg import (
     Float32,
     Float32MultiArray,
@@ -179,6 +187,7 @@ class SensorSyncNode(Node):
         self.battery_buffer: deque = deque(maxlen=self.max_buffer_size)
         self.status_buffer: deque = deque(maxlen=self.max_buffer_size)
         self.camera_timestamps: deque = deque(maxlen=self.max_buffer_size)
+        self.camera_info_cache: Dict[str, CameraInfo] = {}
 
         # System status buffers
         self.system_status_buffer: deque = deque(maxlen=self.max_buffer_size)
@@ -240,14 +249,24 @@ class SensorSyncNode(Node):
         self.status_sub = self.create_subscription(String, status_topic, self._status_callback, 10)
 
         # Camera info subscribers (for republishing to viz namespace alongside images)
+        # Standard library
         from functools import partial
+        # Third-party
+        from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+
+        info_sub_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=5,
+        )
+
         for camera_name in ["camera_front", "camera_rear"]:
             camera_info_topic = f"/hardware/{camera_name}/color/camera_info"
             self.create_subscription(
                 CameraInfo,
                 camera_info_topic,
                 partial(self._camera_info_callback, camera_name=camera_name),
-                10
+                info_sub_qos,
             )
 
         # System monitor subscribers (only if enabled)
@@ -489,9 +508,9 @@ class SensorSyncNode(Node):
                 history=HistoryPolicy.KEEP_LAST,
                 depth=5,  # Small queue for low-latency
             )
-            # Use RELIABLE QoS for camera_info (small, static messages)
+            # Use BEST_EFFORT QoS for camera_info to match Foxglove defaults
             info_qos = QoSProfile(
-                reliability=ReliabilityPolicy.RELIABLE,
+                reliability=ReliabilityPolicy.BEST_EFFORT,
                 history=HistoryPolicy.KEEP_LAST,
                 depth=1,
             )
@@ -642,10 +661,78 @@ class SensorSyncNode(Node):
 
         # Republish to viz namespace (if viz publishing enabled)
         if self.publish_viz_topics:
-            if camera_name == "camera_front" and hasattr(self, 'viz_camera_front_info_pub'):
+            if camera_name == "camera_front" and hasattr(self, "viz_camera_front_info_pub"):
                 self.viz_camera_front_info_pub.publish(msg)
-            elif camera_name == "camera_rear" and hasattr(self, 'viz_camera_rear_info_pub'):
+            elif camera_name == "camera_rear" and hasattr(self, "viz_camera_rear_info_pub"):
                 self.viz_camera_rear_info_pub.publish(msg)
+
+    def _publish_viz_camera_info(
+        self, camera_name: str, frame_id: str, width: int, height: int
+    ) -> None:
+        """Publish camera_info for viz, with fallback to raw buffer intrinsics."""
+        if not self.publish_viz_topics:
+            return
+
+        if camera_name == "camera_front":
+            publisher = getattr(self, "viz_camera_front_info_pub", None)
+        elif camera_name == "camera_rear":
+            publisher = getattr(self, "viz_camera_rear_info_pub", None)
+        else:
+            return
+
+        if publisher is None:
+            return
+
+        info_msg: Optional[CameraInfo] = None
+        cached_info = self.camera_info_cache.get(camera_name)
+        if cached_info is not None:
+            info_msg = CameraInfo()
+            info_msg.header.stamp = self.get_clock().now().to_msg()
+            info_msg.header.frame_id = frame_id
+            info_msg.height = cached_info.height or height
+            info_msg.width = cached_info.width or width
+            info_msg.distortion_model = cached_info.distortion_model
+            info_msg.d = list(cached_info.d)
+            info_msg.k = list(cached_info.k)
+            info_msg.r = list(cached_info.r)
+            info_msg.p = list(cached_info.p)
+        else:
+            raw_frame = self.frame_buffer.read_raw_frame(camera_name)
+            if raw_frame is not None and raw_frame.camera_info is not None:
+                cam_info = raw_frame.camera_info
+                fx = float(cam_info.get("fx", 0.0))
+                fy = float(cam_info.get("fy", 0.0))
+                width = int(cam_info.get("width", width))
+                height = int(cam_info.get("height", height))
+                cx = float(cam_info.get("cx", width / 2.0))
+                cy = float(cam_info.get("cy", height / 2.0))
+
+                info_msg = CameraInfo()
+                info_msg.header.stamp = self.get_clock().now().to_msg()
+                info_msg.header.frame_id = frame_id
+                info_msg.width = width
+                info_msg.height = height
+                info_msg.distortion_model = "plumb_bob"
+                info_msg.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+                info_msg.k = [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0]
+                info_msg.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+                info_msg.p = [
+                    fx,
+                    0.0,
+                    cx,
+                    0.0,
+                    0.0,
+                    fy,
+                    cy,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                ]
+
+        if info_msg is not None:
+            publisher.publish(info_msg)
 
     def _imu_callback(self, msg: Imu):
         """Store IMU data in buffer"""
@@ -1163,7 +1250,9 @@ class SensorSyncNode(Node):
                         # Convert numpy array to ROS message for compatibility with existing code
                         # NOTE: In the future, could downsample directly from numpy array
                         try:
-                            ros_msg = self.bridge.cv2_to_imgmsg(processed_frame.image, encoding="rgb8")
+                            ros_msg = self.bridge.cv2_to_imgmsg(
+                                processed_frame.image, encoding="rgb8"
+                            )
                             ros_msg.header.stamp = self.get_clock().now().to_msg()
                             ros_msg.header.frame_id = f"{camera_name}_color_optical_frame"
                             cameras_to_process[camera_name] = ros_msg
@@ -1180,14 +1269,18 @@ class SensorSyncNode(Node):
                                     f"shape: {processed_frame.image.shape}"
                                 )
                         except Exception as e:
-                            self.get_logger().error(f"Error converting buffer frame to ROS msg for {camera_name}: {e}")
+                            self.get_logger().error(
+                                f"Error converting buffer frame to ROS msg for {camera_name}: {e}"
+                            )
                     else:
                         if not hasattr(self, "_last_null_image_warn"):
                             self._last_null_image_warn = {}
                         if camera_name not in self._last_null_image_warn:
                             self._last_null_image_warn[camera_name] = 0
                         if current_time - self._last_null_image_warn.get(camera_name, 0) > 5.0:
-                            self.get_logger().warn(f"[sensor_fusion] Processed frame has null image for {camera_name}")
+                            self.get_logger().warn(
+                                f"[sensor_fusion] Processed frame has null image for {camera_name}"
+                            )
                             self._last_null_image_warn[camera_name] = current_time
 
             # No fallback logic - cameras must come from nvblox
@@ -1236,7 +1329,7 @@ class SensorSyncNode(Node):
                             self._viz_pub_count[camera_name] = 0
                         self._viz_pub_count[camera_name] += 1
                         if self._viz_pub_count[camera_name] <= 3:
-                            data_size = len(viz_img.data) if hasattr(viz_img, 'data') else 0
+                            data_size = len(viz_img.data) if hasattr(viz_img, "data") else 0
                             self.get_logger().info(
                                 f"[sensor_fusion] Publishing viz for {camera_name}: "
                                 f"{viz_img.width}x{viz_img.height}, data size: {data_size} bytes"
@@ -1244,8 +1337,14 @@ class SensorSyncNode(Node):
 
                         if camera_name == "camera_front":
                             self.viz_camera_front_pub.publish(viz_img)
+                            self._publish_viz_camera_info(
+                                camera_name, viz_img.header.frame_id, viz_img.width, viz_img.height
+                            )
                         elif camera_name == "camera_rear":
                             self.viz_camera_rear_pub.publish(viz_img)
+                            self._publish_viz_camera_info(
+                                camera_name, viz_img.header.frame_id, viz_img.width, viz_img.height
+                            )
                     except Exception as e:
                         self.get_logger().warn(
                             f"Failed to publish viz for {camera_name} from cameras_to_process: {e}"
@@ -1272,6 +1371,12 @@ class SensorSyncNode(Node):
                         self.viz_resolution_width * self.viz_resolution_height * 3
                     )
                     self.viz_camera_front_pub.publish(blank_img)
+                    self._publish_viz_camera_info(
+                        "camera_front",
+                        blank_img.header.frame_id,
+                        blank_img.width,
+                        blank_img.height,
+                    )
 
                 # Publish rear camera (blank if not in cameras_to_process)
                 if "camera_rear" not in cameras_to_process:
@@ -1287,6 +1392,12 @@ class SensorSyncNode(Node):
                         self.viz_resolution_width * self.viz_resolution_height * 3
                     )
                     self.viz_camera_rear_pub.publish(blank_img)
+                    self._publish_viz_camera_info(
+                        "camera_rear",
+                        blank_img.header.frame_id,
+                        blank_img.width,
+                        blank_img.height,
+                    )
 
             # Process 3D data (pointclouds, mesh, TSDF)
             for camera_name in self.pointcloud_buffers.keys():
