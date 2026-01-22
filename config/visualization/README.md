@@ -16,6 +16,7 @@ This directory contains Foxglove Studio layout configurations for visualizing ro
 - `/viz/remote/chassis/battery` - Synced battery data
 - `/viz/remote/three_d/mesh` - Decimated fused mesh (75% reduction @ 5 Hz)
 - `/viz/remote/three_d/pointcloud` - Downsampled pointcloud (factor 16 @ 5 Hz)
+- `/viz/remote/system/health/*` - Aggregated health summary and per-node health
 - `/system/*` - System monitoring
 
 **Features**:
@@ -70,6 +71,16 @@ This directory contains Foxglove Studio layout configurations for visualizing ro
 
 **Use Case**: Debugging camera publishing issues, monitoring frame rates, checking sync status
 
+### `health_debug.json` - Health Monitoring Layout
+
+**Purpose**: Inspect aggregated health summaries and per-node health payloads
+
+**Topics Used**:
+- `/system/health/summary`
+- `/system/health/nodes`
+
+**Use Case**: Debugging node health status and stale signals
+
 ## Usage
 
 ### Step 1: Connect to Data Source
@@ -102,7 +113,7 @@ This directory contains Foxglove Studio layout configurations for visualizing ro
 2. Navigate to `config/visualization/` directory
 3. Select the appropriate layout file:
    - **Bridge connection**: `sensor_bridged.json` or `camera_debug.json`
-   - **Direct connection**: `sensor_raw.json` or `camera_debug.json`
+   - **Direct connection**: `sensor_raw.json`, `camera_debug.json`, or `health_debug.json`
 
 ### Step 3: Verify Topics
 

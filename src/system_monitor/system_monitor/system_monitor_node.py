@@ -18,6 +18,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import Temperature
 from std_msgs.msg import Float32, String
 
+# Local
+from isaac_utils import HealthStatusPublisher, InputWatchdog
+
 
 class SystemMonitorNode(Node):
     """ROS 2 node for system monitoring"""
@@ -32,6 +35,10 @@ class SystemMonitorNode(Node):
         self.declare_parameter("cpu_warning_threshold", 80.0)
         self.declare_parameter("memory_warning_threshold", 85.0)
         self.declare_parameter("disk_warning_threshold", 85.0)
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
 
         self.update_rate = self.get_parameter("update_rate").value
         self.temp_warning = self.get_parameter("temp_warning_threshold").value
@@ -39,6 +46,10 @@ class SystemMonitorNode(Node):
         self.cpu_warning = self.get_parameter("cpu_warning_threshold").value
         self.memory_warning = self.get_parameter("memory_warning_threshold").value
         self.disk_warning = self.get_parameter("disk_warning_threshold").value
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
 
         # Publishers
         self.status_pub = self.create_publisher(String, "status", 10)
@@ -65,6 +76,17 @@ class SystemMonitorNode(Node):
         # Timer
         timer_period = 1.0 / self.update_rate
         self.timer = self.create_timer(timer_period, self.update)
+
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "update_loop",
+                expected_rate_hz=self.update_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
 
         self.get_logger().info("System Monitor Node started")
         self.publish_status("initialized", "System monitor started")
@@ -194,6 +216,7 @@ class SystemMonitorNode(Node):
     def update(self):
         """Update and publish system metrics"""
         try:
+            self.health.record_input("update_loop")
             # CPU temperature
             cpu_temp = self._read_cpu_temperature()
             if cpu_temp is not None:
@@ -279,6 +302,7 @@ class SystemMonitorNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error updating metrics: {e}")
+            self.health.report_error(f"update_error: {e}")
             self.publish_status("error", str(e))
 
     def publish_status(self, status: str, message: str):

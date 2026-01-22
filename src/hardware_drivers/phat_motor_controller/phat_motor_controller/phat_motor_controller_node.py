@@ -18,6 +18,9 @@ from sensor_msgs.msg import Imu, MagneticField
 from std_msgs.msg import Bool, Float32, Header, String
 from std_srvs.srv import SetBool
 
+# Local
+from isaac_utils import HealthStatusPublisher, InputWatchdog
+
 # Try to import I2C library (smbus2 is preferred, fallback to smbus)
 try:
     # Third-party
@@ -121,6 +124,12 @@ class PHATMotorControllerNode(Node):
 
         # Frame IDs
         self.declare_parameter("imu_frame_id", "phat_imu")
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
+        self.declare_parameter("health_expected_cmd_rate_hz", 1.0)
+        self.declare_parameter("health_expected_servo_rate_hz", 1.0)
 
         self.i2c_bus_num = self.get_parameter("i2c_bus").value
         self.accel_address = self.get_parameter("accelerometer_address").value
@@ -186,6 +195,14 @@ class PHATMotorControllerNode(Node):
         self.servo_pan_topic = self.get_parameter("servo_pan_topic").value
         self.servo_tilt_topic = self.get_parameter("servo_tilt_topic").value
         self.imu_frame_id = self.get_parameter("imu_frame_id").value
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+        health_expected_cmd_rate = float(self.get_parameter("health_expected_cmd_rate_hz").value)
+        health_expected_servo_rate = float(
+            self.get_parameter("health_expected_servo_rate_hz").value
+        )
 
         # I2C and GPIO connections
         self.i2c_bus: Optional[SMBus] = None
@@ -218,6 +235,53 @@ class PHATMotorControllerNode(Node):
             if self.enable_accel
             else None
         )
+
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "status_loop",
+                expected_rate_hz=self.publish_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "cmd_vel",
+                expected_rate_hz=health_expected_cmd_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+                required=False,
+            )
+        )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "servo_pan",
+                expected_rate_hz=health_expected_servo_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+                required=False,
+            )
+        )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "servo_tilt",
+                expected_rate_hz=health_expected_servo_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+                required=False,
+            )
+        )
+        if self.enable_accel:
+            self.health.add_watchdog(
+                InputWatchdog(
+                    "imu_publish",
+                    expected_rate_hz=self.publish_rate,
+                    warn_timeout_sec=health_warn_timeout,
+                    error_timeout_sec=health_stale_timeout,
+                )
+            )
 
         # Subscribers
         self.cmd_vel_sub = self.create_subscription(
@@ -784,6 +848,7 @@ class PHATMotorControllerNode(Node):
 
     def cmd_vel_callback(self, msg: Twist):
         """Handle velocity commands"""
+        self.health.record_input("cmd_vel")
         if not self.gpio_initialized:
             return
 
@@ -822,6 +887,7 @@ class PHATMotorControllerNode(Node):
 
     def _publish_status_callback(self):
         """Timer callback to publish status and IMU data"""
+        self.health.record_input("status_loop")
         # Publish IMU data if enabled
         if self.enable_accel and self.imu_pub and self.accel_initialized:
             try:
@@ -883,6 +949,7 @@ class PHATMotorControllerNode(Node):
                     imu_msg.orientation_covariance[0] = -1.0  # Unknown
 
                     self.imu_pub.publish(imu_msg)
+                    self.health.record_input("imu_publish")
 
                     # Publish magnetometer data separately (if available)
                     if self.mag_pub and sensor_data.get("mag"):
@@ -1132,12 +1199,14 @@ class PHATMotorControllerNode(Node):
 
     def servo_pan_callback(self, msg: Float32):
         """Handle pan servo commands (degrees)"""
+        self.health.record_input("servo_pan")
         self._handle_servo_command(
             self.servo_pan_channel, msg.data, inverted=self.servo_pan_inverted, is_pan=True
         )
 
     def servo_tilt_callback(self, msg: Float32):
         """Handle tilt servo commands (degrees)"""
+        self.health.record_input("servo_tilt")
         self._handle_servo_command(
             self.servo_tilt_channel, msg.data, inverted=self.servo_tilt_inverted, is_pan=False
         )

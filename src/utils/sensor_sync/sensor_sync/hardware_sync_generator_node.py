@@ -15,6 +15,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
+# Local
+from isaac_utils import HealthStatusPublisher, InputWatchdog
 # Try to import GPIO library
 GPIO_AVAILABLE = False
 GPIO = None
@@ -45,6 +47,10 @@ class HardwareSyncGeneratorNode(Node):
         self.declare_parameter("gpio_mode", "BOARD")  # GPIO numbering mode: "BOARD" or "BCM"
         self.declare_parameter("enable_sync", True)  # Enable/disable sync signal generation
         self.declare_parameter("status_topic", "/hardware_sync/status")
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
 
         # Get parameters
         self.sync_pin = int(self.get_parameter("sync_gpio_pin").value or 21)
@@ -52,6 +58,10 @@ class HardwareSyncGeneratorNode(Node):
         self.pulse_width_ms = float(self.get_parameter("pulse_width_ms").value or 1.0)
         self.gpio_mode_str = str(self.get_parameter("gpio_mode").value or "BOARD")
         self.enable_sync = bool(self.get_parameter("enable_sync").value or True)
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
 
         # Calculate timing
         self.period = 1.0 / self.sync_frequency  # Period in seconds
@@ -65,6 +75,17 @@ class HardwareSyncGeneratorNode(Node):
         # Status publisher
         status_topic = str(self.get_parameter("status_topic").value or "/hardware_sync/status")
         self.status_pub = self.create_publisher(String, status_topic, 10)
+
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "sync_pulse",
+                expected_rate_hz=self.sync_frequency,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
 
         # Initialize GPIO
         if self.enable_sync:
@@ -136,6 +157,7 @@ class HardwareSyncGeneratorNode(Node):
                     GPIO.output(self.sync_pin, GPIO.HIGH)  # Pulse high
                     time.sleep(self.pulse_width)
                     GPIO.output(self.sync_pin, GPIO.LOW)  # Pulse low
+                    self.health.record_input("sync_pulse")
 
                 pulse_count += 1
 

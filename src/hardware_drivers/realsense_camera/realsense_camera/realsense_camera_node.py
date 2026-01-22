@@ -15,7 +15,7 @@ from typing import Dict, List, Optional
 from cv_bridge import CvBridge
 
 # Local
-from isaac_utils import CameraFrameBuffer
+from isaac_utils import CameraFrameBuffer, HealthStatusPublisher, InputWatchdog
 import numpy as np
 import pyrealsense2 as rs
 import rclpy
@@ -62,6 +62,10 @@ class RealSenseCameraNode(Node):
         self.declare_parameter("status_topic", "realsense/status")
         self.declare_parameter("frame_timeout_ms", 1000)  # Milliseconds to wait for frames
         self.declare_parameter("shutdown_delay", 0.5)  # Seconds to wait for threads on shutdown
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
 
         # Inter-camera sync configuration (firmware-based)
         self.declare_parameter(
@@ -86,6 +90,7 @@ class RealSenseCameraNode(Node):
         self.timer = None
         self.status_pub = None
         self._initialized = False
+        self.health = None
 
         # Shared memory buffer for zero-copy frame passing
         self.frame_buffer = CameraFrameBuffer.get_instance()
@@ -136,6 +141,30 @@ class RealSenseCameraNode(Node):
         ).strip()
         self.sync_status_interval_sec = float(self.get_parameter("sync_status_interval_sec").value)
         self.sync_status_tolerance_ms = float(self.get_parameter("sync_status_tolerance_ms").value)
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+
+        # Health publisher (initialized after parameters are read)
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "publish_loop",
+                expected_rate_hz=self.publish_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        for camera_name in self.camera_names:
+            self.health.add_watchdog(
+                InputWatchdog(
+                    f"{camera_name}_frames",
+                    expected_rate_hz=self.publish_rate,
+                    warn_timeout_sec=health_warn_timeout,
+                    error_timeout_sec=health_stale_timeout,
+                )
+            )
 
         # Status publisher
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
@@ -158,10 +187,14 @@ class RealSenseCameraNode(Node):
                     f"Failed to initialize any cameras after {max_retries} attempts"
                 )
                 self.publish_status("error", "No cameras detected after retries")
+                if self.health:
+                    self.health.report_error("no_cameras_after_retries")
 
         # Only proceed if we have cameras
         if len(self.pipelines) == 0:
             self.get_logger().error("Cannot start camera node: No cameras initialized")
+            if self.health:
+                self.health.report_error("no_cameras_initialized")
             self._initialized = True  # Mark as initialized even if failed, to prevent retries
             return
 
@@ -254,6 +287,8 @@ class RealSenseCameraNode(Node):
         if len(devices) == 0:
             self.get_logger().error("No RealSense devices found!")
             self.publish_status("error", "No cameras detected")
+            if self.health:
+                self.health.report_error("no_realsense_devices")
             return
 
         self.get_logger().info(f"Found {len(devices)} RealSense device(s)")
@@ -715,6 +750,8 @@ class RealSenseCameraNode(Node):
     def _publish_frames(self):
         """Publish frames from all cameras (runs on main thread)"""
         callback_start_time = time.time()
+        if self.health:
+            self.health.record_input("publish_loop")
         self._publish_call_count = getattr(self, "_publish_call_count", 0) + 1
         self._last_publish_time = callback_start_time
 
@@ -791,6 +828,8 @@ class RealSenseCameraNode(Node):
                 frame_data_by_camera[camera_name] = frame_data
                 color_frame = frame_data["color"]
                 depth_frame = frame_data["depth"]
+                if self.health and (color_frame or depth_frame):
+                    self.health.record_input(f"{camera_name}_frames")
 
                 # Write color and depth to shared buffer (zero-copy)
                 if color_frame and depth_frame and self.enable_color and self.enable_depth:

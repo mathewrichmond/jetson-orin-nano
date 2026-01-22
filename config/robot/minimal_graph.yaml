@@ -12,6 +12,22 @@ robot:
       temp_warning_threshold: 70.0
       temp_critical_threshold: 85.0
 
+  health_monitor:
+    enabled: true
+    package: health_monitor
+    node: health_monitor_node
+    namespace: /system
+    parameters:
+      graph_config: "minimal_graph.yaml"
+      group: "all"
+      health_publish_rate: 1.0
+    topics:
+      publish:
+        - /system/health/summary
+        - /system/health/nodes
+      subscribe: []
+
 groups:
   minimal:
     - system_monitor
+    - health_monitor

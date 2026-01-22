@@ -43,7 +43,7 @@ from typing import Dict, Optional
 from cv_bridge import CvBridge
 
 # Local imports - shared utilities
-from isaac_utils import CameraFrameBuffer, KalmanFilter, downsample_image
+from isaac_utils import CameraFrameBuffer, HealthStatusPublisher, InputWatchdog, KalmanFilter, downsample_image
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -105,6 +105,16 @@ class SensorSyncNode(Node):
         self.declare_parameter(
             "enable_system_status", True
         )  # Allow disabling if system monitor not available
+        self.declare_parameter("health_summary_topic", "/system/health/summary")
+        self.declare_parameter("health_nodes_topic", "/system/health/nodes")
+        self.declare_parameter("enable_system_health", True)
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
+        self.declare_parameter("health_expected_camera_rate_hz", 10.0)
+        self.declare_parameter("health_expected_imu_rate_hz", 50.0)
+        self.declare_parameter("health_expected_system_rate_hz", 1.0)
 
         # Audio synchronization parameters
         self.declare_parameter("enable_audio_sync", False)  # Enable audio synchronization
@@ -164,11 +174,68 @@ class SensorSyncNode(Node):
         self.viz_mesh_decimation = float(self.get_parameter("viz_mesh_decimation").value)
         self.viz_tsdf_extract_mesh = bool(self.get_parameter("viz_tsdf_extract_mesh").value)
         self.viz_tsdf_fps = float(self.get_parameter("viz_tsdf_fps").value)
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+        health_expected_camera_rate = float(
+            self.get_parameter("health_expected_camera_rate_hz").value
+        )
+        health_expected_imu_rate = float(self.get_parameter("health_expected_imu_rate_hz").value)
+        health_expected_system_rate = float(
+            self.get_parameter("health_expected_system_rate_hz").value
+        )
 
         # Shared memory buffer for zero-copy frame access
         self.frame_buffer = CameraFrameBuffer.get_instance()
         self.bridge = CvBridge()  # For converting numpy arrays to ROS messages
         self.get_logger().info("Using shared CameraFrameBuffer for zero-copy camera access")
+
+        # Health publisher for this node
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "sync_loop",
+                expected_rate_hz=self.target_frequency,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "imu",
+                expected_rate_hz=health_expected_imu_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        for camera_name in ["camera_front", "camera_rear"]:
+            self.health.add_watchdog(
+                InputWatchdog(
+                    f"camera_{camera_name}",
+                    expected_rate_hz=health_expected_camera_rate,
+                    warn_timeout_sec=health_warn_timeout,
+                    error_timeout_sec=health_stale_timeout,
+                )
+            )
+            self.health.add_watchdog(
+                InputWatchdog(
+                    f"nvblox_{camera_name}",
+                    expected_rate_hz=health_expected_camera_rate,
+                    warn_timeout_sec=health_warn_timeout,
+                    error_timeout_sec=health_stale_timeout,
+                    required=False,
+                )
+            )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "system_health",
+                expected_rate_hz=health_expected_system_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+                required=False,
+            )
+        )
 
         # Kalman filter for IMU
         if self.imu_filter_enabled:
@@ -199,6 +266,8 @@ class SensorSyncNode(Node):
         self.system_disk_usage_buffer: deque = deque(maxlen=self.max_buffer_size)
         self.system_power_buffer: deque = deque(maxlen=self.max_buffer_size)
         self.system_alerts_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_health_summary_buffer: deque = deque(maxlen=self.max_buffer_size)
+        self.system_health_nodes_buffer: deque = deque(maxlen=self.max_buffer_size)
 
         # Audio buffer
         self.audio_buffer: deque = deque(maxlen=self.max_buffer_size)
@@ -309,6 +378,19 @@ class SensorSyncNode(Node):
             self.system_alerts_sub = self.create_subscription(
                 String, system_alerts_topic, self._system_alerts_callback, 10
             )
+            enable_system_health = bool(self.get_parameter("enable_system_health").value)
+            if enable_system_health:
+                health_summary_topic = str(self.get_parameter("health_summary_topic").value)
+                health_nodes_topic = str(self.get_parameter("health_nodes_topic").value)
+                self.system_health_summary_sub = self.create_subscription(
+                    String, health_summary_topic, self._system_health_summary_callback, 10
+                )
+                self.system_health_nodes_sub = self.create_subscription(
+                    String, health_nodes_topic, self._system_health_nodes_callback, 10
+                )
+            else:
+                self.system_health_summary_sub = None
+                self.system_health_nodes_sub = None
         else:
             # Create dummy subscribers to avoid errors
             self.system_status_sub = None
@@ -465,6 +547,12 @@ class SensorSyncNode(Node):
         )
         self.system_power_pub = self.create_publisher(Float32, f"{output_ns}/system/power", 10)
         self.system_alerts_pub = self.create_publisher(String, f"{output_ns}/system/alerts", 10)
+        self.system_health_summary_pub = self.create_publisher(
+            String, f"{output_ns}/system/health/summary", 10
+        )
+        self.system_health_nodes_pub = self.create_publisher(
+            String, f"{output_ns}/system/health/nodes", 10
+        )
         # Camera sync status
         self.system_camera_sync_status_pub = self.create_publisher(
             String, f"{output_ns}/system/hardware/camera_sync_status", 10
@@ -555,6 +643,12 @@ class SensorSyncNode(Node):
             )
             self.viz_system_alerts_pub = self.create_publisher(
                 String, "/viz/remote/system/alerts", 10
+            )
+            self.viz_system_health_summary_pub = self.create_publisher(
+                String, "/viz/remote/system/health/summary", 10
+            )
+            self.viz_system_health_nodes_pub = self.create_publisher(
+                String, "/viz/remote/system/health/nodes", 10
             )
             # Camera sync status for visualization
             self.viz_system_camera_sync_status_pub = self.create_publisher(
@@ -736,6 +830,7 @@ class SensorSyncNode(Node):
 
     def _imu_callback(self, msg: Imu):
         """Store IMU data in buffer"""
+        self.health.record_input("imu")
         with self.buffer_lock:
             timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
             imu_data = {
@@ -837,10 +932,24 @@ class SensorSyncNode(Node):
             timestamp = time.time()
             self.system_alerts_buffer.append({"timestamp": timestamp, "msg": msg})
 
+    def _system_health_summary_callback(self, msg: String):
+        """Store system health summary in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_health_summary_buffer.append({"timestamp": timestamp, "msg": msg})
+        self.health.record_input("system_health")
+
+    def _system_health_nodes_callback(self, msg: String):
+        """Store system health nodes in buffer"""
+        with self.buffer_lock:
+            timestamp = time.time()
+            self.system_health_nodes_buffer.append({"timestamp": timestamp, "msg": msg})
+
     def _camera_callback(self, msg: Image, topic: str):
         """Handle camera frame - latch it and trigger synchronization"""
         timestamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         camera_name = topic.split("/")[-3]  # Extract camera name
+        self.health.record_input(f"camera_{camera_name}")
 
         # Debug: Log all camera callbacks (first few only)
         if (
@@ -904,6 +1013,7 @@ class SensorSyncNode(Node):
         with self.buffer_lock:
             self.latched_nvblox_images[camera_name] = msg
             self.latched_nvblox_timestamps[camera_name] = timestamp
+        self.health.record_input(f"nvblox_{camera_name}")
 
     def _check_camera_frame_sync(self) -> bool:
         """
@@ -1085,6 +1195,7 @@ class SensorSyncNode(Node):
         """Publish synchronized sensor data with downsampling"""
         if sync_timestamp is None:
             sync_timestamp = time.time()
+        self.health.record_input("sync_loop")
 
         current_time = time.time()
 
@@ -1575,6 +1686,12 @@ class SensorSyncNode(Node):
         )
         power_data = self._find_closest_sensor_data(self.system_power_buffer, sync_timestamp)
         alerts_data = self._find_closest_sensor_data(self.system_alerts_buffer, sync_timestamp)
+        health_summary_data = self._find_closest_sensor_data(
+            self.system_health_summary_buffer, sync_timestamp
+        )
+        health_nodes_data = self._find_closest_sensor_data(
+            self.system_health_nodes_buffer, sync_timestamp
+        )
 
         # Publish feature topics (for controller) - synchronized with sensor data
         if system_status_data:
@@ -1627,6 +1744,14 @@ class SensorSyncNode(Node):
             synced_alerts = String()
             synced_alerts.data = alerts_data["msg"].data
             self.system_alerts_pub.publish(synced_alerts)
+        if health_summary_data:
+            synced_health_summary = String()
+            synced_health_summary.data = health_summary_data["msg"].data
+            self.system_health_summary_pub.publish(synced_health_summary)
+        if health_nodes_data:
+            synced_health_nodes = String()
+            synced_health_nodes.data = health_nodes_data["msg"].data
+            self.system_health_nodes_pub.publish(synced_health_nodes)
 
         # Publish camera sync status
         sync_status_msg = String()
@@ -1673,6 +1798,10 @@ class SensorSyncNode(Node):
 
                 if alerts_data:
                     self.viz_system_alerts_pub.publish(synced_alerts)
+                if health_summary_data:
+                    self.viz_system_health_summary_pub.publish(synced_health_summary)
+                if health_nodes_data:
+                    self.viz_system_health_nodes_pub.publish(synced_health_nodes)
 
                 self.last_viz_publish_time["system_status"] = current_time
 

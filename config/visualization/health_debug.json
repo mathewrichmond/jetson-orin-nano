@@ -1,0 +1,24 @@
+{
+  "configById": {
+    "RawMessages!health_summary": {
+      "topicName": "/system/health/summary",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    },
+    "RawMessages!health_nodes": {
+      "topicName": "/system/health/nodes",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": "RawMessages!health_summary",
+    "second": "RawMessages!health_nodes"
+  }
+}

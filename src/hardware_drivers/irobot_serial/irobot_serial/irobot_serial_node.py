@@ -17,6 +17,8 @@ from sensor_msgs.msg import BatteryState
 import serial
 from std_msgs.msg import Header, String
 
+# Local
+from isaac_utils import HealthStatusPublisher, InputWatchdog
 
 class iRobotSerialNode(Node):
     """ROS 2 node for iRobot Create/Roomba serial communication"""
@@ -43,6 +45,11 @@ class iRobotSerialNode(Node):
         self.declare_parameter("max_radius_mm", 2000)  # mm (iRobot Create 2 limit)
         self.declare_parameter("battery_max_charge", 16000)  # Typical max charge value
         self.declare_parameter("battery_max_voltage", 14.4)  # Volts
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
+        self.declare_parameter("health_expected_cmd_rate_hz", 1.0)
 
         self.serial_port = self.get_parameter("serial_port").value
         self.baudrate = self.get_parameter("baudrate").value
@@ -62,6 +69,11 @@ class iRobotSerialNode(Node):
         self.max_radius_mm = self.get_parameter("max_radius_mm").value
         self.battery_max_charge = self.get_parameter("battery_max_charge").value
         self.battery_max_voltage = self.get_parameter("battery_max_voltage").value
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+        health_expected_cmd_rate = float(self.get_parameter("health_expected_cmd_rate_hz").value)
 
         # Serial connection
         self.serial_conn: Optional[serial.Serial] = None
@@ -70,6 +82,26 @@ class iRobotSerialNode(Node):
         # Publishers
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
         self.battery_pub = self.create_publisher(BatteryState, self.battery_topic, 10)
+
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "status_loop",
+                expected_rate_hz=self.publish_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "cmd_vel",
+                expected_rate_hz=health_expected_cmd_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+                required=False,
+            )
+        )
 
         # Subscribers
         self.cmd_vel_sub = self.create_subscription(
@@ -111,9 +143,11 @@ class iRobotSerialNode(Node):
             except serial.SerialException as e:
                 self.get_logger().warn(f"Failed to connect to iRobot: {e}")
                 self._publish_status_message("error", f"Connection failed: {str(e)[:50]}")
+                self.health.report_error("connect_failed")
                 time.sleep(self.retry_delay)
             except Exception as e:
                 self.get_logger().error(f"Unexpected error connecting to iRobot: {e}")
+                self.health.report_error(f"connect_exception: {e}")
                 time.sleep(self.retry_delay)
 
     def _send_command(self, command_bytes: list):
@@ -126,6 +160,7 @@ class iRobotSerialNode(Node):
 
     def cmd_vel_callback(self, msg: Twist):
         """Handle velocity commands"""
+        self.health.record_input("cmd_vel")
         if not self.connected:
             self.get_logger().warn("iRobot not connected, ignoring command")
             return
@@ -163,6 +198,7 @@ class iRobotSerialNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error sending command to iRobot: {e}")
+            self.health.report_error(f"command_error: {e}")
 
     def _read_sensor_data(self):
         """Read sensor data from iRobot"""
@@ -189,7 +225,9 @@ class iRobotSerialNode(Node):
 
     def _publish_status_callback(self):
         """Timer callback to publish iRobot status"""
+        self.health.record_input("status_loop")
         if not self.connected:
+            self.health.report_warning("not_connected")
             return
 
         try:
@@ -224,6 +262,7 @@ class iRobotSerialNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error publishing status: {e}")
+            self.health.report_error(f"status_publish_error: {e}")
 
     def _publish_status_message(self, status: str, message: str = ""):
         """Publish a status message"""

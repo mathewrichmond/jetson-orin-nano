@@ -21,7 +21,7 @@ from std_msgs.msg import Header, String
 from visualization_msgs.msg import Marker, MarkerArray
 
 # Local
-from isaac_utils import CameraFrameBuffer
+from isaac_utils import CameraFrameBuffer, HealthStatusPublisher, InputWatchdog
 
 
 class NvbloxProcessorNode(Node):
@@ -45,6 +45,11 @@ class NvbloxProcessorNode(Node):
         self.declare_parameter("fuse_cameras", True)  # Multi-camera fusion
         self.declare_parameter("status_topic", "/nvblox/status")
         self.declare_parameter("namespace", "/nvblox/full")  # Full quality namespace
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
+        self.declare_parameter("health_expected_frame_rate_hz", 5.0)
 
         # Get parameters
         self.camera_names = self.get_parameter("camera_names").value
@@ -61,6 +66,13 @@ class NvbloxProcessorNode(Node):
         self.fuse_cameras = bool(self.get_parameter("fuse_cameras").value)
         self.status_topic = str(self.get_parameter("status_topic").value)
         self.namespace = str(self.get_parameter("namespace").value)
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+        health_expected_frame_rate = float(
+            self.get_parameter("health_expected_frame_rate_hz").value
+        )
 
         # CV Bridge
         self.bridge = CvBridge()
@@ -79,6 +91,26 @@ class NvbloxProcessorNode(Node):
         # Processing timer (poll buffer instead of subscriptions)
         self.process_timer = None
         self.process_rate_hz = 10.0  # Process buffer at 10Hz (adjust as needed)
+
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "process_loop",
+                expected_rate_hz=self.process_rate_hz,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        for camera_name in self.camera_names:
+            self.health.add_watchdog(
+                InputWatchdog(
+                    f"raw_frame_{camera_name}",
+                    expected_rate_hz=health_expected_frame_rate,
+                    warn_timeout_sec=health_warn_timeout,
+                    error_timeout_sec=health_stale_timeout,
+                )
+            )
 
         # Publishers
         self.status_publisher = self.create_publisher(String, self.status_topic, 10)
@@ -152,6 +184,7 @@ class NvbloxProcessorNode(Node):
     def _process_buffer_frames(self):
         """Process frames from shared buffer (replaces subscription callbacks)"""
         try:
+            self.health.record_input("process_loop")
             for camera_name in self.camera_names:
                 # Read raw frame from buffer
                 raw_frame = self.frame_buffer.read_raw_frame(camera_name)
@@ -166,6 +199,7 @@ class NvbloxProcessorNode(Node):
                 # Update last processed
                 self.last_processed_frame[camera_name] = raw_frame.frame_number
                 self._process_counts[camera_name] += 1
+                self.health.record_input(f"raw_frame_{camera_name}")
 
                 # Store camera info if available
                 if raw_frame.camera_info and camera_name not in self.camera_infos:
@@ -207,6 +241,7 @@ class NvbloxProcessorNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"[nvblox] Error processing buffer frames: {e}")
+            self.health.report_error(f"process_error: {e}")
             import traceback
             self.get_logger().error(traceback.format_exc())
 

@@ -17,6 +17,8 @@ from sensor_msgs.msg import Imu
 import serial
 from std_msgs.msg import Header, String
 
+# Local
+from isaac_utils import HealthStatusPublisher, InputWatchdog
 
 class ODriveControllerNode(Node):
     """ROS 2 node for ODrive motor controller"""
@@ -38,6 +40,11 @@ class ODriveControllerNode(Node):
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
         self.declare_parameter("imu_frame_id", "odrive_imu")
         self.declare_parameter("retry_delay", 2.0)  # Seconds between connection retry attempts
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
+        self.declare_parameter("health_expected_cmd_rate_hz", 1.0)
 
         self.serial_port = self.get_parameter("serial_port").value
         self.baudrate = self.get_parameter("baudrate").value
@@ -52,6 +59,11 @@ class ODriveControllerNode(Node):
         self.cmd_vel_topic = self.get_parameter("cmd_vel_topic").value
         self.imu_frame_id = self.get_parameter("imu_frame_id").value
         self.retry_delay = self.get_parameter("retry_delay").value
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+        health_expected_cmd_rate = float(self.get_parameter("health_expected_cmd_rate_hz").value)
 
         # Serial connection
         self.serial_conn: Optional[serial.Serial] = None
@@ -61,6 +73,26 @@ class ODriveControllerNode(Node):
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
         self.imu_pub = (
             self.create_publisher(Imu, self.imu_topic, 10) if self.enable_accelerometer else None
+        )
+
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "status_loop",
+                expected_rate_hz=self.publish_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "cmd_vel",
+                expected_rate_hz=health_expected_cmd_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+                required=False,
+            )
         )
 
         # Subscribers
@@ -103,13 +135,16 @@ class ODriveControllerNode(Node):
             except serial.SerialException as e:
                 self.get_logger().warn(f"Failed to connect to ODrive: {e}")
                 self._publish_status_message("error", f"Connection failed: {str(e)[:50]}")
+                self.health.report_error("connect_failed")
                 time.sleep(self.retry_delay)
             except Exception as e:
                 self.get_logger().error(f"Unexpected error connecting to ODrive: {e}")
+                self.health.report_error(f"connect_exception: {e}")
                 time.sleep(self.retry_delay)
 
     def cmd_vel_callback(self, msg: Twist):
         """Handle velocity commands"""
+        self.health.record_input("cmd_vel")
         if not self.connected:
             self.get_logger().warn("ODrive not connected, ignoring command")
             return
@@ -130,10 +165,13 @@ class ODriveControllerNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error sending command to ODrive: {e}")
+            self.health.report_error(f"command_error: {e}")
 
     def _publish_status_callback(self):
         """Timer callback to publish ODrive status"""
+        self.health.record_input("status_loop")
         if not self.connected:
+            self.health.report_warning("not_connected")
             return
 
         try:
@@ -164,6 +202,7 @@ class ODriveControllerNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error publishing status: {e}")
+            self.health.report_error(f"status_publish_error: {e}")
 
     def _publish_status_message(self, status: str, message: str = ""):
         """Publish a status message"""

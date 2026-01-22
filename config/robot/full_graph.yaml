@@ -15,6 +15,21 @@ robot:
       memory_warning_threshold: 90.0
       disk_warning_threshold: 90.0
 
+  health_monitor:
+    enabled: true
+    package: health_monitor
+    node: health_monitor_node
+    namespace: /system
+    parameters:
+      graph_config: "full_graph.yaml"
+      group: "all"
+      health_publish_rate: 1.0
+    topics:
+      publish:
+        - /system/health/summary
+        - /system/health/nodes
+      subscribe: []
+
   vla_controller:
     enabled: true
     package: vla_controller
@@ -38,5 +53,6 @@ robot:
 groups:
   full:
     - system_monitor
+    - health_monitor
     - vla_controller
     - hardware_drivers

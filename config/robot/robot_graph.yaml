@@ -30,6 +30,21 @@ robot:
       subscribe:
         - /realsense/status
 
+  health_monitor:
+    enabled: true
+    package: health_monitor
+    node: health_monitor_node
+    namespace: /system
+    parameters:
+      graph_config: "robot_graph.yaml"
+      group: "all"
+      health_publish_rate: 1.0
+    topics:
+      publish:
+        - /system/health/summary
+        - /system/health/nodes
+      subscribe: []
+
   # VLA Controller (placeholder for future)
   vla_controller:
     enabled: false
@@ -97,6 +112,7 @@ robot:
       tsdf_truncation_distance: 0.1
       max_tsdf_weight: 100.0
       mesh_update_rate: 5.0
+      health_expected_frame_rate_hz: 6.0
       # Full quality outputs (fusion node handles downsampling for consumers)
       pointcloud_downsample_factor: 1  # Full resolution (fusion node downsamples)
       publish_tsdf_markers: true  # Full TSDF (fusion node extracts/coarsens)
@@ -137,6 +153,7 @@ robot:
       format: 'S16_LE'
       chunk_size: 1024
       publish_rate: 10.0
+      health_expected_audio_rate_hz: 10.0
       status_topic: '/microphone/status'
       audio_topic: '/microphone/audio'
     topics:
@@ -158,6 +175,7 @@ robot:
       format: 'S16_LE'
       volume_history_size: 100
       waveform_samples: 100
+      health_expected_audio_rate_hz: 10.0
     topics:
       publish:
         - /microphone/volume
@@ -241,6 +259,9 @@ robot:
       sync_camera_frames: true  # Sync multiple cameras together (software sync)
       camera_frame_sync_tolerance: 0.05  # Max time diff between cameras (50ms)
       target_frequency: 15.0  # Match camera FPS for features
+      health_expected_camera_rate_hz: 15.0
+      health_expected_imu_rate_hz: 50.0
+      health_expected_system_rate_hz: 1.0
       # IMU topic - Single IMU from phat motor controller (D435 cameras lack IMU hardware)
       imu_topic: "/hardware/phat/imu"
       imu_filter_enabled: true
@@ -305,6 +326,8 @@ robot:
         - /sensor_fusion/system/disk/usage
         - /sensor_fusion/system/power
         - /sensor_fusion/system/alerts
+        - /sensor_fusion/system/health/summary
+        - /sensor_fusion/system/health/nodes
         - /sensor_fusion/system/hardware/camera_sync_status
         # Audio topics (synchronized to camera frames)
         - /sensor_fusion/audio/raw  # Synchronized raw audio chunks (for features)
@@ -325,6 +348,8 @@ robot:
         - /viz/remote/system/memory/usage
         - /viz/remote/audio/stats  # Audio stats (max volume per channel)
         - /viz/remote/system/alerts
+        - /viz/remote/system/health/summary
+        - /viz/remote/system/health/nodes
         - /sensor_fusion/status
       subscribe:
         - /phat/imu
@@ -342,6 +367,8 @@ robot:
         - /system/disk/usage
         - /system/power
         - /system/alerts
+        - /system/health/summary
+        - /system/health/nodes
         # Full quality 3D data from nvblox (for downsampling)
         - /nvblox/full/camera_front/pointcloud  # Full resolution pointclouds
         - /nvblox/full/camera_rear/pointcloud
@@ -464,6 +491,7 @@ remappings:
 groups:
   core:
     - system_monitor
+    - health_monitor
 
   control:
     - vla_controller
@@ -481,6 +509,7 @@ groups:
   # Sensor pipeline (zero-copy intra-process communication for camera/IMU/sensor processing)
   sensor_pipeline:
     - system_monitor
+    - health_monitor
     - phat_motor_controller
     - realsense_camera
     - nvblox_processor
@@ -489,6 +518,7 @@ groups:
 
   bench_test:
     - system_monitor
+    - health_monitor
     - realsense_camera
     - nvblox_processor
     - usb_microphone
@@ -499,6 +529,7 @@ groups:
 
   all:
     - system_monitor
+    - health_monitor
     - realsense_camera
     - nvblox_processor
     - usb_microphone

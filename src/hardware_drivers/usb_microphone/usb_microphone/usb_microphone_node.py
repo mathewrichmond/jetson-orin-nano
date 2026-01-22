@@ -15,6 +15,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, UInt8MultiArray
 
+# Local
+from isaac_utils import HealthStatusPublisher, InputWatchdog
 
 class USBMicrophoneNode(Node):
     """ROS 2 node for USB microphone audio capture"""
@@ -33,6 +35,11 @@ class USBMicrophoneNode(Node):
         self.declare_parameter("audio_topic", "/microphone/audio")
         self.declare_parameter("retry_delay", 1.0)  # Seconds between retry attempts
         self.declare_parameter("device_check_timeout", 2.0)  # Seconds for device check timeout
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
+        self.declare_parameter("health_expected_audio_rate_hz", 10.0)
 
         self.device = self.get_parameter("device").value
         self.sample_rate = self.get_parameter("sample_rate").value
@@ -44,10 +51,36 @@ class USBMicrophoneNode(Node):
         self.audio_topic = self.get_parameter("audio_topic").value
         self.retry_delay = self.get_parameter("retry_delay").value
         self.device_check_timeout = self.get_parameter("device_check_timeout").value
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+        health_expected_audio_rate = float(
+            self.get_parameter("health_expected_audio_rate_hz").value
+        )
 
         # Publishers
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
         self.audio_pub = self.create_publisher(UInt8MultiArray, self.audio_topic, 10)
+
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "status_loop",
+                expected_rate_hz=self.publish_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+        self.health.add_watchdog(
+            InputWatchdog(
+                "audio_stream",
+                expected_rate_hz=health_expected_audio_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
 
         # Audio capture state
         self.audio_capturing = False
@@ -72,6 +105,7 @@ class USBMicrophoneNode(Node):
                 # Check if device is available
                 if not self._check_device():
                     self.publish_status("error", "Microphone device not found")
+                    self.health.report_error("device_not_found")
                     time.sleep(self.retry_delay)
                     continue
 
@@ -105,6 +139,7 @@ class USBMicrophoneNode(Node):
                         audio_msg = UInt8MultiArray()
                         audio_msg.data = list(chunk)
                         self.audio_pub.publish(audio_msg)
+                        self.health.record_input("audio_stream")
 
                         # Log warning if consistently getting zeros (might indicate no audio input)
                         if not any(byte != 0 for byte in chunk):
@@ -120,13 +155,16 @@ class USBMicrophoneNode(Node):
                         error = self.arecord_process.stderr.read().decode("utf-8", errors="ignore")
                         self.get_logger().warn(f"arecord error: {error}")
                         self.publish_status("error", f"Capture error: {error[:50]}")
+                        self.health.report_error("capture_error")
                     else:
                         self.get_logger().warn("arecord error: unknown error")
                         self.publish_status("error", "Capture error: unknown")
+                        self.health.report_error("capture_error_unknown")
 
             except Exception as e:
                 self.get_logger().error(f"Audio capture error: {e}")
                 self.publish_status("error", str(e))
+                self.health.report_error(f"capture_exception: {e}")
                 self.audio_capturing = False
                 time.sleep(self.retry_delay)
 
@@ -175,6 +213,7 @@ class USBMicrophoneNode(Node):
 
     def _publish_status_callback(self):
         """Timer callback to publish periodic status"""
+        self.health.record_input("status_loop")
         if self.audio_capturing:
             self.publish_status("capturing", f"Recording at {self.sample_rate}Hz")
         else:

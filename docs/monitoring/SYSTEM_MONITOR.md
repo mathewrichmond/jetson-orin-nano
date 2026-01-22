@@ -11,6 +11,8 @@ The System Monitor module provides comprehensive monitoring of the Isaac robot s
 - **Resource Monitoring**: CPU, memory, and disk usage
 - **Alerting**: Threshold-based alerts for critical conditions
 - **ROS 2 Integration**: Publishes status via ROS 2 topics
+- **Per-node Health**: Nodes publish structured health heartbeats
+- **Health Aggregation**: Health monitor aggregates node status into system health
 
 ## Installation
 
@@ -96,6 +98,12 @@ The system monitor publishes the following topics:
 - `/system/disk/usage` (`std_msgs/Float32`) - Disk usage percentage
 - `/system/power` (`std_msgs/Float32`) - Power consumption in watts
 - `/system/alerts` (`std_msgs/String`) - Alert messages for threshold violations
+- `/system/health/summary` (`std_msgs/String`) - Aggregated health summary (JSON)
+- `/system/health/nodes` (`std_msgs/String`) - Per-node health payloads (JSON)
+
+Each node publishes a health heartbeat on its namespace:
+
+- `/<namespace>/health/<node_name>` (`std_msgs/String`) - Per-node health (JSON)
 
 ## Configuration
 
@@ -176,6 +184,37 @@ The system monitor is integrated into the **system sub-graph** and its status is
 - **Comprehensive Status**: Includes traditional metrics (CPU, GPU, memory) AND system-specific status (camera sync, device errors, voltages)
 
 The sensor fusion node consumes system monitor topics and includes them in the fused output, synchronized with sensor data.
+
+Health summaries are also fused for downstream consumers:
+
+- `/sensor_fusion/system/health/summary`
+- `/sensor_fusion/system/health/nodes`
+- `/viz/remote/system/health/summary`
+- `/viz/remote/system/health/nodes`
+
+These provide low-rate health visibility for remote monitoring.
+
+## Health Monitoring Design
+
+### Per-node Health
+
+Each node publishes a JSON health payload that includes:
+- Current status (`OK`, `WARN`, `ERROR`, `INIT`)
+- Watchdog freshness (last seen age, expected rates, timeouts)
+- Recent error/warning messages
+
+Nodes maintain watchdogs for:
+- Internal publish loops (heartbeat)
+- Critical input topics (staleness + rate checks)
+
+### Health Monitor Node
+
+The `health_monitor_node` aggregates all per-node health topics into:
+- `/system/health/summary` (overall status + stale/error nodes)
+- `/system/health/nodes` (raw per-node payloads)
+
+The health monitor reads the active graph configuration and respects the
+rates and tolerances defined in the running graph parameters.
 
 ## Integration
 

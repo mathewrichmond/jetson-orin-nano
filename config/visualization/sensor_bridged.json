@@ -196,6 +196,16 @@
       "maxYValue": 1.0,
       "showLegend": true,
       "title": "Audio Max Volume Per Channel"
+    },
+    "RawMessages!health_summary": {
+      "topicName": "/viz/remote/system/health/summary",
+      "diffEnabled": false,
+      "diffMethod": "char"
+    },
+    "RawMessages!health_nodes": {
+      "topicName": "/viz/remote/system/health/nodes",
+      "diffEnabled": false,
+      "diffMethod": "char"
     }
   },
   "globalVariables": {},
@@ -216,7 +226,9 @@
       "second": "Plot!imu_filtered",
       "third": "Plot!chassis_signals",
       "fourth": "Plot!audio_volume",
-      "fifth": "Plot!audio_channels"
+      "fifth": "Plot!audio_channels",
+      "sixth": "RawMessages!health_summary",
+      "seventh": "RawMessages!health_nodes"
     }
   }
 }

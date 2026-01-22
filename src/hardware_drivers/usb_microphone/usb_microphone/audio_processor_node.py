@@ -17,6 +17,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32, Float32MultiArray, UInt8MultiArray
 
+# Local
+from isaac_utils import HealthStatusPublisher, InputWatchdog
 
 class AudioProcessorNode(Node):
     """Processes raw audio data for visualization"""
@@ -31,6 +33,11 @@ class AudioProcessorNode(Node):
         self.declare_parameter("format", "S16_LE")
         self.declare_parameter("volume_history_size", 100)  # Number of volume samples to keep
         self.declare_parameter("waveform_samples", 100)  # Number of waveform samples per channel to publish
+        self.declare_parameter("health_topic", f"health/{self.get_name()}")
+        self.declare_parameter("health_publish_rate", 1.0)
+        self.declare_parameter("health_warn_timeout_sec", 3.0)
+        self.declare_parameter("health_stale_timeout_sec", 6.0)
+        self.declare_parameter("health_expected_audio_rate_hz", 10.0)
 
         self.audio_topic = self.get_parameter("audio_topic").value
         self.sample_rate = int(self.get_parameter("sample_rate").value)
@@ -38,6 +45,13 @@ class AudioProcessorNode(Node):
         self.format = self.get_parameter("format").value
         self.volume_history_size = int(self.get_parameter("volume_history_size").value)
         self.waveform_samples = int(self.get_parameter("waveform_samples").value)
+        health_topic = str(self.get_parameter("health_topic").value)
+        health_rate = float(self.get_parameter("health_publish_rate").value)
+        health_warn_timeout = float(self.get_parameter("health_warn_timeout_sec").value)
+        health_stale_timeout = float(self.get_parameter("health_stale_timeout_sec").value)
+        health_expected_audio_rate = float(
+            self.get_parameter("health_expected_audio_rate_hz").value
+        )
 
         # Publishers
         self.volume_pub = self.create_publisher(Float32, "/microphone/volume", 10)
@@ -56,6 +70,17 @@ class AudioProcessorNode(Node):
             10
         )
 
+        # Health publisher
+        self.health = HealthStatusPublisher(self, health_topic, health_rate)
+        self.health.add_watchdog(
+            InputWatchdog(
+                "audio_stream",
+                expected_rate_hz=health_expected_audio_rate,
+                warn_timeout_sec=health_warn_timeout,
+                error_timeout_sec=health_stale_timeout,
+            )
+        )
+
         self.get_logger().info(
             f"Audio processor started: {self.channels} channels, {self.sample_rate}Hz, format={self.format}"
         )
@@ -63,6 +88,7 @@ class AudioProcessorNode(Node):
     def _audio_callback(self, msg: UInt8MultiArray):
         """Process incoming audio data"""
         try:
+            self.health.record_input("audio_stream")
             # Convert bytes to numpy array
             audio_bytes = np.frombuffer(bytes(msg.data), dtype=np.uint8)
 
@@ -139,6 +165,7 @@ class AudioProcessorNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error processing audio: {e}", throttle_duration_sec=1.0)
+            self.health.report_error(f"audio_process_error: {e}")
 
     def _extract_waveform_samples(self, samples: np.ndarray, num_samples: int) -> np.ndarray:
         """Extract evenly spaced samples for waveform visualization"""
