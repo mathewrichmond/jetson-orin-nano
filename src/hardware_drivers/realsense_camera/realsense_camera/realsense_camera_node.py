@@ -627,12 +627,16 @@ class RealSenseCameraNode(Node):
         align = self.aligns.get(camera_name)
         consecutive_errors = 0
         max_consecutive_errors = 10
+        last_frame_time = time.time()
+        timeout_count = 0
+        last_watchdog_log = 0.0
 
         while self.running:
             try:
                 # Wait for frames (non-blocking with timeout)
                 frames = pipeline.wait_for_frames(timeout_ms=self.frame_timeout_ms)
                 consecutive_errors = 0  # Reset error counter on success
+                last_frame_time = time.time()
 
                 # Align depth to color if requested
                 if align:
@@ -673,6 +677,16 @@ class RealSenseCameraNode(Node):
 
             except Exception as e:
                 consecutive_errors += 1
+                if "Frame didn't arrive" in str(e):
+                    timeout_count += 1
+                    now = time.time()
+                    if now - last_watchdog_log > 5.0:
+                        last_watchdog_log = now
+                        self.get_logger().warn(
+                            f"[watchdog] {camera_name} frame timeout x{timeout_count} "
+                            f"(timeout_ms={self.frame_timeout_ms}, "
+                            f"last_frame_age={now - last_frame_time:.2f}s)"
+                        )
                 if self.running:  # Only log if still running
                     if consecutive_errors <= max_consecutive_errors:
                         self.get_logger().error(f"Error capturing frames for {camera_name}: {e}")
