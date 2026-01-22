@@ -64,7 +64,7 @@ class NvbloxProcessorNode(Node):
 
         # CV Bridge
         self.bridge = CvBridge()
-        
+
         # Shared memory buffer for zero-copy frame access
         self.frame_buffer = CameraFrameBuffer.get_instance()
         self.get_logger().info("Using shared CameraFrameBuffer for zero-copy frame access")
@@ -98,7 +98,7 @@ class NvbloxProcessorNode(Node):
         self.get_logger().info(
             f"[nvblox_processor_node] Initializing with camera_names={self.camera_names} (buffer mode)"
         )
-        
+
         # Initialize processing counters
         self._process_counts = {}
 
@@ -155,34 +155,34 @@ class NvbloxProcessorNode(Node):
             for camera_name in self.camera_names:
                 # Read raw frame from buffer
                 raw_frame = self.frame_buffer.read_raw_frame(camera_name)
-                
+
                 if raw_frame is None:
                     continue
-                
+
                 # Skip if already processed
                 if raw_frame.frame_number <= self.last_processed_frame[camera_name]:
                     continue
-                
+
                 # Update last processed
                 self.last_processed_frame[camera_name] = raw_frame.frame_number
                 self._process_counts[camera_name] += 1
-                
+
                 # Store camera info if available
                 if raw_frame.camera_info and camera_name not in self.camera_infos:
                     self.camera_infos[camera_name] = raw_frame.camera_info
                     self.get_logger().info(f"[nvblox] Received camera info for {camera_name}")
-                
+
                 # Log first few processes
                 count = self._process_counts[camera_name]
                 if count <= 3:
                     self.get_logger().info(
                         f"[nvblox] Processing frame #{raw_frame.frame_number} for {camera_name}"
                     )
-                
+
                 # Process the frame: raw_frame.color is RGB numpy array, raw_frame.depth is uint16 depth in mm
                 # For now, just pass through the color image to the buffer
                 # (in full implementation, this would do actual nvblox processing)
-                
+
                 # Write processed frame to buffer for sensor_fusion to consume
                 self.frame_buffer.write_processed_frame(
                     camera_name,
@@ -191,7 +191,7 @@ class NvbloxProcessorNode(Node):
                     pointcloud=None,  # TODO: Generate pointcloud from depth
                     frame_number=raw_frame.frame_number,
                 )
-                
+
                 # Also publish to topics for backward compatibility (sensor_fusion subscribes)
                 if camera_name in self.full_image_publishers:
                     # Convert numpy to ROS message
@@ -199,12 +199,12 @@ class NvbloxProcessorNode(Node):
                     ros_msg.header.stamp = self.get_clock().now().to_msg()
                     ros_msg.header.frame_id = f"{camera_name}_color_optical_frame"
                     self.full_image_publishers[camera_name].publish(ros_msg)
-                    
+
                     if count <= 3:
                         self.get_logger().info(
                             f"[nvblox] Published processed frame to {self.namespace}/{camera_name}/image"
                         )
-                        
+
         except Exception as e:
             self.get_logger().error(f"[nvblox] Error processing buffer frames: {e}")
             import traceback

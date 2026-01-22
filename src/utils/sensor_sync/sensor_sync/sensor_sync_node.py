@@ -161,7 +161,7 @@ class SensorSyncNode(Node):
         self.frame_buffer = CameraFrameBuffer.get_instance()
         self.bridge = CvBridge()  # For converting numpy arrays to ROS messages
         self.get_logger().info("Using shared CameraFrameBuffer for zero-copy camera access")
-        
+
         # Kalman filter for IMU
         if self.imu_filter_enabled:
             process_noise = float(self.get_parameter("imu_process_noise").value)
@@ -238,7 +238,7 @@ class SensorSyncNode(Node):
             BatteryState, battery_topic, self._battery_callback, 10
         )
         self.status_sub = self.create_subscription(String, status_topic, self._status_callback, 10)
-        
+
         # Camera info subscribers (for republishing to viz namespace alongside images)
         from functools import partial
         for camera_name in ["camera_front", "camera_rear"]:
@@ -495,7 +495,7 @@ class SensorSyncNode(Node):
                 history=HistoryPolicy.KEEP_LAST,
                 depth=1,
             )
-            
+
             self.viz_camera_front_pub = self.create_publisher(
                 Image, "/viz/remote/camera_front/color/image_raw", image_qos
             )
@@ -639,14 +639,14 @@ class SensorSyncNode(Node):
         """Cache camera_info and republish to viz namespace"""
         # Store in cache
         self.camera_info_cache[camera_name] = msg
-        
+
         # Republish to viz namespace (if viz publishing enabled)
         if self.publish_viz_topics:
             if camera_name == "camera_front" and hasattr(self, 'viz_camera_front_info_pub'):
                 self.viz_camera_front_info_pub.publish(msg)
             elif camera_name == "camera_rear" and hasattr(self, 'viz_camera_rear_info_pub'):
                 self.viz_camera_rear_info_pub.publish(msg)
-    
+
     def _imu_callback(self, msg: Imu):
         """Store IMU data in buffer"""
         with self.buffer_lock:
@@ -666,7 +666,7 @@ class SensorSyncNode(Node):
                 ),
             }
             self.imu_buffer.append(imu_data)
-            
+
             # Debug logging for first few callbacks
             if not hasattr(self, "_imu_callback_count"):
                 self._imu_callback_count = 0
@@ -1004,7 +1004,7 @@ class SensorSyncNode(Node):
         with self.buffer_lock:
             # Find closest IMU data
             imu_data = self._find_closest_sensor_data(self.imu_buffer, sync_timestamp)
-            
+
             # Debug logging for IMU data retrieval
             if not hasattr(self, "_imu_publish_count"):
                 self._imu_publish_count = 0
@@ -1094,7 +1094,7 @@ class SensorSyncNode(Node):
                         f"{filtered_imu.linear_acceleration.y:.3f}, {filtered_imu.linear_acceleration.z:.3f}], "
                         f"publish_viz_topics={self.publish_viz_topics}"
                     )
-                
+
                 # Publish filtered IMU (feature topic)
                 self.filtered_imu_pub.publish(filtered_imu)
 
@@ -1167,7 +1167,7 @@ class SensorSyncNode(Node):
                             ros_msg.header.stamp = self.get_clock().now().to_msg()
                             ros_msg.header.frame_id = f"{camera_name}_color_optical_frame"
                             cameras_to_process[camera_name] = ros_msg
-                            
+
                             # Log first few successful reads
                             if not hasattr(self, "_buffer_read_count"):
                                 self._buffer_read_count = {}
@@ -1228,7 +1228,7 @@ class SensorSyncNode(Node):
                             camera_name,
                         )
                         viz_img.header.stamp = self.get_clock().now().to_msg()
-                        
+
                         # Log first few publishes
                         if not hasattr(self, "_viz_pub_count"):
                             self._viz_pub_count = {}
@@ -1241,7 +1241,7 @@ class SensorSyncNode(Node):
                                 f"[sensor_fusion] Publishing viz for {camera_name}: "
                                 f"{viz_img.width}x{viz_img.height}, data size: {data_size} bytes"
                             )
-                        
+
                         if camera_name == "camera_front":
                             self.viz_camera_front_pub.publish(viz_img)
                         elif camera_name == "camera_rear":

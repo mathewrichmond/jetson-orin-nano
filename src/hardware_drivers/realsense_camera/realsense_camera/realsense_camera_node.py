@@ -13,6 +13,9 @@ from typing import Dict, List, Optional
 
 # Third-party
 from cv_bridge import CvBridge
+
+# Local
+from isaac_utils import CameraFrameBuffer
 import numpy as np
 import pyrealsense2 as rs
 import rclpy
@@ -20,9 +23,6 @@ from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import String
-
-# Local
-from isaac_utils import CameraFrameBuffer
 
 
 class RealSenseCameraNode(Node):
@@ -83,7 +83,7 @@ class RealSenseCameraNode(Node):
         self.timer = None
         self.status_pub = None
         self._initialized = False
-        
+
         # Shared memory buffer for zero-copy frame passing
         self.frame_buffer = CameraFrameBuffer.get_instance()
         self.get_logger().info("Using shared CameraFrameBuffer for zero-copy frame passing")
@@ -608,7 +608,9 @@ class RealSenseCameraNode(Node):
 
             if self.enable_imu:
                 self.camera_publishers[camera_name]["imu"] = self.create_publisher(
-                    Imu, f"{camera_name}/imu", info_qos  # Use reliable QoS for IMU (small, important data)
+                    Imu,
+                    f"{camera_name}/imu",
+                    info_qos,  # Use reliable QoS for IMU (small, important data)
                 )
 
     def _camera_capture_loop(self, camera_name: str):
@@ -765,11 +767,11 @@ class RealSenseCameraNode(Node):
                         # Get numpy arrays directly from frames (no conversion needed)
                         color_image = np.asanyarray(color_frame.get_data())  # RGB
                         depth_image = np.asanyarray(depth_frame.get_data())  # uint16 mm
-                        
+
                         # Get timestamp
                         timestamp = self.get_clock().now().seconds_nanoseconds()
                         timestamp_sec = timestamp[0] + timestamp[1] / 1e9
-                        
+
                         # Get camera info as dict
                         camera_info_dict = None
                         if "color" in self.camera_infos.get(camera_name, {}):
@@ -782,7 +784,7 @@ class RealSenseCameraNode(Node):
                                 "cx": info.k[2],
                                 "cy": info.k[5],
                             }
-                        
+
                         # Write to shared buffer (zero-copy - just stores references)
                         self.frame_buffer.write_raw_frame(
                             camera_name,
@@ -792,14 +794,18 @@ class RealSenseCameraNode(Node):
                             camera_info_dict,
                         )
                         frames_published += 1
-                        
+
                     except Exception as e:
                         self.get_logger().error(
                             f"Error writing frame to buffer for {camera_name}: {e}"
                         )
 
                 # Publish camera_info topics whenever frames are available
-                if color_frame and self.enable_color and "color" in self.camera_infos.get(camera_name, {}):
+                if (
+                    color_frame
+                    and self.enable_color
+                    and "color" in self.camera_infos.get(camera_name, {})
+                ):
                     info = self.camera_infos[camera_name]["color"]
                     info.header.stamp = self.get_clock().now().to_msg()
                     if (
@@ -808,7 +814,11 @@ class RealSenseCameraNode(Node):
                     ):
                         self.camera_publishers[camera_name]["color_info"].publish(info)
 
-                if depth_frame and self.enable_depth and "depth" in self.camera_infos.get(camera_name, {}):
+                if (
+                    depth_frame
+                    and self.enable_depth
+                    and "depth" in self.camera_infos.get(camera_name, {})
+                ):
                     info = self.camera_infos[camera_name]["depth"]
                     info.header.stamp = self.get_clock().now().to_msg()
                     if (
