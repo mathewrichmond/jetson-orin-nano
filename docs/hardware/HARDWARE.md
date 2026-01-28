@@ -57,6 +57,14 @@ See [Hardware Setup Guide](HARDWARE_SETUP.md) for detailed instructions.
 
 ## Hardware-Specific Documentation
 
+### Hardware Organization
+
+- **[BOM.md](BOM.md)** - Bill of Materials (complete parts list)
+- **[ELECTRICAL.md](ELECTRICAL.md)** - Electrical specifications, wiring, power requirements
+- **[MECHANICAL.md](MECHANICAL.md)** - Mechanical specifications, tolerances, calibration values
+
+### Setup & Installation
+
 - [Hardware Setup Guide](HARDWARE_SETUP.md) - Unified hardware installation guide
 - [RealSense Setup](realsense.md) - Camera installation and configuration
 - [Camera Frame Sync](CAMERA_FRAME_SYNC.md) - Hardware frame synchronization setup
