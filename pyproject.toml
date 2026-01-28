@@ -1,3 +1,139 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "isaac-robot"
+version = "0.1.0"
+description = "Modular robotics system for Jetson Orin Nano with VLA model integration"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Isaac Robot Team"}
+]
+keywords = ["robotics", "ros2", "vla", "jetson", "autonomous"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Robotics",
+]
+
+# Runtime dependencies
+dependencies = [
+    "pyyaml>=6.0",
+    "numpy>=1.24.0",
+    "psutil>=5.9.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    # Core development
+    "ipython>=8.0.0",
+    "jupyter>=1.0.0",
+    "notebook>=6.4.0",
+    "jupyterlab>=3.0.0",
+    
+    # Testing
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-timeout>=2.1.0",
+    
+    # Code quality
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "pylint>=2.17.0",
+    "mypy>=1.0.0",
+    "isort>=5.12.0",
+    "autopep8>=2.0.0",
+    "yapf>=0.40.0",
+    "bandit>=1.7.0",
+    "safety>=2.3.0",
+    
+    # Pre-commit hooks
+    "pre-commit>=3.0.0",
+    
+    # Task runner
+    "invoke>=2.0.0",
+    
+    # Documentation
+    "sphinx>=6.0.0",
+    "sphinx-rtd-theme>=1.2.0",
+    "myst-parser>=1.0.0",
+    
+    # Utilities
+    "toml>=0.10.2",
+    "rich>=13.0.0",
+    "click>=8.1.0",
+    
+    # Mock data generation (for testing)
+    "Pillow>=10.0.0",
+]
+
+# ROS 2 dependencies (installed via apt, listed for reference)
+ros2 = [
+    # These are installed via apt, not pip
+    # ros-humble-ros-base
+    # ros-humble-foxglove-bridge
+    # python3-colcon-common-extensions
+    # python3-rosdep
+]
+
+# Hardware-specific dependencies
+hardware = [
+    "odrive>=0.5.0",  # ODrive motor controller
+    "pyserial>=3.5",  # Serial communication (iRobot)
+    # Jetson.GPIO - installed separately on Jetson
+]
+
+# Vision dependencies
+vision = [
+    "opencv-python>=4.8.0",
+    "Pillow>=10.0.0",
+]
+
+# Audio dependencies
+audio = [
+    "sounddevice>=0.4.6",
+    "librosa>=0.10.0",
+    "scipy>=1.11.0",
+]
+
+# VLA model dependencies (optional, large models)
+vla = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "huggingface-hub>=0.16.0",
+]
+
+# All optional dependencies combined
+all = [
+    "isaac-robot[dev,hardware,vision,audio,vla]",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/isaac-robot"
+Documentation = "https://github.com/yourusername/isaac-robot/tree/main/docs"
+Repository = "https://github.com/yourusername/isaac-robot"
+"Bug Tracker" = "https://github.com/yourusername/isaac-robot/issues"
+
+[project.scripts]
+# Command-line tools (if any)
+isaac-robot = "isaac_robot.cli:main"
+
+[tool.setuptools]
+packages = ["isaac_robot"]
+
+[tool.setuptools.package-data]
+isaac_robot = ["py.typed"]
+
 [tool.black]
 line-length = 100
 target-version = ['py310']

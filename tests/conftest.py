@@ -1,12 +1,14 @@
 """
-Pytest configuration and shared fixtures for unified testing framework
+Pytest Configuration and Shared Fixtures
+
+This file provides common fixtures and configuration for all tests.
 """
 
-# Standard library
-from pathlib import Path
+import os
 import sys
+from pathlib import Path
+from typing import Generator
 
-# Third-party
 import pytest
 
 # Add src to path for imports
@@ -15,29 +17,105 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 
 @pytest.fixture(scope="session")
-def repo_root():
-    """Return repository root directory"""
+def repo_root() -> Path:
+    """Get repository root directory"""
     return REPO_ROOT
 
 
 @pytest.fixture(scope="session")
-def ros2_workspace():
-    """Return ROS 2 workspace path"""
-    # Standard library
-    import os
-
-    return Path(os.path.expanduser("~/ros2_ws"))
+def test_data_dir(repo_root: Path) -> Path:
+    """Get test data directory"""
+    return repo_root / "tests" / "fixtures"
 
 
 @pytest.fixture(scope="session")
-def isaac_root():
-    """Return Isaac root directory (dev or installed)"""
-    dev_dir = Path("/home/nano/src/jetson-orin-nano")
-    install_dir = Path("/opt/isaac-robot")
+def config_dir(repo_root: Path) -> Path:
+    """Get config directory"""
+    return repo_root / "config"
 
-    if dev_dir.exists():
-        return dev_dir
-    elif install_dir.exists():
-        return install_dir
+
+@pytest.fixture
+def ros_domain_id() -> Generator[int, None, None]:
+    """Set isolated ROS domain for testing"""
+    original = os.environ.get("ROS_DOMAIN_ID")
+    test_domain = "42"  # Isolated test domain
+    os.environ["ROS_DOMAIN_ID"] = test_domain
+    
+    yield int(test_domain)
+    
+    # Restore original
+    if original is not None:
+        os.environ["ROS_DOMAIN_ID"] = original
     else:
-        return Path.cwd()
+        os.environ.pop("ROS_DOMAIN_ID", None)
+
+
+@pytest.fixture
+def mock_hardware_mode() -> Generator[bool, None, None]:
+    """Enable mock hardware mode for testing"""
+    original = os.environ.get("MOCK_HARDWARE")
+    os.environ["MOCK_HARDWARE"] = "true"
+    
+    yield True
+    
+    # Restore original
+    if original is not None:
+        os.environ["MOCK_HARDWARE"] = original
+    else:
+        os.environ.pop("MOCK_HARDWARE", None)
+
+
+# Test markers
+def pytest_configure(config):
+    """Register custom markers"""
+    config.addinivalue_line(
+        "markers", "unit: Unit tests (hermetic, fast)"
+    )
+    config.addinivalue_line(
+        "markers", "integration: Integration tests (require ROS 2)"
+    )
+    config.addinivalue_line(
+        "markers", "hardware: Hardware tests (require real devices)"
+    )
+    config.addinivalue_line(
+        "markers", "slow: Slow tests (> 1 second)"
+    )
+    config.addinivalue_line(
+        "markers", "gpu: GPU tests (require CUDA)"
+    )
+
+
+# Test collection
+def pytest_collection_modifyitems(config, items):
+    """Modify test collection based on markers"""
+    # Skip hardware tests by default
+    skip_hardware = pytest.mark.skip(reason="Requires hardware (use --hardware to run)")
+    skip_gpu = pytest.mark.skip(reason="Requires GPU (use --gpu to run)")
+    
+    for item in items:
+        if "hardware" in item.keywords and not config.getoption("--hardware", default=False):
+            item.add_marker(skip_hardware)
+        if "gpu" in item.keywords and not config.getoption("--gpu", default=False):
+            item.add_marker(skip_gpu)
+
+
+def pytest_addoption(parser):
+    """Add custom command line options"""
+    parser.addoption(
+        "--hardware",
+        action="store_true",
+        default=False,
+        help="Run hardware tests"
+    )
+    parser.addoption(
+        "--gpu",
+        action="store_true",
+        default=False,
+        help="Run GPU tests"
+    )
+    parser.addoption(
+        "--ros-domain",
+        action="store",
+        default="42",
+        help="ROS domain ID for tests"
+    )

@@ -1,0 +1,197 @@
+name: Deploy to Robot
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      hosts:
+        description: 'Target hosts (comma-separated, e.g., jetson,pi)'
+        required: true
+        default: 'jetson'
+
+env:
+  DEPLOY_USER: nano
+  ROS_DISTRO: humble
+
+jobs:
+  deploy-jetson:
+    name: Deploy to Jetson
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.hosts, 'jetson') || github.event_name != 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "DEPLOY_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "DEPLOY_ENV=production" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_ENV=dev" >> $GITHUB_ENV
+          fi
+      
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.JETSON_SSH_KEY }}" > ~/.ssh/jetson_key
+          chmod 600 ~/.ssh/jetson_key
+          
+          # Add host to known_hosts
+          ssh-keyscan -H ${{ secrets.JETSON_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} "echo 'SSH connection successful'"
+      
+      - name: Deploy code to Jetson
+        run: |
+          # Rsync code to Jetson
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/jetson_key" \
+            --exclude '.git' \
+            --exclude 'build' \
+            --exclude 'install' \
+            --exclude 'log' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            ./ ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }}:~/src/jetson-orin-nano/
+      
+      - name: Build on Jetson
+        run: |
+          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} << 'EOF'
+            cd ~/src/jetson-orin-nano
+            
+            # Source ROS 2
+            source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+            
+            # Build packages
+            colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+            
+            echo "Build completed successfully"
+          EOF
+      
+      - name: Restart services (if production)
+        if: env.DEPLOY_ENV == 'production'
+        run: |
+          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} << 'EOF'
+            # Restart systemd service
+            systemctl --user restart isaac-robot.service || true
+            
+            # Wait for service to start
+            sleep 5
+            
+            # Check status
+            systemctl --user status isaac-robot.service
+          EOF
+      
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} << 'EOF'
+            cd ~/src/jetson-orin-nano
+            source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+            source install/setup.bash
+            
+            # Check ROS 2 nodes
+            timeout 10 ros2 node list || echo "No nodes running (may be expected)"
+          EOF
+      
+      - name: Send deployment notification
+        if: always()
+        run: |
+          echo "Deployment to Jetson (${{ env.DEPLOY_ENV }}) completed with status: ${{ job.status }}"
+  
+  deploy-pi:
+    name: Deploy to Raspberry Pi
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.hosts, 'pi')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "DEPLOY_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_ENV=dev" >> $GITHUB_ENV
+          fi
+      
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_key
+          chmod 600 ~/.ssh/pi_key
+          
+          ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy code to Pi
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/pi_key" \
+            --exclude '.git' \
+            --exclude 'build' \
+            --exclude 'install' \
+            --exclude 'log' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            ./ pi@${{ secrets.PI_HOST }}:~/src/jetson-orin-nano/
+      
+      - name: Build on Pi
+        run: |
+          ssh -i ~/.ssh/pi_key pi@${{ secrets.PI_HOST }} << 'EOF'
+            cd ~/src/jetson-orin-nano
+            
+            source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+            
+            # Build only Pi-specific packages
+            colcon build \
+              --packages-select custom_msgs chassis_control power_management \
+              --symlink-install \
+              --cmake-args -DCMAKE_BUILD_TYPE=Release
+            
+            echo "Build completed successfully"
+          EOF
+      
+      - name: Restart services (if production)
+        if: env.DEPLOY_ENV == 'production'
+        run: |
+          ssh -i ~/.ssh/pi_key pi@${{ secrets.PI_HOST }} << 'EOF'
+            systemctl --user restart isaac-robot.service || true
+            sleep 5
+            systemctl --user status isaac-robot.service
+          EOF
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [deploy-jetson]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
