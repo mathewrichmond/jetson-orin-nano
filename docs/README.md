@@ -11,8 +11,9 @@ This directory contains comprehensive documentation for the Isaac Robot System.
 | Document | Description |
 |----------|-------------|
 | **MODULAR_QUICK_START.md** | ⭐ Quick start guide for development |
+| **PRE_COMMIT_DOCKER.md** | ⭐ Fast local testing (30s feedback) |
 | **DEPLOYMENT.md** | Multi-environment deployment guide |
-| **TESTING.md** | Testing framework and CI/CD guide |
+| **TESTING.md** | Testing framework guide |
 
 ### Project Status
 
@@ -38,14 +39,13 @@ This directory contains comprehensive documentation for the Isaac Robot System.
 ```
 architecture/     - System architecture and design
 deployment/       - Deployment configurations and guides  
-development/      - Development workflows and tools
+development/      - Development workflows, CI, local testing
 hardware/         - Hardware setup and configuration
 monitoring/       - System monitoring and diagnostics
-robot/            - Robot-specific documentation
 setup/            - Installation and setup guides
-system/           - System configuration (WiFi, Bluetooth, etc.)
 testing/          - Testing strategies and tools
 visualization/    - Visualization setup (Foxglove, RViz)
+archived/         - Pre-modular architecture docs (historical)
 ```
 
 ---
@@ -55,15 +55,16 @@ visualization/    - Visualization setup (Foxglove, RViz)
 **New to the project?** Start here:
 
 1. **MODULAR_QUICK_START.md** - Build and run the system
-2. **DEPLOYMENT.md** - Choose your deployment configuration
-3. **TESTING.md** - Learn the testing framework
+2. **PRE_COMMIT_DOCKER.md** - Set up fast local testing
+3. **DEPLOYMENT.md** - Choose your deployment configuration
 
 **Looking for specific information?**
 
+- Local testing → `PRE_COMMIT_DOCKER.md`
+- CI/CD → `development/CI.md`
 - Hardware setup → `hardware/`
-- Deployment options → `DEPLOYMENT.md`
+- Deployment → `DEPLOYMENT.md`
 - Testing → `TESTING.md`
-- System configuration → `system/`
 
 ---
 

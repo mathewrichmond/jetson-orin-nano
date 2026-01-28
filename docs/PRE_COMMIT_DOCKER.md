@@ -1,7 +1,20 @@
-# Pre-Commit Hooks with Docker
+# Local Testing with Docker Pre-Commit Hooks
 
-**Purpose**: Run lint and unit tests locally in Docker before pushing to GitHub  
-**Benefit**: Fast feedback loop, CI consistency, catch issues before push
+**Purpose**: Fast local testing before pushing to GitHub  
+**Speed**: ~30 seconds vs 5-10 minutes GitHub Actions  
+**Benefit**: CI consistency, catch issues immediately
+
+---
+
+## Quick Setup
+
+```bash
+# One-time setup
+make pre-commit-install
+
+# Use normally
+git commit -m "message"  # Hooks run automatically
+```
 
 ---
 

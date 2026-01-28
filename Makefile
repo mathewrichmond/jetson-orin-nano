@@ -53,12 +53,25 @@ docker-unit: ## Run unit tests in Docker
 docker-test: ## Run lint + unit tests in Docker (pre-commit simulation)
 	@./scripts/testing/docker_test.sh all
 
-pre-commit-install: ## Install pre-commit hooks
-	@echo "Installing pre-commit hooks..."
+pre-commit-install: ## Install pre-commit hooks (Docker-based testing)
+	@echo "=== Pre-Commit Hook Setup ==="
+	@echo ""
+	@echo "Step 1: Installing pre-commit..."
 	@pip install --user pre-commit || pip3 install --user pre-commit
+	@echo ""
+	@echo "Step 2: Installing hooks..."
 	@pre-commit install
-	@echo "✅ Pre-commit hooks installed"
-	@echo "Hooks will run Docker tests before each commit"
+	@echo ""
+	@echo "Step 3: Building Docker image (first time only)..."
+	@$(MAKE) docker-build
+	@echo ""
+	@echo "✅ Pre-commit hooks installed!"
+	@echo ""
+	@echo "Usage:"
+	@echo "  git commit -m 'message'  # Hooks run automatically (~30s)"
+	@echo "  make docker-test         # Manual testing"
+	@echo ""
+	@echo "See docs/PRE_COMMIT_DOCKER.md for details"
 
 pre-commit-test: ## Test pre-commit hooks manually
 	@echo "Running pre-commit hooks on all files..."
