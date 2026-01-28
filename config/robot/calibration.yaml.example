@@ -1,0 +1,228 @@
+# Robot Calibration Values
+# ======================
+# This file contains calibrated mechanical and sensor parameters for the Isaac robot.
+# These values are automatically updated by calibration nodes and used in simulation.
+#
+# Location: /home/nano/.config/robot/calibration.yaml (production)
+#           config/robot/calibration.yaml.example (template)
+#
+# Last Updated: 2026-01-27
+
+# Camera Extrinsics (Camera to Base Link Transforms)
+# ===================================================
+# Units: meters for translation, radians for rotation
+# Frame convention: ROS REP 105 (X=forward, Y=left, Z=up)
+
+camera_front_extrinsics:
+  # Translation relative to base_link origin (center of iRobot Create, ground level)
+  translation:
+    x: 0.200  # TBD: forward from base center (meters)
+    y: 0.000  # TBD: left from base center (meters)
+    z: 0.300  # TBD: up from base ground level (meters)
+  
+  # Rotation as euler angles (roll, pitch, yaw) in radians
+  rotation:
+    roll: 0.000   # rotation about x-axis (radians)
+    pitch: 0.000  # rotation about y-axis, camera tilt (radians)
+    yaw: 0.000    # rotation about z-axis, camera pan (radians)
+  
+  # Tolerances (for verification)
+  tolerances:
+    translation: [0.005, 0.005, 0.005]  # ±5mm in each axis
+    rotation: [0.017, 0.017, 0.017]     # ±1° in radians
+
+camera_rear_extrinsics:
+  translation:
+    x: -0.200  # TBD: behind base center
+    y: 0.000
+    z: 0.300
+  
+  rotation:
+    roll: 0.000
+    pitch: 0.000
+    yaw: 3.14159  # 180° (facing backward)
+  
+  tolerances:
+    translation: [0.005, 0.005, 0.005]
+    rotation: [0.017, 0.017, 0.017]
+
+# Camera Intrinsics
+# =================
+# Calibrated using ROS 2 camera_calibration or RealSense SDK
+
+camera_front_intrinsics:
+  color:
+    image_width: 1920
+    image_height: 1080
+    camera_matrix:
+      fx: 1380.0  # TBD: focal length x (pixels)
+      fy: 1380.0  # TBD: focal length y (pixels)
+      cx: 960.0   # TBD: principal point x (pixels)
+      cy: 540.0   # TBD: principal point y (pixels)
+    distortion_model: "plumb_bob"
+    distortion_coefficients: [0.0, 0.0, 0.0, 0.0, 0.0]  # TBD: [k1, k2, p1, p2, k3]
+  
+  depth:
+    image_width: 1280
+    image_height: 720
+    camera_matrix:
+      fx: 920.0   # TBD
+      fy: 920.0   # TBD
+      cx: 640.0   # TBD
+      cy: 360.0   # TBD
+    distortion_model: "plumb_bob"
+    distortion_coefficients: [0.0, 0.0, 0.0, 0.0, 0.0]  # TBD
+
+camera_rear_intrinsics:
+  color:
+    image_width: 1920
+    image_height: 1080
+    camera_matrix:
+      fx: 1380.0  # TBD
+      fy: 1380.0  # TBD
+      cx: 960.0   # TBD
+      cy: 540.0   # TBD
+    distortion_model: "plumb_bob"
+    distortion_coefficients: [0.0, 0.0, 0.0, 0.0, 0.0]  # TBD
+  
+  depth:
+    image_width: 1280
+    image_height: 720
+    camera_matrix:
+      fx: 920.0   # TBD
+      fy: 920.0   # TBD
+      cx: 640.0   # TBD
+      cy: 360.0   # TBD
+    distortion_model: "plumb_bob"
+    distortion_coefficients: [0.0, 0.0, 0.0, 0.0, 0.0]  # TBD
+
+# IMU Calibration
+# ===============
+
+imu_calibration:
+  # IMU to base_link transform (SparkFun Auto pHAT location)
+  translation:
+    x: 0.000  # TBD: IMU location on Auto pHAT (meters)
+    y: 0.000
+    z: 0.100  # TBD: approximate height above ground
+  
+  rotation:
+    roll: 0.000   # TBD: IMU alignment with base
+    pitch: 0.000
+    yaw: 0.000
+  
+  tolerances:
+    translation: [0.005, 0.005, 0.005]
+    rotation: [0.017, 0.017, 0.017]
+  
+  # Accelerometer bias (at rest, gravity removed)
+  accel_bias:
+    x: 0.0  # m/s²
+    y: 0.0
+    z: 0.0
+  accel_bias_tolerance: [0.1, 0.1, 0.1]  # ±0.1 m/s²
+  
+  # Gyroscope bias (at rest)
+  gyro_bias:
+    x: 0.0  # rad/s
+    y: 0.0
+    z: 0.0
+  gyro_bias_tolerance: [0.01, 0.01, 0.01]  # ±0.01 rad/s
+  
+  # Magnetometer calibration (hard/soft iron)
+  mag_offset:
+    x: 0.0  # μT
+    y: 0.0
+    z: 0.0
+  
+  mag_scale:
+    x: 1.0  # dimensionless scale factor
+    y: 1.0
+    z: 1.0
+
+# Servo Calibration
+# =================
+
+servo_calibration:
+  # Servo model: MG996R (4x units)
+  # Nominal specs: 180° range, 1000-2000μs PWM, 11 kg·cm @ 6V
+  
+  # Front camera servos
+  front_pan_servo:
+    channel: 0  # PCA9685 channel
+    servo_model: "MG996R"
+    pwm_min: 1000      # microseconds for 0° (to be calibrated)
+    pwm_center: 1500   # microseconds for 90°
+    pwm_max: 2000      # microseconds for 180°
+    angle_min: 0.0     # degrees (mechanical limit, to be verified)
+    angle_center: 90.0 # degrees (forward position)
+    angle_max: 180.0   # degrees (mechanical limit, to be verified)
+    safe_min: 30.0     # degrees (software limit to prevent collision)
+    safe_max: 150.0    # degrees (software limit to prevent collision)
+    tolerance: 2.0     # degrees
+  
+  front_tilt_servo:
+    channel: 1  # PCA9685 channel
+    servo_model: "MG996R"
+    pwm_min: 1000
+    pwm_center: 1500
+    pwm_max: 2000
+    angle_min: 0.0     # TBD: verify mechanical limits
+    angle_center: 90.0 # TBD: level position
+    angle_max: 180.0   # TBD: verify mechanical limits
+    safe_min: 45.0     # TBD: adjust after testing
+    safe_max: 135.0    # TBD: adjust after testing
+    tolerance: 2.0
+  
+  # Rear camera servos
+  rear_pan_servo:
+    channel: 2  # PCA9685 channel
+    servo_model: "MG996R"
+    pwm_min: 1000
+    pwm_center: 1500
+    pwm_max: 2000
+    angle_min: 0.0
+    angle_center: 90.0
+    angle_max: 180.0
+    safe_min: 30.0
+    safe_max: 150.0
+    tolerance: 2.0
+  
+  rear_tilt_servo:
+    channel: 3  # PCA9685 channel
+    servo_model: "MG996R"
+    pwm_min: 1000
+    pwm_center: 1500
+    pwm_max: 2000
+    angle_min: 0.0
+    angle_center: 90.0
+    angle_max: 180.0
+    safe_min: 45.0
+    safe_max: 135.0
+    tolerance: 2.0
+
+# Robot Base Calibration (iRobot Create Odometry)
+# ================================================
+
+robot_base_calibration:
+  # Wheel parameters
+  wheel_radius: 0.036        # meters (nominal: 36mm)
+  wheel_separation: 0.235    # meters (nominal: 235mm)
+  
+  # Odometry correction factors (calibrated via distance tests)
+  linear_scale_factor: 1.0   # correct for wheel wear/slip
+  angular_scale_factor: 1.0  # correct for wheelbase variance
+  
+  # Tolerances
+  tolerances:
+    wheel_radius: 0.001      # ±1mm
+    wheel_separation: 0.002  # ±2mm
+
+# Calibration Metadata
+# ====================
+
+calibration_metadata:
+  last_calibration_date: "TBD"
+  calibration_method: "automated"  # or "manual"
+  robot_serial_number: "TBD"
+  notes: "Initial calibration values - to be refined"

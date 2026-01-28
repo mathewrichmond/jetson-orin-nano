@@ -1,0 +1,62 @@
+# Data Pipeline Configuration
+# Post-processing configuration for session data
+
+pipeline:
+  # Quality check thresholds
+  quality:
+    max_frame_gap_ms: 200        # Flag if >200ms between camera frames
+    min_imu_rate_hz: 40          # Flag if IMU rate <40 Hz
+    max_battery_drop_percent: 5  # Flag if battery drops >5% in 1 minute
+    min_topic_count: 20          # Minimum expected topics in bag
+    check_black_frames: true     # Detect completely black camera frames
+    check_frozen_frames: true    # Detect frozen (duplicate) frames
+    black_threshold: 10          # Mean pixel value threshold for black frames
+    frozen_similarity: 0.99      # Similarity threshold for frozen frames
+  
+  # Parquet conversion settings
+  parquet:
+    compression: "snappy"        # Fast compression (snappy, gzip, zstd)
+    row_group_size: 10000        # Rows per Parquet row group
+    image_encoding: "jpeg"       # Image storage format (jpeg, png, raw)
+    image_quality: 85            # JPEG quality (1-100)
+    sync_timestamps: true        # Align all data to common time base
+    time_base: "monotonic"       # Use monotonic clock as reference
+  
+  # Artifact generation settings
+  artifacts:
+    generate_trajectory_video: true
+    trajectory_video_fps: 10          # Frames per second
+    trajectory_video_resolution: "1280x720"
+    trajectory_views:
+      - "top_down"                    # Bird's eye view
+      - "3d_perspective"              # 3D view
+    
+    generate_thumbnails: true
+    thumbnail_interval_sec: 60        # One thumbnail per minute
+    thumbnail_resolution: "320x240"
+    
+    generate_summary_stats: true
+    summary_stats_include:
+      - "distance_traveled"
+      - "actions_taken"
+      - "inference_count"
+      - "anomaly_count"
+      - "avg_inference_time_ms"
+      - "battery_usage_percent"
+  
+  # Pipeline execution settings
+  execution:
+    priority: 19                 # nice priority (19 = lowest)
+    io_class: "best-effort"      # ionice class
+    max_parallel_conversions: 2  # Max parallel Parquet conversions
+    auto_trigger_on_stop: true   # Automatically run pipeline on session stop
+    retry_on_failure: true
+    max_retries: 3
+    
+  # Output locations (relative to session directory)
+  output:
+    quality_report: "quality/qc_report.json"
+    anomaly_flags: "quality/anomaly_flags.json"
+    processing_log: "metadata/pipeline.log"
+    processing_manifest: "metadata/processing_manifest.json"
+    data_schema: "metadata/data_schema.json"

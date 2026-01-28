@@ -1,0 +1,71 @@
+# Session-Based Data Structure Configuration
+# Unified structure for both robot and simulation data collection
+
+session_structure:
+  # Storage locations
+  root: "/mnt/nfs/robot_data"  # Primary shared volume mount point
+  local_fallback: "/home/nano/data"  # Local fallback when NFS unavailable
+  
+  # Session naming convention: session_{timestamp}_{session_id}
+  # Example: session_20260127_143022_abc123
+  session_naming: "session_{timestamp}_{session_id}"
+  
+  # Directory structure within each session
+  directories:
+    raw: "raw/"              # Original ROS bag files
+    processed: "processed/"  # Converted Parquet files for ML
+    metadata: "metadata/"    # Session manifests, configs, schemas
+    artifacts: "artifacts/"  # Videos, images, visualizations
+    quality: "quality/"      # Quality check reports, anomaly flags
+    models: "models/"        # Model checkpoints/checksums used in session
+  
+  # ROS bag recording configuration
+  bag_naming: "{session_id}_part_{num:03d}.bag"  # e.g., abc123_part_001.bag
+  bag_split_size_mb: 1024   # Split bags at 1GB
+  bag_split_duration_sec: 600  # Or split at 10 minutes
+  
+  # Topics to record (VLA training data)
+  topics:
+    camera:
+      - "/hardware/camera_front/color/image_raw"
+      - "/hardware/camera_front/depth/image_rect_raw"
+      - "/hardware/camera_rear/color/image_raw"
+      - "/hardware/camera_rear/depth/image_rect_raw"
+    audio:
+      - "/sensor_fusion/audio/raw"
+      - "/audio/features/mfcc"
+      - "/audio/transcription"
+    actions:
+      - "/vla/actions"
+      - "/control/cmd_vel"
+    state:
+      - "/rpi/chassis/odometry"
+      - "/rpi/imu/filtered"
+      - "/vision/global_pose"
+    power:
+      - "/irobot/battery"
+      - "/jetson/power/status"
+      - "/jetson/system/performance"
+    health:
+      - "/jetson/health/summary"
+  
+  # Session metadata fields
+  metadata_fields:
+    - robot_config      # Robot configuration at session start
+    - model_version     # VLA model version/checksum
+    - git_commit        # Code version
+    - environment       # "robot" or "sim"
+    - start_time        # ISO 8601 timestamp
+    - end_time          # ISO 8601 timestamp (set on stop)
+    - duration_sec      # Total duration
+    - total_size_bytes  # Total data size
+    - bag_count         # Number of bag files
+    - status            # "recording", "processing", "completed", "failed"
+  
+  # Cleanup policy
+  cleanup:
+    keep_raw_days: 7           # Keep raw bags for 7 days on device
+    keep_processed_days: 30    # Keep processed data for 30 days
+    delete_failed_days: 30     # Delete failed sessions after 30 days
+    archive_threshold_percent: 85  # Start archiving when disk >85% full
+    min_free_gb: 10            # Minimum free space to maintain

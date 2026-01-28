@@ -9,6 +9,8 @@ Implements power mode state machine based on battery level and system health
 from enum import Enum
 import time
 from typing import Dict, Optional
+import subprocess
+import re
 
 # Third-party
 import rclpy
@@ -19,6 +21,14 @@ from custom_msgs.msg import PowerRequest, SystemPerformance
 
 # Local
 from isaac_utils import HealthStatusPublisher
+
+# Try to import psutil for system metrics
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("Warning: psutil not available, system metrics will be unavailable")
 
 
 class PowerMode(Enum):
@@ -114,6 +124,12 @@ class PowerManagerNode(Node):
 
         self.gpu_power_state = "off"  # off, on, sleep
         self.pending_power_requests: Dict[str, PowerRequest] = {}  # {requester: request}
+        
+        # System metrics cache
+        self.cpu_usage_pct = 0.0
+        self.gpu_usage_pct = 0.0
+        self.memory_usage_pct = 0.0
+        self.last_metrics_update = time.time()
 
         # Subscribers
         self.battery_sub = self.create_subscription(
@@ -325,6 +341,9 @@ class PowerManagerNode(Node):
 
     def _publish_system_performance(self):
         """Publish system performance metrics"""
+        # Update metrics cache
+        self._update_system_metrics()
+        
         msg = SystemPerformance()
         msg.header.stamp = self.get_clock().now().to_msg()
 
@@ -337,12 +356,67 @@ class PowerManagerNode(Node):
         msg.battery_voltage_v = self.battery_voltage
         msg.battery_current_a = self.battery_current
 
-        # TODO: Add CPU/GPU usage, memory, etc. from system monitor
-        msg.cpu_usage_pct = 0.0
-        msg.gpu_usage_pct = 0.0 if self.gpu_power_state == "off" else 0.0
-        msg.memory_usage_pct = 0.0
+        # System metrics (from psutil and tegrastats)
+        msg.cpu_usage_pct = self.cpu_usage_pct
+        msg.gpu_usage_pct = self.gpu_usage_pct if self.gpu_power_state != "off" else 0.0
+        msg.memory_usage_pct = self.memory_usage_pct
 
         self.system_performance_pub.publish(msg)
+    
+    def _update_system_metrics(self):
+        """Update CPU/GPU/memory usage metrics"""
+        current_time = time.time()
+        
+        # Rate limit updates to every 1 second
+        if current_time - self.last_metrics_update < 1.0:
+            return
+        
+        self.last_metrics_update = current_time
+        
+        # CPU usage via psutil
+        if PSUTIL_AVAILABLE:
+            try:
+                self.cpu_usage_pct = psutil.cpu_percent(interval=None)
+            except Exception as e:
+                self.get_logger().debug(f"Failed to get CPU usage: {e}")
+        
+        # Memory usage via psutil
+        if PSUTIL_AVAILABLE:
+            try:
+                memory = psutil.virtual_memory()
+                self.memory_usage_pct = memory.percent
+            except Exception as e:
+                self.get_logger().debug(f"Failed to get memory usage: {e}")
+        
+        # GPU usage via tegrastats (Jetson-specific)
+        if self.gpu_power_state != "off":
+            try:
+                self.gpu_usage_pct = self._get_gpu_usage_tegrastats()
+            except Exception as e:
+                self.get_logger().debug(f"Failed to get GPU usage: {e}")
+    
+    def _get_gpu_usage_tegrastats(self) -> float:
+        """Get GPU usage from tegrastats command"""
+        try:
+            # Run tegrastats for 1 iteration
+            result = subprocess.run(
+                ['tegrastats', '--interval', '500'],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            
+            if result.returncode == 0:
+                # Parse output for GPU usage
+                # Format: GR3D_FREQ x%@yMHz
+                match = re.search(r'GR3D_FREQ\s+(\d+)%', result.stdout)
+                if match:
+                    return float(match.group(1))
+            
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+            pass
+        
+        return 0.0
 
     def _publish_health(self):
         """Publish health status"""

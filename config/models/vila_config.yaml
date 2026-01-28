@@ -1,0 +1,111 @@
+# VILA 1.5-3B Model Configuration
+
+model:
+  name: "VILA1.5-3b"
+  path: "/opt/models/vila/VILA1.5-3b"  # Production model path
+  type: "vila"
+  device: "cuda"  # cuda or cpu
+  dtype: "float16"  # float16 for inference, float32 for training
+  
+  # Model source locations
+  sources:
+    production: "/opt/models/vila/VILA1.5-3b"
+    test: "/home/nano/models/test/vila"
+    huggingface: "Efficient-Large-Model/VILA1.5-3b"
+    local_cache: "/home/nano/.cache/huggingface"
+
+inference:
+  # Action prediction
+  action_horizon: 16  # Predict 16-step action sequences
+  max_new_tokens: 16  # Same as action horizon
+  do_sample: false    # Deterministic for robotics
+  temperature: 1.0
+  
+  # Context management
+  context_window: 8   # Use last 8 frames for video understanding
+  include_history: true  # Include recent action history
+  
+  # Performance
+  inference_rate: 5.0  # Target Hz (may be lower depending on hardware)
+  batch_size: 1        # Process one observation at a time
+  
+  # Confidence and safety
+  confidence_threshold: 0.5  # Min confidence to execute action
+  safety_checks: true         # Enable safety constraint checking
+
+actions:
+  # Action space definition
+  output_dim: 7  # [x, y, z, roll, pitch, yaw, gripper]
+  
+  # Action components
+  components:
+    - name: "linear_x"
+      index: 0
+      min: -0.5
+      max: 0.5
+      unit: "m/s"
+    - name: "linear_y"
+      index: 1
+      min: -0.5
+      max: 0.5
+      unit: "m/s"
+    - name: "linear_z"
+      index: 2
+      min: -0.2
+      max: 0.2
+      unit: "m/s"
+    - name: "angular_roll"
+      index: 3
+      min: -0.5
+      max: 0.5
+      unit: "rad/s"
+    - name: "angular_pitch"
+      index: 4
+      min: -0.5
+      max: 0.5
+      unit: "rad/s"
+    - name: "angular_yaw"
+      index: 5
+      min: -1.0
+      max: 1.0
+      unit: "rad/s"
+    - name: "gripper"
+      index: 6
+      min: 0.0
+      max: 1.0
+      unit: "normalized"
+  
+  # Safety constraints
+  clip_range: [-1.0, 1.0]     # Clip all actions to this range first
+  velocity_scaling: 0.5        # Safety multiplier for velocities
+  max_acceleration: 2.0        # Max acceleration (m/s²)
+  emergency_stop_threshold: 0.1  # Confidence below this triggers stop
+  
+  # Action smoothing
+  enable_smoothing: true
+  smoothing_alpha: 0.3  # EMA smoothing factor (lower = more smoothing)
+
+# Logging and monitoring
+logging:
+  enable_data_logging: true   # Log all inferences to session
+  log_interval: 1             # Log every N inferences
+  log_failed_inferences: true # Log when inference fails
+  
+monitoring:
+  publish_latency: true      # Publish inference latency metrics
+  publish_confidence: true   # Publish model confidence
+  warn_latency_ms: 200       # Warn if inference takes >200ms
+  error_latency_ms: 500      # Error if inference takes >500ms
+
+# Model loading
+loading:
+  lazy_load: false           # Load model at startup (not on first inference)
+  verify_checksum: true      # Verify model file integrity
+  auto_download: false       # Don't auto-download from HuggingFace
+  download_timeout_sec: 600  # Timeout for model download
+
+# GPU power management
+power:
+  request_gpu: true          # Request GPU power from power manager
+  gpu_priority: 4            # Highest priority (0-5, higher = more important)
+  allow_cpu_fallback: false  # Don't fall back to CPU if GPU unavailable

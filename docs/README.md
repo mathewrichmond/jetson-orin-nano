@@ -13,6 +13,7 @@ This directory contains comprehensive documentation for the Isaac Robot System.
 | **QUICK_START.md** | ⭐ 3-step quick start (10 minutes) |
 | **MODULAR_QUICK_START.md** | ⭐ Detailed setup guide for development |
 | **development/LOCAL_TESTING.md** | ⭐ Fast local testing with Docker (30s feedback) |
+| **development/LOGGING.md** | ⭐ Data logging and session management |
 | **deployment/DEPLOYMENT.md** | Multi-environment deployment guide |
 | **testing/TESTING.md** | Testing framework guide |
 
@@ -63,6 +64,7 @@ archived/         - Pre-modular architecture docs (historical)
 **Looking for specific information?**
 
 - Quick start → `QUICK_START.md`
+- Data logging → `development/LOGGING.md`
 - Local testing → `development/LOCAL_TESTING.md`
 - CI/CD → `development/CI.md`
 - Hardware setup → `hardware/`

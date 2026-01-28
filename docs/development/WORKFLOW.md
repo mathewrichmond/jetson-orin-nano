@@ -42,12 +42,29 @@ source ~/ros2_ws/install/setup.bash  # If workspace is built
 ### 4. Run Code
 
 ```bash
-# Run system monitor
-ros2 launch system_monitor system_monitor.launch.py
+# Launch minimal system
+ros2 launch isaac_robot graph.launch.py graph:=minimal_graph.yaml
 
 # Or run any other ROS 2 nodes
 ros2 run <package> <node>
 ```
+
+### 5. Data Collection (Optional)
+
+```bash
+# Start recording training data
+scripts/logging/start_logging.sh
+
+# Do your robot operations...
+
+# Stop recording (automatically processes data)
+scripts/logging/stop_logging.sh
+
+# Check session status
+scripts/logging/session_status.sh
+```
+
+See [LOGGING.md](LOGGING.md) for complete guide on data collection and session management.
 
 ## Docker Workflow
 

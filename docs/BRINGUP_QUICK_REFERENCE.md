@@ -89,6 +89,27 @@ ros2 launch isaac_robot graph.launch.py \
 
 ---
 
+## Session Logging
+
+### Start/Stop Data Recording
+```bash
+# Start recording (creates new session)
+scripts/logging/start_logging.sh
+
+# Stop recording (triggers data pipeline)
+scripts/logging/stop_logging.sh
+
+# Check session status
+scripts/logging/session_status.sh
+
+# List recent sessions
+python3 scripts/logging/list_sessions.py --limit 5
+```
+
+**Note**: Logging automatically starts/stops with systemd service. See [LOGGING.md](development/LOGGING.md) for full guide.
+
+---
+
 ## Monitoring Commands
 
 ### Node Status
