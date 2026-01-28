@@ -17,6 +17,7 @@ This is a **robot control system** repository that:
 2. **Stability**: The system should be self-updating, self-cleaning, and self-restoring where possible.
 3. **Documentation**: Code should be well-documented for both humans and AI tools.
 4. **Modularity**: Hardware drivers, control modes, and utilities should be modular and reusable.
+5. **Organization**: Keep repo clean - NO ad-hoc docs or scripts at root level. Use `docs/` subdirectories and `Makefile`.
 
 ## Directory Structure
 
@@ -92,6 +93,7 @@ This is a **robot control system** repository that:
 4. **Document assumptions**: Note hardware requirements, dependencies
 5. **Consider safety**: Add safety checks for hardware operations
 6. **Test incrementally**: Test hardware integration step-by-step
+7. **Keep repo clean**: NO ad-hoc docs or scripts at root - see Documentation Policies and Script Management
 
 ## Node and Graph Management
 
@@ -131,39 +133,194 @@ When writing code or documentation:
 
 ## Documentation Policies
 
-**CRITICAL**: Follow these rules to prevent documentation sprawl:
+**CRITICAL**: Follow these rules to prevent documentation sprawl and ad-hoc files:
 
-1. **Location Rules**:
-   - **README.md**: Only in package roots (`src/<package>/README.md`) and repository root
-   - **All other docs**: Must be in `docs/` folder, organized by topic
-   - **No root-level docs**: Except `README.md` and `CONTRIBUTING.md`
+### 1. Location Rules (STRICT)
 
-2. **Consolidation Rules**:
-   - **Prefer updating existing docs** over creating new ones
-   - **Merge redundant content** into single authoritative docs
-   - **Remove deprecated docs** - don't document deprecated features
-   - **One doc per topic** - consolidate related quick starts into main docs
+**ALLOWED at root level**:
+- `README.md` - Project overview only
+- `CONTRIBUTING.md` - Contribution guidelines only
+- `setup.sh` - Main system setup script only
+- `Makefile` - Build and common commands only
 
-3. **Documentation Structure**:
-   - `docs/setup/` - Setup and installation guides
-   - `docs/development/` - Development workflow and tools
-   - `docs/deployment/` - Deployment and CI/CD
-   - `docs/hardware/` - Hardware setup and configuration
-   - `docs/system/` - System configuration (WiFi, Bluetooth, etc.)
-   - `docs/robot/` - Robot-specific documentation
-   - `docs/monitoring/` - Monitoring and diagnostics
-   - `docs/architecture/` - System architecture and design
+**FORBIDDEN at root level**:
+- ❌ **NO ad-hoc documentation** (CLEANUP_*.md, FIXES*.md, SETUP_*.md, STATUS*.md, etc.)
+- ❌ **NO temporary/summary docs** (SUMMARY.md, NOTES.md, TODO.md, LOG.md, etc.)
+- ❌ **NO ad-hoc scripts** (quick_*.sh, setup_*.sh, test_*.sh, run_*.sh, etc.)
+- ❌ **NO duplicate quick starts** (QUICK_START_*.md, *_QUICK_START.md, etc.)
+- ❌ **NO status/tracking files** (except .gitignore, .setup_state, etc.)
 
-4. **Before Creating New Docs**:
-   - Check if similar doc exists in `docs/`
-   - Update existing doc instead of creating new one
-   - If creating new doc, ensure it's in correct `docs/` subfolder
-   - Never create test/summary/temporary markdown files
+**ALL documentation MUST go in `docs/` subdirectories**:
+- `docs/setup/` - Setup and installation guides
+- `docs/development/` - Development workflow, CI, local testing
+- `docs/deployment/` - Deployment and multi-environment configs
+- `docs/hardware/` - Hardware setup and configuration
+- `docs/testing/` - Testing strategies and tools
+- `docs/monitoring/` - Monitoring and diagnostics
+- `docs/architecture/` - System architecture and design
+- `docs/visualization/` - Visualization setup
+- `docs/archived/` - Deprecated/historical docs (clearly marked)
 
-5. **Quick Reference**:
-   - Use `docs/QUICK_START.md` for quick reference
-   - Link to detailed docs from quick start
-   - Keep quick start concise and actionable
+### 2. Before Creating ANY File
+
+**ALWAYS ask these questions**:
+1. Does this file belong in `docs/` instead of root?
+2. Can I update an existing doc instead?
+3. Is this a temporary file that will clutter the repo?
+4. Should this be a `Makefile` command instead of a script?
+5. Am I creating duplicate documentation?
+
+**If creating documentation**:
+- ✅ Check `docs/README.md` for existing docs on this topic
+- ✅ Update existing doc if one exists
+- ✅ Place in appropriate `docs/` subdirectory
+- ✅ Add reference to `docs/README.md` if it's a major doc
+- ❌ NEVER create root-level ad-hoc docs
+- ❌ NEVER create temporary summary/log files
+
+**If creating a script**:
+- ✅ Check if it belongs in `scripts/` subdirectory
+- ✅ Check if it should be a `Makefile` command instead
+- ✅ Use existing patterns from `scripts/` subdirectories
+- ❌ NEVER create root-level ad-hoc scripts
+- ❌ NEVER create one-off helper scripts at root
+
+### 3. Consolidation Rules
+
+- **Prefer updating existing docs** over creating new ones
+- **Merge redundant content** into single authoritative docs
+- **Remove deprecated docs** - move to `docs/archived/` with clear README
+- **One doc per topic** - no duplicate QUICK_START.md files
+- **Use Makefile for common commands** - not ad-hoc scripts
+
+### 4. Common Commands (Use Makefile)
+
+**Instead of creating ad-hoc scripts, add to Makefile**:
+- `make pre-commit-install` - Setup pre-commit hooks
+- `make docker-build` - Build Docker CI image
+- `make docker-test` - Run all tests in Docker
+- `make docker-lint` - Run lint checks in Docker
+- `make docker-unit` - Run unit tests in Docker
+
+**NEVER create these at root**:
+- ❌ `quick_start.sh` → Use `make` commands
+- ❌ `setup_precommit.sh` → Use `make pre-commit-install`
+- ❌ `run_tests.sh` → Use `make docker-test`
+- ❌ `build_docker.sh` → Use `make docker-build`
+
+### 5. Documentation Checklist
+
+**Before committing documentation**:
+- [ ] Is it in the correct `docs/` subdirectory?
+- [ ] Did I check for existing docs to update?
+- [ ] Is this the single source of truth for this topic?
+- [ ] Did I update `docs/README.md` if needed?
+- [ ] Did I avoid creating root-level ad-hoc files?
+- [ ] Did I avoid creating temporary/summary files?
+- [ ] Will this file still be useful in 6 months?
+
+### 6. Key Documentation Files
+
+**Main Documentation**:
+- `docs/README.md` - Documentation index (START HERE)
+- `docs/QUICK_START.md` - 3-step quick start
+- `docs/MODULAR_QUICK_START.md` - Detailed setup guide
+- `docs/PRE_COMMIT_DOCKER.md` - Local testing setup
+- `docs/DEPLOYMENT.md` - Deployment guide
+- `docs/TESTING.md` - Testing guide
+- `docs/IMPLEMENTATION_STATUS.md` - TODOs and integration points
+
+**Development Workflow**:
+- `docs/development/CI.md` - CI status and local alternatives
+- `docs/development/WORKFLOW.md` - Development workflow
+- `docs/development/DEVELOPMENT_ENVIRONMENT.md` - Dev environment setup
+
+**NEVER create duplicate/competing versions of these**
+
+## Script Management
+
+**CRITICAL**: Keep scripts organized and avoid ad-hoc root-level scripts.
+
+### Script Locations
+
+**Organized scripts** (in `scripts/` subdirectories):
+- `scripts/system/` - System-level setup and configuration (sudo scripts)
+- `scripts/hardware/` - Hardware installation and setup
+- `scripts/monitoring/` - Health checks and diagnostics
+- `scripts/maintenance/` - Self-updating, cleaning, recovery
+- `scripts/testing/` - Testing utilities and Docker helpers
+- `scripts/deployment/` - Deployment automation
+
+**Common commands** (in `Makefile`):
+- Build commands (`make build`, `make clean`)
+- Test commands (`make test`, `make docker-test`, etc.)
+- Setup commands (`make pre-commit-install`)
+- Docker commands (`make docker-build`, `make docker-lint`)
+
+**NEVER create at root level**:
+- ❌ Ad-hoc scripts (quick_*.sh, setup_*.sh, run_*.sh, test_*.sh)
+- ❌ One-off helper scripts
+- ❌ Temporary automation scripts
+- ❌ Duplicate functionality scripts
+
+### Before Creating a Script
+
+**Ask these questions**:
+1. Should this be a `Makefile` command instead?
+2. Does a similar script already exist in `scripts/`?
+3. Which `scripts/` subdirectory does this belong in?
+4. Will this script be used more than once?
+5. Is this duplicating existing functionality?
+
+**If it should be a script**:
+- ✅ Place in appropriate `scripts/` subdirectory
+- ✅ Follow naming convention (`snake_case.sh` or `kebab-case.sh`)
+- ✅ Add shebang (`#!/bin/bash`)
+- ✅ Add error handling (`set -e`)
+- ✅ Add description comment at top
+- ✅ Make executable (`chmod +x`)
+- ❌ NEVER place at root level
+- ❌ NEVER create temporary/ad-hoc scripts
+
+**If it should be a Makefile command**:
+- ✅ Add to `Makefile` with clear target name
+- ✅ Add help text with `## Comment`
+- ✅ Keep command simple or call script in `scripts/`
+- ✅ Group related commands together
+
+### Examples
+
+**GOOD** (organized):
+```bash
+# Makefile command for common task
+make pre-commit-install
+
+# Script in proper location
+scripts/testing/docker_test.sh
+
+# Script in system subdirectory
+scripts/system/setup_network.sh
+```
+
+**BAD** (ad-hoc):
+```bash
+# Root-level ad-hoc scripts (DON'T DO THIS)
+./quick_start.sh          # Should be: make pre-commit-install
+./setup_precommit.sh      # Should be: make pre-commit-install
+./run_tests.sh            # Should be: make docker-test
+./build_docker.sh         # Should be: make docker-build
+./deploy_now.sh           # Should be: scripts/deployment/deploy.sh
+```
+
+### Script Checklist
+
+**Before creating a script**:
+- [ ] Can this be a `Makefile` command instead?
+- [ ] Is there an existing script I can update?
+- [ ] Which `scripts/` subdirectory does this belong in?
+- [ ] Does this script have a clear, singular purpose?
+- [ ] Is it properly documented with comments?
+- [ ] Did I avoid creating it at root level?
 
 ## License
 
