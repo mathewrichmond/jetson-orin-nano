@@ -15,7 +15,7 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         (os.path.join("share", package_name, "launch"), glob("launch/*.py")),
-        (os.path.join("share", package_name, "config"), glob("config/**/*.yaml", recursive=True)),
+        # Note: Configs are now centralized in workspace root /config/robot/
     ],
     install_requires=["setuptools", "pyyaml"],
     zip_safe=True,

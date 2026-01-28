@@ -17,10 +17,8 @@ install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}/
 )
 
-# Install config files
-install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}/
-)
+# Note: Config files are now centralized in workspace root /config/robot/
+# No need to install package-specific configs
 
 # Create entry point scripts for Python executables
 install(CODE "
