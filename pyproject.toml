@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Modular robotics system for Jetson Orin Nano with VLA model integration"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Isaac Robot Team"}
 ]
@@ -16,7 +16,6 @@ keywords = ["robotics", "ros2", "vla", "jetson", "autonomous"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Topic :: Scientific/Engineering :: Robotics",
@@ -124,15 +123,17 @@ Documentation = "https://github.com/yourusername/isaac-robot/tree/main/docs"
 Repository = "https://github.com/yourusername/isaac-robot"
 "Bug Tracker" = "https://github.com/yourusername/isaac-robot/issues"
 
-[project.scripts]
-# Command-line tools (if any)
-isaac-robot = "isaac_robot.cli:main"
+# No CLI scripts for ROS 2 workspace (use ros2 commands instead)
+# [project.scripts]
 
 [tool.setuptools]
-packages = ["isaac_robot"]
+# ROS 2 workspace - packages are built with colcon, not pip
+# This pyproject.toml is for development dependencies only
+packages = []
 
-[tool.setuptools.package-data]
-isaac_robot = ["py.typed"]
+[tool.setuptools.package-dir]
+# Point to src for any development imports
+"" = "src"
 
 [tool.black]
 line-length = 100
