@@ -14,7 +14,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument(
-                "graph_config", default_value="robot_graph.yaml", description="Graph config file"
+                "graph_config", default_value="modular_graph.yaml", description="Graph config file"
             ),
             DeclareLaunchArgument("group", default_value="all", description="Graph group"),
             DeclareLaunchArgument(

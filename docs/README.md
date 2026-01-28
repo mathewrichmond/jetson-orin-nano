@@ -20,6 +20,7 @@ This directory contains comprehensive documentation for the Isaac Robot System.
 |----------|-------------|
 | **MODULAR_ARCHITECTURE_PROGRESS.md** | Overall project progress (100% complete) |
 | **PHASES_COMPLETE.md** | Summary of all 6 completed phases |
+| **IMPLEMENTATION_STATUS.md** | ⭐ TODOs, placeholders, and integration guide |
 
 ### Technical Guides
 

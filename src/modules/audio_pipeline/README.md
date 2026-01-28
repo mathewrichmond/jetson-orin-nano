@@ -178,7 +178,7 @@ python3 test_node_imports.py
 
 **Input Sources**:
 - `usb_microphone_node` - Raw audio capture
-- `sensor_sync_node` - Audio synchronization to camera frames
+- `audio_pipeline_node` - Audio orchestration and power management
 
 **Outputs**:
 - `vla_planner` module - Consumes audio features
@@ -187,9 +187,9 @@ python3 test_node_imports.py
 ### Data Flow
 
 ```
-USB Mic → sensor_sync → audio_feature_extractor → VLA Model
-                              ↓
-                      speech_recognition → Commands
+USB Mic → audio_pipeline → audio_feature_extractor → VLA Model
+                                 ↓
+                        speech_recognition → Commands
 ```
 
 ---
@@ -279,7 +279,7 @@ pip install vosk  # Vosk (offline)
 
 **Check**:
 1. USB microphone is publishing: `ros2 topic echo /microphone/audio`
-2. sensor_sync is running: `ros2 topic echo /sensor_fusion/audio/raw`
+2. audio_pipeline is running: `ros2 node list | grep audio`
 3. Feature extractor is subscribed: `ros2 node info /audio_feature_extractor_node`
 
 ### High CPU Usage

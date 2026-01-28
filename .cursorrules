@@ -101,12 +101,12 @@ This is a **robot control system** repository that:
   - Start: `systemctl --user start isaac-robot.service`
   - Stop: `systemctl --user stop isaac-robot.service`
   - Logs: `journalctl --user -u isaac-robot.service -f`
-- **Primary method (development)**: `ros2 launch isaac_robot composable_graph.launch.py`
-  - Use the graph config + group parameters from `config/robot/robot_graph.yaml`
+- **Primary method (development)**: `ros2 launch isaac_robot graph.launch.py`
+  - Use the graph config + group parameters from `config/robot/modular_graph.yaml`
 - **Avoid multiple instances**:
   - Before launching, stop systemd service and ensure no `ros2 launch`/container processes are running.
   - Never run both systemd and a manual `ros2 launch` concurrently.
-- **Adding nodes**: Add to `config/robot/robot_graph.yaml` (or other graph configs) and launch via systemd/launch.
+- **Adding nodes**: Add to `config/robot/modular_graph.yaml` (or other graph configs) and launch via systemd/launch.
 - **Systemd integration**: `scripts/system/start_robot.sh` is the entry point used by systemd.
 
 When writing code or documentation:

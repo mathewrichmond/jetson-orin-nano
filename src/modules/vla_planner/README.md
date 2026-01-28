@@ -192,7 +192,7 @@ python3 test_node_imports.py
 ### With Existing System
 
 **Input Sources**:
-- `sensor_sync_node` - Synchronized sensor data
+- `vision_pipeline` module - Synchronized vision data
 - `audio_feature_extractor_node` - Audio features
 - `chassis_controller_node` - Robot state
 - `speech_recognition_node` - Voice commands
@@ -204,10 +204,10 @@ python3 test_node_imports.py
 ### Full Pipeline
 
 ```
-Cameras → sensor_sync → VLA Controller → Action Executor → Motors
-                              ↑                 ↓
-Audio → audio_features ────┘           execution_feedback
-                                              ↓
+Cameras → vision_pipeline → VLA Controller → Action Executor → Motors
+                                  ↑                 ↓
+Audio → audio_features ─────────┘           execution_feedback
+                                                    ↓
 Speech → transcription → Planner ───────────┘
 ```
 

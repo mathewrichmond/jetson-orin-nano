@@ -25,7 +25,7 @@ class HealthMonitorNode(Node):
         super().__init__("health_monitor_node")
 
         # Parameters
-        self.declare_parameter("graph_config", "robot_graph.yaml")
+        self.declare_parameter("graph_config", "modular_graph.yaml")
         self.declare_parameter("group", "all")
         self.declare_parameter("health_publish_rate", 1.0)
         self.declare_parameter("health_warn_timeout_sec", 5.0)

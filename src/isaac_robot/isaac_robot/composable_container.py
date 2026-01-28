@@ -315,7 +315,7 @@ class ComposableNodeContainer(Node):
 
                         # If node supports deferred initialization, initialize now
                         if defer_init:
-                            # Check for _initialize_cameras (camera node) or _initialize (sensor_sync)
+                            # Check for _initialize_cameras or other deferred init methods
                             if hasattr(node_instance, "_initialize_cameras"):
                                 self.get_logger().info(
                                     f"Initializing {class_name} after parameter setup"

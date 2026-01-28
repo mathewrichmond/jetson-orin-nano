@@ -14,6 +14,6 @@ ros2 launch health_monitor health_monitor.launch.py
 ```
 
 Parameters:
-- `graph_config`: Graph config YAML file (default `robot_graph.yaml`)
+- `graph_config`: Graph config YAML file (default `modular_graph.yaml`)
 - `group`: Node group (default `all`)
 - `health_publish_rate`: Publish rate for summary (Hz)

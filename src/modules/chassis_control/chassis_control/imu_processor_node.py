@@ -2,7 +2,7 @@
 """
 IMU Processor Node
 Processes raw IMU data with Kalman filtering for dead reckoning on Raspberry Pi
-Extracted from monolithic sensor_sync for modular chassis control
+Part of the modular chassis_control module
 """
 
 # Standard library
