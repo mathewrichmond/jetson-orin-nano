@@ -1,10 +1,7 @@
 name: Deploy to Robot
 
 on:
-  push:
-    branches: [ main ]
-    tags:
-      - 'v*'
+  # Only manual deployment (auto-deploy disabled until secrets configured)
   workflow_dispatch:
     inputs:
       environment:
@@ -28,7 +25,7 @@ jobs:
   deploy-jetson:
     name: Deploy to Jetson
     runs-on: ubuntu-latest
-    if: contains(github.event.inputs.hosts, 'jetson') || github.event_name != 'workflow_dispatch'
+    if: contains(github.event.inputs.hosts, 'jetson')
     
     steps:
       - name: Checkout code
