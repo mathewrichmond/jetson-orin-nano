@@ -1,0 +1,58 @@
+cmake_minimum_required(VERSION 3.8)
+project(audio_pipeline)
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(isaac_utils REQUIRED)
+find_package(custom_msgs REQUIRED)
+
+# Install Python package
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS
+  audio_pipeline/audio_feature_extractor_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME audio_feature_extractor_node
+)
+
+install(PROGRAMS
+  audio_pipeline/speech_recognition_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME speech_recognition_node
+)
+
+install(PROGRAMS
+  audio_pipeline/audio_pipeline_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME audio_pipeline_node
+)
+
+# Install launch files
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+  OPTIONAL
+)
+
+# Install config files
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}
+  OPTIONAL
+)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()

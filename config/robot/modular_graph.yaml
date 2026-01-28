@@ -1,0 +1,731 @@
+# Modular Robot Graph Configuration
+# Phases 1-4 Complete: Chassis Control + Vision Pipeline + Power Management + Audio + VLA Planner
+# This configuration integrates the new modular architecture
+
+robot:
+  # ====================
+  # SYSTEM CORE (Existing)
+  # ====================
+  
+  system_monitor:
+    enabled: true
+    package: system_monitor
+    node: system_monitor_node
+    namespace: /jetson
+    parameters:
+      update_rate: 5.0
+      temp_warning_threshold: 70.0
+      temp_critical_threshold: 85.0
+      cpu_warning_threshold: 80.0
+      memory_warning_threshold: 85.0
+      disk_warning_threshold: 85.0
+    topics:
+      publish:
+        - /jetson/system/status
+        - /jetson/system/temperature/cpu
+        - /jetson/system/temperature/gpu
+        - /jetson/system/cpu/usage
+        - /jetson/system/gpu/usage
+        - /jetson/system/memory/usage
+        - /jetson/system/disk/usage
+        - /jetson/system/power
+        - /jetson/system/alerts
+
+  health_monitor:
+    enabled: true
+    package: health_monitor
+    node: health_monitor_node
+    namespace: /jetson
+    parameters:
+      graph_config: "modular_graph.yaml"
+      group: "all"
+      health_publish_rate: 1.0
+    topics:
+      publish:
+        - /jetson/health/summary
+        - /jetson/health/nodes
+
+  # ====================
+  # PHASE 3: POWER MANAGEMENT MODULE
+  # ====================
+  
+  power_manager:
+    enabled: true
+    package: power_management
+    node: power_manager_node
+    namespace: /jetson
+    parameters:
+      # Power mode configuration
+      initial_mode: "AUTO"  # AUTO, FULL, BALANCED, ECONOMY, CRITICAL, CHARGING
+      battery_full_threshold: 45.0  # % - Switch to FULL mode
+      battery_balanced_threshold: 30.0  # % - Switch to BALANCED mode
+      battery_economy_threshold: 15.0  # % - Switch to ECONOMY mode
+      battery_critical_threshold: 10.0  # % - Switch to CRITICAL mode
+      # Thermal management
+      temp_warning_threshold: 70.0  # °C
+      temp_critical_threshold: 80.0  # °C
+      temp_throttle_threshold: 75.0  # °C
+      # Power request handling
+      request_timeout_sec: 30.0
+      priority_levels: [0, 1, 2, 3, 4]  # 0=lowest, 4=highest
+      # Performance monitoring
+      publish_rate: 2.0  # Hz
+    topics:
+      publish:
+        - /jetson/power/mode
+        - /jetson/power/status
+        - /jetson/power/performance
+        - /jetson/power/gpu_control
+      subscribe:
+        - /jetson/power/request  # From vision_pipeline, etc.
+        - /jetson/system/temperature/cpu
+        - /jetson/system/temperature/gpu
+        - /irobot/battery
+
+  gpio_controller:
+    enabled: true
+    package: power_management
+    node: gpio_controller_node
+    namespace: /jetson
+    composable: false  # Cannot be composable (uses GPIO hardware)
+    parameters:
+      # GPIO configuration
+      gpio_mode: "BOARD"  # BOARD or BCM
+      mock_mode: false  # Set to true for testing without hardware
+      # GPU power control pins (adjust for your hardware)
+      gpu_power_pin: 15  # Example GPIO pin
+      gpu_enable_pin: 16  # Example GPIO pin
+      # Safety parameters
+      power_on_delay_ms: 100
+      power_off_delay_ms: 50
+      max_toggle_frequency_hz: 1.0
+    topics:
+      publish:
+        - /jetson/gpio/status
+      subscribe:
+        - /jetson/power/gpu_control
+
+  battery_monitor:
+    enabled: true
+    package: power_management
+    node: battery_monitor_node
+    namespace: /jetson
+    parameters:
+      # Battery monitoring
+      voltage_low_threshold: 11.0  # V - Warning threshold
+      voltage_critical_threshold: 10.5  # V - Critical threshold
+      capacity_estimation_enabled: true
+      runtime_estimation_enabled: true
+      # Runtime estimation
+      power_history_window_sec: 300.0  # 5 minutes
+      runtime_update_rate: 0.2  # Hz (every 5 seconds)
+      # Health monitoring
+      health_check_interval_sec: 10.0
+    topics:
+      publish:
+        - /jetson/battery/alerts
+        - /jetson/battery/runtime_estimate
+      subscribe:
+        - /irobot/battery
+
+  # ====================
+  # PHASE 1: CHASSIS CONTROL MODULE
+  # ====================
+  
+  imu_processor:
+    enabled: true
+    package: chassis_control
+    node: imu_processor_node
+    namespace: /rpi
+    parameters:
+      # Input/output topics
+      raw_imu_topic: "/hardware/phat/imu"
+      filtered_imu_topic: "/rpi/imu/filtered"
+      # Processing parameters
+      publish_rate: 50.0  # Hz
+      kalman_filter_enabled: true
+      imu_process_noise: 0.01
+      imu_measurement_noise: 0.1
+      # Calibration (loaded from file)
+      imu_bias_x: 0.0
+      imu_bias_y: 0.0
+      imu_bias_z: 0.0
+      gyro_bias_x: 0.0
+      gyro_bias_y: 0.0
+      gyro_bias_z: 0.0
+    topics:
+      publish:
+        - /rpi/imu/filtered
+      subscribe:
+        - /hardware/phat/imu
+
+  chassis_controller:
+    enabled: true
+    package: chassis_control
+    node: chassis_controller_node
+    namespace: /rpi
+    parameters:
+      # Control parameters
+      publish_rate: 50.0  # Hz
+      max_linear_velocity: 0.5  # m/s
+      max_angular_velocity: 2.0  # rad/s
+      # Wheel odometry (loaded from calibration)
+      wheel_diameter_m: 0.072
+      wheelbase_m: 0.235
+      # Vision integration
+      keyframe_drift_threshold_m: 0.1  # Reset odometry when drift exceeds this
+    topics:
+      publish:
+        - /rpi/chassis/odometry
+        - /rpi/chassis/pose_estimate
+      subscribe:
+        - /control/cmd_vel
+        - /rpi/imu/filtered
+        - /vision/global_pose  # From visual_slam_node
+
+  calibration_manager:
+    enabled: true
+    package: chassis_control
+    node: calibration_manager_node
+    namespace: /rpi
+    parameters:
+      # Calibration file
+      calibration_file: "/home/nano/.config/robot/calibration.yaml"
+      use_last_known_calibration: true
+      # Auto-calibration
+      auto_save_interval_sec: 300.0  # Save every 5 minutes
+      min_samples_for_update: 10
+      calibration_learning_rate: 0.01
+      # Quality thresholds
+      drift_threshold_excellent: 0.01  # m
+      drift_threshold_good: 0.05  # m
+      drift_threshold_poor: 0.1  # m
+    topics:
+      publish:
+        - /rpi/calibration/status
+      subscribe:
+        - /vision/global_pose
+        - /rpi/chassis/odometry
+
+  # ====================
+  # PHASE 2: VISION PIPELINE MODULE
+  # ====================
+  
+  visual_slam:
+    enabled: true
+    package: vision_pipeline
+    node: visual_slam_node
+    namespace: /vision
+    parameters:
+      # Camera configuration
+      camera_name: "camera_front"  # Primary camera for SLAM
+      use_depth: true  # RGB-D SLAM
+      use_imu: true  # Visual-inertial SLAM
+      # SLAM parameters
+      publish_global_pose: true
+      global_frame_id: "map"
+      odom_frame_id: "odom"
+      base_frame_id: "base_link"
+      # RTAB-Map parameters (when installed)
+      rtabmap_enabled: false  # Set to true after installing rtabmap_ros
+      rtabmap_min_inliers: 20
+      rtabmap_max_depth: 4.0
+      rtabmap_loop_closure_enabled: true
+      # Performance
+      update_rate: 10.0  # Hz
+    topics:
+      publish:
+        - /vision/global_pose  # For chassis drift correction
+        - /vision/odometry
+        - /vision/trajectory
+      subscribe:
+        - /hardware/camera_front/color/image_raw
+        - /hardware/camera_front/aligned_depth_to_color/image_raw
+        - /hardware/camera_front/color/camera_info
+        - /rpi/imu/filtered
+
+  camera_calibration:
+    enabled: true
+    package: vision_pipeline
+    node: camera_calibration_node
+    namespace: /vision
+    parameters:
+      # Camera list
+      camera_names: ["camera_front", "camera_rear"]
+      # Calibration parameters
+      calibration_window_sec: 30.0
+      min_motion_for_calibration: 0.5  # meters
+      min_rotation_for_calibration: 0.3  # radians
+      calibration_update_rate: 0.1  # Hz (every 10 seconds)
+      # Quality assessment
+      quality_threshold_excellent: 0.01
+      quality_threshold_good: 0.05
+      quality_threshold_poor: 0.1
+    topics:
+      publish:
+        - /rpi/calibration/status  # Publishes camera extrinsics
+      subscribe:
+        - /rpi/imu/filtered
+        - /hardware/camera_front/color/camera_info
+        - /hardware/camera_rear/color/camera_info
+        - /vision/odometry
+
+  vision_pipeline:
+    enabled: true
+    package: vision_pipeline
+    node: vision_pipeline_node
+    namespace: /jetson
+    parameters:
+      # Mode configuration
+      initial_mode: "FULL"  # FULL, TRACKING_ONLY, SLEEP
+      # Camera health monitoring
+      camera_names: ["camera_front", "camera_rear"]
+      camera_timeout_sec: 5.0
+      # Power management integration
+      auto_mode_switching: true
+      battery_threshold_tracking_only: 20.0  # %
+      battery_threshold_sleep: 10.0  # %
+      temp_threshold_reduce: 75.0  # °C
+      # GPU power requests
+      request_gpu_on_full: true
+      request_gpu_off_sleep: true
+      gpu_request_priority: 3  # 0-4
+      # Health monitoring
+      health_publish_rate: 1.0  # Hz
+    topics:
+      publish:
+        - /jetson/health/vision_pipeline  # ModuleHealth
+        - /jetson/power/request  # PowerRequest for GPU
+      subscribe:
+        - /vision/global_pose
+        - /hardware/camera_front/color/camera_info
+        - /hardware/camera_rear/color/camera_info
+        - /irobot/battery
+        - /jetson/system/temperature/gpu
+
+  # ====================
+  # PHASE 4: AUDIO PIPELINE MODULE
+  # ====================
+  
+  audio_feature_extractor:
+    enabled: true
+    package: audio_pipeline
+    node: audio_feature_extractor_node
+    namespace: /audio
+    parameters:
+      # Input/output
+      audio_topic: "/sensor_fusion/audio/raw"
+      output_namespace: "/audio"
+      sample_rate: 16000
+      channels: 2
+      format: "S16_LE"
+      # Feature extraction
+      mfcc_coefficients: 13
+      fft_size: 2048
+      hop_length: 512
+      enable_vad: true
+      vad_threshold: 0.5
+    topics:
+      publish:
+        - /audio/features/mfcc
+        - /audio/features/spectrogram
+        - /audio/features/vad
+      subscribe:
+        - /sensor_fusion/audio/raw
+
+  speech_recognition:
+    enabled: false  # Disabled by default (placeholder implementation)
+    package: audio_pipeline
+    node: speech_recognition_node
+    namespace: /audio
+    parameters:
+      audio_topic: "/sensor_fusion/audio/raw"
+      output_namespace: "/audio"
+      sample_rate: 16000
+      channels: 2
+      recognition_engine: "placeholder"  # whisper, deepspeech, google
+      language: "en-US"
+      model_size: "base"
+      buffer_duration_sec: 2.0
+      enable_continuous: true
+      vad_enabled: true
+    topics:
+      publish:
+        - /audio/transcription
+        - /audio/transcription_confidence
+      subscribe:
+        - /sensor_fusion/audio/raw
+
+  audio_pipeline:
+    enabled: true
+    package: audio_pipeline
+    node: audio_pipeline_node
+    namespace: /jetson
+    parameters:
+      output_namespace: "/jetson"
+      audio_namespace: "/audio"
+      initial_mode: "FULL"  # FULL, REDUCED, SLEEP
+      enable_feature_extraction: true
+      enable_speech_recognition: false  # Match speech_recognition node
+      auto_mode_switching: true
+      battery_threshold_reduced: 25.0  # %
+      battery_threshold_sleep: 15.0  # %
+      temp_threshold_reduce: 75.0  # °C
+    topics:
+      publish:
+        - /jetson/health/audio_pipeline
+        - /jetson/power/request
+      subscribe:
+        - /irobot/battery
+        - /jetson/system/temperature/cpu
+
+  # ====================
+  # PHASE 4: VLA PLANNER MODULE
+  # ====================
+  
+  vla_controller:
+    enabled: false  # Disabled by default (requires VLA model)
+    package: vla_planner
+    node: vla_controller_node
+    namespace: /vla
+    parameters:
+      # Model configuration
+      model_path: ""  # Path to VLA model weights
+      model_type: "placeholder"  # placeholder, openvla, rt1
+      device: "cuda"  # cuda or cpu
+      inference_rate: 10.0  # Hz
+      # Input topics
+      vision_features_topic: "/sensor_fusion/vlm_features"
+      audio_features_topic: "/audio/features/mfcc"
+      robot_state_topic: "/rpi/chassis/pose_estimate"
+      transcription_topic: "/audio/transcription"
+      # Output topics
+      action_topic: "/vla/actions"
+      cmd_vel_topic: "/control/cmd_vel"
+      # Model parameters
+      action_horizon: 10
+      context_window: 5
+      confidence_threshold: 0.5
+      # Power management
+      request_gpu: true
+      gpu_priority: 4  # Highest priority
+    topics:
+      publish:
+        - /vla/actions
+        - /control/cmd_vel
+        - /jetson/power/request
+      subscribe:
+        - /sensor_fusion/vlm_features
+        - /audio/features/mfcc
+        - /rpi/chassis/pose_estimate
+        - /audio/transcription
+
+  action_executor:
+    enabled: false  # Disabled by default (requires VLA controller)
+    package: vla_planner
+    node: action_executor_node
+    namespace: /vla
+    parameters:
+      action_topic: "/vla/actions"
+      cmd_vel_topic: "/control/cmd_vel"
+      execution_feedback_topic: "/vla/execution_feedback"
+      # Safety parameters
+      max_linear_velocity: 0.5  # m/s
+      max_angular_velocity: 2.0  # rad/s
+      action_timeout_sec: 5.0
+      enable_safety_checks: true
+      # Execution parameters
+      action_buffer_size: 10
+      execution_rate: 50.0  # Hz
+    topics:
+      publish:
+        - /control/cmd_vel
+        - /vla/execution_feedback
+      subscribe:
+        - /vla/actions
+
+  planner:
+    enabled: false  # Disabled by default (requires VLA controller)
+    package: vla_planner
+    node: planner_node
+    namespace: /vla
+    parameters:
+      task_queue_size: 10
+      max_retries: 3
+      task_timeout_sec: 60.0
+      planning_rate: 1.0  # Hz
+      command_topic: "/vla/command"
+      transcription_topic: "/audio/transcription"
+      execution_feedback_topic: "/vla/execution_feedback"
+      plan_status_topic: "/vla/plan_status"
+    topics:
+      publish:
+        - /vla/plan_status
+        - /jetson/health/vla_planner
+      subscribe:
+        - /vla/command
+        - /audio/transcription
+        - /vla/execution_feedback
+
+  # ====================
+  # HARDWARE DRIVERS (Existing)
+  # ====================
+  
+  realsense_camera:
+    enabled: true
+    package: realsense_camera
+    node: realsense_camera_node
+    namespace: /hardware
+    parameters:
+      enable_color: true
+      enable_depth: true
+      enable_pointcloud: false
+      enable_imu: false
+      color_width: 640
+      color_height: 480
+      color_fps: 30
+      depth_width: 640
+      depth_height: 480
+      depth_fps: 30
+      publish_rate: 30.0
+      frame_timeout_ms: 5000
+    topics:
+      publish:
+        - /hardware/camera_front/color/image_raw
+        - /hardware/camera_front/color/camera_info
+        - /hardware/camera_front/aligned_depth_to_color/image_raw
+        - /hardware/camera_front/depth/camera_info
+        - /hardware/camera_rear/color/image_raw
+        - /hardware/camera_rear/color/camera_info
+        - /hardware/camera_rear/aligned_depth_to_color/image_raw
+        - /hardware/camera_rear/depth/camera_info
+        - /realsense/status
+
+  nvblox_processor:
+    enabled: true
+    package: nvblox_processor
+    node: nvblox_processor_node
+    namespace: ""
+    parameters:
+      camera_names: ["camera_front", "camera_rear"]
+      voxel_size: 0.05
+      tsdf_truncation_distance: 0.1
+      max_tsdf_weight: 100.0
+      mesh_update_rate: 5.0
+      fuse_cameras: true
+      namespace: "/nvblox"
+    topics:
+      publish:
+        - /nvblox/mesh
+        - /nvblox/pointcloud
+      subscribe:
+        - /hardware/camera_front/depth/image_rect_raw
+        - /hardware/camera_front/color/image_raw
+        - /hardware/camera_rear/depth/image_rect_raw
+        - /hardware/camera_rear/color/image_raw
+
+  irobot_serial:
+    enabled: true
+    package: irobot_serial
+    node: irobot_serial_node
+    namespace: /hardware
+    parameters:
+      serial_port: '/dev/ttyUSB0'
+      baudrate: 115200
+      timeout: 1.0
+      publish_rate: 10.0
+      robot_type: 'create2'
+    topics:
+      publish:
+        - /irobot/status
+        - /irobot/battery
+      subscribe:
+        - /control/cmd_vel
+
+  phat_motor_controller:
+    enabled: true
+    composable: false
+    package: phat_motor_controller
+    node: phat_motor_controller_node
+    namespace: /hardware
+    parameters:
+      i2c_bus: 7
+      accelerometer_address: 0x69
+      accelerometer_type: 'ICM20948'
+      enable_accelerometer: true
+      publish_rate: 50.0
+      imu_topic: 'phat/imu'
+      cmd_vel_topic: '/control/cmd_vel'
+    topics:
+      publish:
+        - /hardware/phat/imu
+        - /hardware/phat/status
+      subscribe:
+        - /control/cmd_vel
+
+  # ====================
+  # VISUALIZATION (Existing)
+  # ====================
+  
+  foxglove_bridge:
+    enabled: true
+    package: foxglove_bridge
+    node: foxglove_bridge
+    namespace: ""
+    parameters:
+      port: 8765
+      address: "0.0.0.0"
+      topic_whitelist:
+        - "/jetson/.*"
+        - "/rpi/.*"
+        - "/vision/.*"
+        - "/hardware/camera_.*/color/camera_info"
+        - "/nvblox/.*"
+      best_effort_qos_topic_whitelist:
+        - "/hardware/camera_.*"
+        - "/nvblox/.*"
+
+# ====================
+# NODE GROUPS
+# ====================
+
+groups:
+  # Core system
+  core:
+    - system_monitor
+    - health_monitor
+
+  # Phase 3: Power Management
+  power_management:
+    - power_manager
+    - gpio_controller
+    - battery_monitor
+
+  # Phase 1: Chassis Control
+  chassis_control:
+    - imu_processor
+    - chassis_controller
+    - calibration_manager
+
+  # Phase 2: Vision Pipeline
+  vision_pipeline:
+    - visual_slam
+    - camera_calibration
+    - vision_pipeline
+
+  # Phase 4: Audio Pipeline
+  audio_pipeline:
+    - audio_feature_extractor
+    - speech_recognition
+    - audio_pipeline
+
+  # Phase 4: VLA Planner
+  vla_planner:
+    - vla_controller
+    - action_executor
+    - planner
+
+  # Hardware drivers
+  hardware:
+    - realsense_camera
+    - nvblox_processor
+    - irobot_serial
+    - phat_motor_controller
+
+  # Visualization
+  visualization:
+    - foxglove_bridge
+
+  # Roomba+ mode (Raspberry Pi only - chassis + power, no vision)
+  roomba_plus:
+    - system_monitor
+    - health_monitor
+    - battery_monitor
+    - imu_processor
+    - chassis_controller
+    - calibration_manager
+    - irobot_serial
+    - phat_motor_controller
+
+  # Vision-only mode (Jetson only - vision + power, no chassis)
+  vision_only:
+    - system_monitor
+    - health_monitor
+    - power_manager
+    - gpio_controller
+    - visual_slam
+    - camera_calibration
+    - vision_pipeline
+    - realsense_camera
+    - nvblox_processor
+    - foxglove_bridge
+
+  # Full system (all modules - Phases 1-4)
+  all:
+    - system_monitor
+    - health_monitor
+    - power_manager
+    - gpio_controller
+    - battery_monitor
+    - imu_processor
+    - chassis_controller
+    - calibration_manager
+    - visual_slam
+    - camera_calibration
+    - vision_pipeline
+    - audio_feature_extractor
+    - speech_recognition
+    - audio_pipeline
+    - vla_controller
+    - action_executor
+    - planner
+    - realsense_camera
+    - nvblox_processor
+    - irobot_serial
+    - phat_motor_controller
+    - foxglove_bridge
+
+  # Development/testing groups
+  minimal_test:
+    - system_monitor
+    - health_monitor
+    - imu_processor
+
+  chassis_test:
+    - system_monitor
+    - health_monitor
+    - imu_processor
+    - chassis_controller
+    - calibration_manager
+    - phat_motor_controller
+
+  vision_test:
+    - system_monitor
+    - health_monitor
+    - visual_slam
+    - camera_calibration
+    - vision_pipeline
+    - realsense_camera
+    - nvblox_processor
+
+  power_test:
+    - system_monitor
+    - health_monitor
+    - power_manager
+    - gpio_controller
+    - battery_monitor
+    - irobot_serial
+
+  audio_test:
+    - system_monitor
+    - health_monitor
+    - audio_feature_extractor
+    - speech_recognition
+    - audio_pipeline
+
+  vla_test:
+    - system_monitor
+    - health_monitor
+    - vla_controller
+    - action_executor
+    - planner

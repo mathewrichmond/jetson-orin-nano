@@ -117,5 +117,6 @@
       "protocol": "http"
     }
   },
-  "remote.autoForwardPorts": true
+  "remote.autoForwardPorts": true,
+  "cmake.sourceDirectory": "/home/nano/src/jetson-orin-nano/src/hello_world"
 }
