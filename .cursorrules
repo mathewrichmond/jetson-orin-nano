@@ -226,9 +226,9 @@ When writing code or documentation:
 - `docs/QUICK_START.md` - 3-step quick start
 - `docs/MODULAR_QUICK_START.md` - Detailed setup guide
 - `docs/PRE_COMMIT_DOCKER.md` - Local testing setup
-- `docs/DEPLOYMENT.md` - Deployment guide
-- `docs/TESTING.md` - Testing guide
-- `docs/IMPLEMENTATION_STATUS.md` - TODOs and integration points
+- `docs/deployment/DEPLOYMENT.md` - Deployment guide
+- `docs/testing/TESTING.md` - Testing guide
+- `docs/architecture/IMPLEMENTATION_STATUS.md` - TODOs and integration points
 
 **Development Workflow**:
 - `docs/development/CI.md` - CI status and local alternatives

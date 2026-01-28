@@ -263,7 +263,7 @@ Dockerfile.ci                          # Lightweight CI Docker image
 scripts/testing/docker_test.sh         # Docker test runner
 .pre-commit-config.yaml                # Updated with Docker hooks
 Makefile                               # Added docker-* commands
-docs/PRE_COMMIT_DOCKER.md              # This file
+docs/development/LOCAL_TESTING.md      # This file
 ```
 
 ### Configuration

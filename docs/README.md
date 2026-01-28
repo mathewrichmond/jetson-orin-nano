@@ -10,25 +10,26 @@ This directory contains comprehensive documentation for the Isaac Robot System.
 
 | Document | Description |
 |----------|-------------|
-| **MODULAR_QUICK_START.md** | ⭐ Quick start guide for development |
-| **PRE_COMMIT_DOCKER.md** | ⭐ Fast local testing (30s feedback) |
-| **DEPLOYMENT.md** | Multi-environment deployment guide |
-| **TESTING.md** | Testing framework guide |
+| **QUICK_START.md** | ⭐ 3-step quick start (10 minutes) |
+| **MODULAR_QUICK_START.md** | ⭐ Detailed setup guide for development |
+| **development/LOCAL_TESTING.md** | ⭐ Fast local testing with Docker (30s feedback) |
+| **deployment/DEPLOYMENT.md** | Multi-environment deployment guide |
+| **testing/TESTING.md** | Testing framework guide |
 
 ### Project Status
 
 | Document | Description |
 |----------|-------------|
-| **MODULAR_ARCHITECTURE_PROGRESS.md** | Overall project progress (100% complete) |
-| **PHASES_COMPLETE.md** | Summary of all 6 completed phases |
-| **IMPLEMENTATION_STATUS.md** | ⭐ TODOs, placeholders, and integration guide |
+| **architecture/IMPLEMENTATION_STATUS.md** | ⭐ TODOs, placeholders, and integration guide |
+| **archived/MODULAR_ARCHITECTURE_PROGRESS.md** | Overall project progress (100% complete) |
+| **archived/PHASES_COMPLETE.md** | Summary of all 6 completed phases |
 
 ### Technical Guides
 
 | Document | Description |
 |----------|-------------|
-| **PYPROJECT_MIGRATION.md** | Modern dependency management with pyproject.toml |
-| **REPOSITORY_STRUCTURE.md** | Repository organization and structure |
+| **architecture/REPOSITORY_STRUCTURE.md** | Repository organization and structure |
+| **development/PYPROJECT_MIGRATION.md** | Modern dependency management with pyproject.toml |
 
 ---
 
@@ -54,17 +55,20 @@ archived/         - Pre-modular architecture docs (historical)
 
 **New to the project?** Start here:
 
-1. **MODULAR_QUICK_START.md** - Build and run the system
-2. **PRE_COMMIT_DOCKER.md** - Set up fast local testing
-3. **DEPLOYMENT.md** - Choose your deployment configuration
+1. **QUICK_START.md** - 3-step quick start (10 minutes)
+2. **MODULAR_QUICK_START.md** - Detailed setup and build guide
+3. **development/LOCAL_TESTING.md** - Set up fast local testing
+4. **deployment/DEPLOYMENT.md** - Choose your deployment configuration
 
 **Looking for specific information?**
 
-- Local testing → `PRE_COMMIT_DOCKER.md`
+- Quick start → `QUICK_START.md`
+- Local testing → `development/LOCAL_TESTING.md`
 - CI/CD → `development/CI.md`
 - Hardware setup → `hardware/`
-- Deployment → `DEPLOYMENT.md`
-- Testing → `TESTING.md`
+- Deployment → `deployment/DEPLOYMENT.md`
+- Testing → `testing/TESTING.md`
+- Architecture → `architecture/`
 
 ---
 
@@ -87,4 +91,4 @@ When adding documentation:
 
 ---
 
-**Last Updated**: 2026-01-27
+**Last Updated**: 2026-01-28

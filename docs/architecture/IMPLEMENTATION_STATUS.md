@@ -536,8 +536,8 @@ pip install transformers torch   # For VLA models (~2GB+)
 
 ### Integration Guides Available ✅
 
-- [x] Multi-environment deployment (docs/DEPLOYMENT.md)
-- [x] Testing framework (docs/TESTING.md)
+- [x] Multi-environment deployment (docs/deployment/DEPLOYMENT.md)
+- [x] Testing framework (docs/testing/TESTING.md)
 - [x] Dependency management (docs/PYPROJECT_MIGRATION.md)
 - [x] Quick start (docs/MODULAR_QUICK_START.md)
 - [x] This implementation status document

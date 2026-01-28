@@ -64,7 +64,7 @@ git push
 ## Next Steps
 
 - **Full setup**: See [MODULAR_QUICK_START.md](MODULAR_QUICK_START.md)
-- **Local testing**: See [PRE_COMMIT_DOCKER.md](PRE_COMMIT_DOCKER.md)
+- **Local testing**: See [LOCAL_TESTING.md](development/LOCAL_TESTING.md)
 - **Deployment**: See [DEPLOYMENT.md](DEPLOYMENT.md)
 - **Testing guide**: See [TESTING.md](TESTING.md)
 

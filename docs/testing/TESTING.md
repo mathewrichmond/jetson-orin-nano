@@ -1,338 +1,793 @@
-# Unified Testing Framework
+## Testing Framework - Isaac Robot System
 
-This guide covers the unified testing system for the Isaac robot, providing consistent testing across all packages and modules.
+**Status**: Phase 6 ✅ | Comprehensive testing and CI/CD
+
+---
 
 ## Overview
 
-The testing framework has **four levels**:
+The Isaac robot system includes a comprehensive testing framework with:
 
-1. **Lint Tests** - Code quality and consistency (fast, no hardware)
-2. **Unit Tests** - Hermetic mocked tests (fast, no hardware)
-3. **Integration Tests** - Node/graph level tests (medium, spoofed topics)
-4. **Bench Tests** - Real hardware tests (slow, requires hardware)
+- **Unit Tests** - Hermetic, fast tests of individual functions/classes
+- **Integration Tests** - Test graphs with spoofed data or log replay
+- **Mock Hardware** - Test without real devices
+- **Log Replay** - Replay recorded ROS 2 bags for reproducible testing
+- **CI/CD** - Automated testing and deployment via GitHub Actions
 
-All tests use the same infrastructure and can be run consistently across:
-- Pre-commit hooks (local development)
-- GitHub CI (automated)
-- Target hardware (manual/CI)
+---
 
 ## Quick Start
 
-### Run All Tests (except bench)
+### Run All Tests
 
 ```bash
+# Run locally
 ./scripts/testing/run_tests.sh all
+
+# With coverage
+COVERAGE=true ./scripts/testing/run_tests.sh all
+
+# Verbose mode
+VERBOSE=true ./scripts/testing/run_tests.sh all
 ```
 
-### Run Specific Test Level
+### Run Specific Test Suites
 
 ```bash
-# Lint only
-./scripts/testing/run_tests.sh lint
-
-# Unit tests only
+# Unit tests only (fast, no ROS 2 required)
 ./scripts/testing/run_tests.sh unit
 
-# Integration tests
+# Integration tests (requires ROS 2)
 ./scripts/testing/run_tests.sh integration
 
-# Bench tests (requires hardware)
-./scripts/testing/run_tests.sh bench
+# Using pytest directly
+pytest tests/unit/ -v -m "unit"
+pytest tests/integration/ -v -m "integration"
 ```
 
-### Run Tests for Specific Package
-
-```bash
-./scripts/testing/run_tests.sh unit --package realsense_camera
-```
-
-## Test Levels
-
-### 1. Lint Tests
-
-**Purpose**: Code quality and consistency
-
-**What they check**:
-- Code formatting (Black)
-- Import sorting (isort)
-- Style violations (flake8)
-- Type checking (mypy)
-- Security issues (bandit)
-- ROS 2 linting (ament_lint)
-
-**Run**:
-```bash
-./scripts/testing/run_tests.sh lint
-```
-
-**Pre-commit**: Runs automatically on commit
-
-**CI**: Runs on every push/PR
-
-### 2. Unit Tests
-
-**Purpose**: Hermetic, mocked tests that don't require ROS 2 or hardware
-
-**Location**: `tests/unit/`
-
-**Characteristics**:
-- Fast execution
-- No external dependencies
-- Mocked ROS 2 interfaces
-- Test individual functions/classes
-
-**Example**:
-```python
-@pytest.mark.unit
-class TestGraphManager:
-    def test_load_config(self):
-        # Test with mocked file system
-        pass
-```
-
-**Run**:
-```bash
-./scripts/testing/run_tests.sh unit
-```
-
-**Pre-commit**: Runs on commit (can be disabled for speed)
-
-**CI**: Runs on every push/PR
-
-### 3. Integration Tests
-
-**Purpose**: Node/graph level tests with spoofed topics and synthetic data
-
-**Location**: `tests/integration/`
-
-**Characteristics**:
-- Requires ROS 2 (but not hardware)
-- Uses spoofed/synthetic data
-- Tests node interactions
-- Tests graph configurations
-- Can use recorded bag files
-
-**Example**:
-```python
-@pytest.mark.integration
-class TestNodeLaunch:
-    def test_nodes_can_be_launched(self):
-        # Launch nodes and verify they start
-        pass
-```
-
-**Run**:
-```bash
-./scripts/testing/run_tests.sh integration
-```
-
-**CI**: Runs on every push/PR (if ROS 2 available)
-
-### 4. Bench Tests
-
-**Purpose**: Real hardware tests on target (Jetson)
-
-**Location**: `tests/bench/`
-
-**Characteristics**:
-- Requires actual hardware
-- Tests real sensors/actuators
-- Can be slow
-- May require manual verification
-- Should be run before releases
-
-**Example**:
-```python
-@pytest.mark.bench
-@pytest.mark.hardware
-class TestCameraVisualization:
-    def test_camera_node_starts(self):
-        # Test with real cameras
-        pass
-```
-
-**Run**:
-```bash
-# On Jetson
-./scripts/testing/run_tests.sh bench
-
-# Or use bench test scripts
-./scripts/testing/bench_test_cameras.sh
-```
-
-**CI**: Manual trigger only (workflow_dispatch)
+---
 
 ## Test Organization
 
 ```
 tests/
-├── __init__.py
-├── conftest.py              # Shared fixtures
-├── unit/                    # Unit tests
-│   ├── __init__.py
+├── conftest.py              # Shared pytest fixtures
+├── unit/                    # Unit tests (hermetic)
 │   └── test_*.py
-├── integration/            # Integration tests
-│   ├── __init__.py
+├── integration/             # Integration tests (ROS 2)
+│   ├── conftest.py          # ROS 2 fixtures
 │   └── test_*.py
-└── bench/                   # Bench tests
-    ├── __init__.py
-    └── test_*.py
+├── fixtures/                # Test data and utilities
+│   ├── log_replay.py        # Bag replay system
+│   └── sample_bags/         # Sample bag files
+└── mocks/                   # Mock implementations
+    ├── mock_sensor_data.py  # Mock data generators
+    └── mock_hardware_nodes.py # Mock ROS 2 nodes
 ```
 
-## Writing Tests
+---
 
-### Unit Test Example
+## Unit Testing
+
+### Philosophy
+
+Unit tests should be:
+- **Hermetic** - No external dependencies (no ROS 2, no hardware, no network)
+- **Fast** - Complete in < 100ms each
+- **Isolated** - No side effects between tests
+- **Deterministic** - Same result every time
+
+### Example Unit Test
 
 ```python
 import pytest
-from unittest.mock import Mock, patch
 
 @pytest.mark.unit
-class TestMyNode:
+def test_example():
+    """Test a pure function"""
+    result = my_function(5)
+    assert result == 10
+
+@pytest.mark.unit
+class TestMyClass:
+    """Test a class"""
+    
     def test_initialization(self):
-        # Mock ROS 2 dependencies
-        with patch('rclpy.init'):
-            node = MyNode()
-            assert node is not None
+        obj = MyClass(param=5)
+        assert obj.param == 5
+    
+    def test_method(self):
+        obj = MyClass(param=5)
+        result = obj.calculate()
+        assert result == 25
+
+@pytest.mark.unit
+@pytest.mark.parametrize("input,expected", [
+    (0, 0),
+    (1, 2),
+    (5, 10),
+])
+def test_parametrized(input, expected):
+    """Parametrized test"""
+    assert input * 2 == expected
 ```
 
-### Integration Test Example
+### Running Unit Tests
+
+```bash
+# All unit tests
+pytest tests/unit/ -m "unit"
+
+# Specific file
+pytest tests/unit/test_example.py
+
+# Specific test
+pytest tests/unit/test_example.py::test_example
+
+# With coverage
+pytest tests/unit/ --cov=src --cov-report=html
+
+# Verbose
+pytest tests/unit/ -v -s
+```
+
+---
+
+## Integration Testing
+
+### Philosophy
+
+Integration tests:
+- **Test ROS 2 graphs** - Launch nodes and verify behavior
+- **Use mock hardware** - No real devices required
+- **Spoof data** - Generate realistic sensor data
+- **Replay logs** - Use recorded bags for reproducibility
+
+### Test Graphs
+
+Integration tests launch minimal graphs with mock hardware:
 
 ```python
 import pytest
-import rclpy
+import subprocess
+import time
 
 @pytest.mark.integration
-class TestMyNodeIntegration:
-    @pytest.fixture(autouse=True)
-    def setup_ros2(self):
-        rclpy.init()
-        yield
-        rclpy.shutdown()
-
-    def test_node_publishes(self):
-        # Launch node and verify topics
-        pass
+class TestMinimalGraph:
+    """Test minimal graph deployment"""
+    
+    @pytest.fixture
+    def launch_graph(self, ros_domain_id):
+        """Launch test graph"""
+        env = {"ROS_DOMAIN_ID": str(ros_domain_id), "MOCK_HARDWARE": "true"}
+        
+        process = subprocess.Popen(
+            ["ros2", "launch", "isaac_robot", "graph.launch.py",
+             "graph:=minimal_graph.yaml"],
+            env=env
+        )
+        
+        time.sleep(5)  # Wait for startup
+        yield process
+        
+        process.terminate()
+        process.wait()
+    
+    def test_nodes_present(self, launch_graph, ros_domain_id):
+        """Verify expected nodes are running"""
+        result = subprocess.run(
+            ["ros2", "node", "list"],
+            env={"ROS_DOMAIN_ID": str(ros_domain_id)},
+            capture_output=True,
+            text=True
+        )
+        
+        assert "/system_monitor" in result.stdout
+        assert "/health_monitor" in result.stdout
 ```
 
-### Bench Test Example
+### Spoofing Data
+
+Use mock data generators for testing:
 
 ```python
+from tests.mocks import MockIMUData, MockCameraData
+
+# Generate mock IMU data
+imu = MockIMUData(frequency=50.0, noise_level=0.01)
+data = imu.generate()
+
+# Generate mock camera frame
+camera = MockCameraData(width=640, height=480)
+frame = camera.generate()
+```
+
+### Running Integration Tests
+
+```bash
+# All integration tests
+pytest tests/integration/ -m "integration"
+
+# Exclude slow tests
+pytest tests/integration/ -m "integration and not slow"
+
+# Exclude hardware tests
+pytest tests/integration/ -m "integration and not hardware"
+
+# Specific graph test
+pytest tests/integration/test_graph_minimal.py -v
+```
+
+---
+
+## Log Replay Testing
+
+### Recording Logs
+
+Record ROS 2 bags for later replay:
+
+```bash
+# Record all topics for 30 seconds
+ros2 bag record --all --duration 30 -o test_scenario_1
+
+# Record specific topics
+ros2 bag record /camera/image /imu/data -o imu_camera_test
+```
+
+Or use the Python API:
+
+```python
+from tests.fixtures import BagRecorder
+
+recorder = BagRecorder(
+    output_path=Path("test_data.bag"),
+    topics=["/camera/image", "/imu/data"]
+)
+
+recorder.start_recording(max_duration=30.0)
+# ... run test scenario ...
+recorder.stop_recording()
+```
+
+### Replaying Logs
+
+Replay bags in integration tests:
+
+```python
+from tests.fixtures import LogReplayer
+
+@pytest.mark.integration
+def test_with_bag_replay():
+    """Test using recorded bag file"""
+    replayer = LogReplayer(
+        bag_path=Path("tests/fixtures/sample_bags/test_scenario_1"),
+        domain_id=42
+    )
+    
+    # Start replay
+    replayer.start_replay(rate=1.0, loop=False)
+    
+    # Wait for replay to start
+    time.sleep(2)
+    
+    # Run your test assertions
+    # ... check that nodes process the data correctly ...
+    
+    # Stop replay
+    replayer.stop_replay()
+```
+
+### Sample Bags
+
+Store sample bags in `tests/fixtures/sample_bags/`:
+- `minimal_system/` - System monitor + health monitor
+- `chassis_control/` - IMU + motor commands
+- `vision_pipeline/` - Camera + depth images
+- `full_system/` - Complete robot operation
+
+---
+
+## Mock Hardware
+
+### Mock Nodes
+
+Use mock hardware nodes for testing without devices:
+
+```python
+from tests.mocks import MockIMUNode, MockCameraNode
+
+# Launch mock IMU
+mock_imu = MockIMUNode(node_name="mock_imu")
+
+# Launch mock camera
+mock_camera = MockCameraNode(node_name="mock_camera")
+```
+
+Or launch via command line:
+
+```bash
+# Mock IMU
+ros2 run isaac_utils mock_imu_node --ros-args -p publish_rate:=50.0
+
+# Mock camera
+ros2 run isaac_utils mock_camera_node --ros-args -p fps:=30.0
+```
+
+### Mock Data Generators
+
+Available mock data generators:
+
+```python
+from tests.mocks import (
+    MockIMUData,
+    MockCameraData,
+    MockAudioData,
+    MockBatteryData,
+    MockOdometryData,
+)
+
+# IMU data
+imu = MockIMUData(frequency=50.0, noise_level=0.01)
+data = imu.generate()  # Returns dict with accelerometer + gyro
+
+# Camera frames
+camera = MockCameraData(width=640, height=480, fps=30.0)
+frame = camera.generate()  # Returns numpy array (H, W, 3)
+
+# Audio samples
+audio = MockAudioData(sample_rate=16000, channels=1)
+samples = audio.generate(duration_sec=0.1)  # Returns numpy array
+
+# Battery readings
+battery = MockBatteryData(initial_voltage=12.6)
+reading = battery.generate()  # Returns dict with voltage, current, temp
+
+# Odometry
+odom = MockOdometryData()
+pose = odom.generate(linear_vel=0.5, angular_vel=0.1)
+```
+
+---
+
+## Test Markers
+
+### Available Markers
+
+| Marker | Description | Use Case |
+|--------|-------------|----------|
+| `@pytest.mark.unit` | Unit test | Fast, hermetic tests |
+| `@pytest.mark.integration` | Integration test | ROS 2 graph tests |
+| `@pytest.mark.hardware` | Hardware test | Requires real devices |
+| `@pytest.mark.slow` | Slow test (> 1s) | Long-running tests |
+| `@pytest.mark.gpu` | GPU test | Requires CUDA |
+| `@pytest.mark.smoke` | Smoke test | Quick sanity check |
+
+### Running Specific Markers
+
+```bash
+# Only unit tests
+pytest -m "unit"
+
+# Only integration tests
+pytest -m "integration"
+
+# Integration tests, but not slow
+pytest -m "integration and not slow"
+
+# No hardware tests (default)
+pytest -m "not hardware"
+
+# Include hardware tests
+pytest -m "hardware" --hardware
+
+# GPU tests only
+pytest -m "gpu" --gpu
+```
+
+---
+
+## Continuous Integration (CI)
+
+### GitHub Actions Workflows
+
+#### Test Workflow (`.github/workflows/test.yml`)
+
+Runs on every push and PR:
+1. **Unit Tests** - Fast hermetic tests
+2. **Integration Tests** - ROS 2 graph tests with mock hardware
+3. **Linting** - black, isort, flake8, pylint
+4. **Build Test** - Verify all packages build
+
+**Triggers**:
+- Push to `main` or `dev`
+- Pull requests to `main`
+- Manual dispatch
+
+**Jobs**:
+- `unit-tests` - Python unit tests with coverage
+- `integration-tests` - ROS 2 integration tests
+- `lint` - Code quality checks
+- `build-test` - Full build verification
+
+#### Deployment Workflow (`.github/workflows/deploy.yml`)
+
+Deploys to robot hosts:
+1. **Deploy to Jetson** - Rsync + build
+2. **Deploy to Pi** - Rsync + build (if dual-compute)
+3. **Health Check** - Verify deployment
+4. **Create Release** - For tagged versions
+
+**Triggers**:
+- Push to `main`
+- Tags matching `v*`
+- Manual dispatch (select hosts)
+
+**Required Secrets**:
+- `JETSON_SSH_KEY` - SSH private key for Jetson
+- `JETSON_HOST` - Jetson hostname/IP
+- `PI_SSH_KEY` - SSH private key for Pi
+- `PI_HOST` - Pi hostname/IP
+
+### Setting Up Secrets
+
+In GitHub: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+```bash
+# Generate SSH key for deployment
+ssh-keygen -t ed25519 -f ~/.ssh/isaac_deploy_key -N ""
+
+# Add public key to robot
+ssh-copy-id -i ~/.ssh/isaac_deploy_key.pub nano@isaac-jetson.local
+
+# Add private key to GitHub secrets
+# Name: JETSON_SSH_KEY
+# Value: Contents of ~/.ssh/isaac_deploy_key
+```
+
+### Manual Deployment Trigger
+
+**GitHub** → **Actions** → **Deploy to Robot** → **Run workflow**
+
+Select:
+- Environment: dev, staging, or production
+- Hosts: jetson, pi, or both
+
+---
+
+## Remote Deployment
+
+### Deploy from Development Machine
+
+```bash
+# Deploy to Jetson
+./scripts/deployment/remote_deploy.sh jetson
+
+# Deploy to Pi
+./scripts/deployment/remote_deploy.sh pi
+
+# Deploy to all hosts
+./scripts/deployment/remote_deploy.sh all
+
+# Dry run (show what would be deployed)
+DRY_RUN=true ./scripts/deployment/remote_deploy.sh jetson
+
+# Deploy without building
+BUILD_AFTER_DEPLOY=false ./scripts/deployment/remote_deploy.sh jetson
+
+# Deploy and restart services
+RESTART_SERVICES=true ./scripts/deployment/remote_deploy.sh jetson
+```
+
+### Environment Variables
+
+```bash
+# Jetson configuration
+export JETSON_USER=nano
+export JETSON_HOST=isaac-jetson.local
+
+# Pi configuration
+export PI_USER=pi
+export PI_HOST=isaac-pi.local
+
+# Deployment options
+export DRY_RUN=false
+export BUILD_AFTER_DEPLOY=true
+export RESTART_SERVICES=false
+export DEPLOYMENT_CONFIG=dual_compute
+```
+
+### Multi-Target Deployment Strategy
+
+**Scenario 1: Local Development on Jetson**
+```bash
+# Currently: Developing directly on Jetson
+# No deployment needed, just build locally
+colcon build --symlink-install
+```
+
+**Scenario 2: Development Machine → Jetson**
+```bash
+# From dev machine
+./scripts/deployment/remote_deploy.sh jetson
+
+# Or manually
+rsync -avz --exclude '.git' --exclude 'build' \
+    ./ nano@isaac-jetson.local:~/src/jetson-orin-nano/
+
+ssh nano@isaac-jetson.local "cd ~/src/jetson-orin-nano && colcon build --symlink-install"
+```
+
+**Scenario 3: Development Machine → Pi + Jetson** (Future)
+```bash
+# Deploy to both hosts
+./scripts/deployment/remote_deploy.sh all
+
+# Or deploy sequentially
+./scripts/deployment/remote_deploy.sh jetson
+./scripts/deployment/remote_deploy.sh pi
+
+# Restart services on both
+RESTART_SERVICES=true ./scripts/deployment/remote_deploy.sh all
+```
+
+**Scenario 4: CI/CD → Production**
+```bash
+# Automatic via GitHub Actions on push to main
+# Or manual trigger via GitHub UI
+
+# Manual deployment with specific config
+DEPLOYMENT_CONFIG=production ./scripts/deployment/remote_deploy.sh all
+```
+
+---
+
+## Test Development Workflow
+
+### 1. Write Unit Tests First (TDD)
+
+```python
+# tests/unit/test_new_feature.py
 import pytest
 
-@pytest.mark.bench
-@pytest.mark.hardware
-class TestCameraBench:
-    def test_camera_visualization(self):
-        # Test with real hardware
-        # May require manual verification
-        pass
+@pytest.mark.unit
+def test_new_feature():
+    """Test new feature implementation"""
+    # Write test first (it will fail)
+    result = new_feature(input_data)
+    assert result == expected_output
+
+# Now implement new_feature() to make test pass
 ```
 
-## Pytest Markers
+### 2. Add Integration Tests
 
-Tests are marked with pytest markers:
+```python
+# tests/integration/test_new_feature_integration.py
+import pytest
 
-- `@pytest.mark.lint` - Lint tests
-- `@pytest.mark.unit` - Unit tests
-- `@pytest.mark.integration` - Integration tests
-- `@pytest.mark.bench` - Bench tests
-- `@pytest.mark.hardware` - Requires hardware
-
-Run tests by marker:
-```bash
-pytest -m unit
-pytest -m integration
-pytest -m bench
+@pytest.mark.integration
+def test_new_feature_in_graph(launch_graph):
+    """Test new feature in ROS 2 graph"""
+    # Launch graph with new feature
+    # Verify it integrates correctly
+    pass
 ```
 
-## Pre-commit Hooks
-
-Pre-commit hooks run automatically on commit:
+### 3. Run Tests Locally
 
 ```bash
-# Install hooks
-pre-commit install
+# Unit tests (fast iteration)
+pytest tests/unit/test_new_feature.py -v
 
-# Run manually
-pre-commit run --all-files
+# Integration tests
+pytest tests/integration/test_new_feature_integration.py -v
 
-# Run specific hook
-pre-commit run lint --all-files
+# All tests
+./scripts/testing/run_tests.sh all
 ```
 
-Hooks run:
-- Lint tests (formatting, style)
-- Unit tests (optional, can disable for speed)
-
-## GitHub CI
-
-CI runs automatically on push/PR:
-
-1. **Lint** - Always runs
-2. **Unit** - Always runs
-3. **Integration** - Runs if ROS 2 available
-4. **Bench** - Manual trigger only (workflow_dispatch)
-
-View CI status: `.github/workflows/ci.yml`
-
-## Bench Test Scripts
-
-Dedicated scripts for common bench tests:
+### 4. Push and Let CI Run
 
 ```bash
-# Camera visualization bench test
-./scripts/testing/bench_test_cameras.sh
+git add tests/
+git commit -m "test: Add tests for new feature"
+git push
 
-# Or use the visualization script
-./scripts/visualization/bench_test_cameras.sh
+# GitHub Actions will automatically:
+# 1. Run all unit tests
+# 2. Run integration tests
+# 3. Check code quality
+# 4. Verify build
 ```
 
-## Test Coverage
-
-Coverage reports are generated:
+### 5. Review Coverage
 
 ```bash
-# Generate HTML report
-./scripts/testing/run_tests.sh unit --coverage
+# Generate local coverage report
+COVERAGE=true ./scripts/testing/run_tests.sh all
 
-# View report
+# Open HTML report
 open htmlcov/index.html
+
+# Or view on GitHub (uploaded to Codecov)
 ```
+
+---
 
 ## Best Practices
 
-1. **Write unit tests first** - Fast feedback
-2. **Mock external dependencies** - Keep tests hermetic
-3. **Use integration tests for node interactions** - Test graph behavior
-4. **Use bench tests sparingly** - Only for hardware validation
-5. **Mark tests appropriately** - Use correct pytest markers
-6. **Keep tests fast** - Unit < 1s, Integration < 10s
-7. **Document test requirements** - Note hardware needs
-8. **Run tests before commit** - Use pre-commit hooks
+### Unit Tests
+
+✅ **DO**:
+- Test pure functions without side effects
+- Use fixtures for common setup
+- Parametrize tests for multiple inputs
+- Keep tests fast (< 100ms)
+- Mock external dependencies
+
+❌ **DON'T**:
+- Access real hardware
+- Use ROS 2 (that's integration testing)
+- Make network calls
+- Write to filesystem (use tmp_path fixture)
+- Depend on test execution order
+
+### Integration Tests
+
+✅ **DO**:
+- Test complete ROS 2 graphs
+- Use mock hardware by default
+- Use isolated ROS domain (42)
+- Clean up launched processes
+- Use fixtures for graph lifecycle
+
+❌ **DON'T**:
+- Test on production domain (0)
+- Leave processes running
+- Assume hardware is available
+- Make tests depend on each other
+
+### Mock Hardware
+
+✅ **DO**:
+- Generate realistic data (with noise)
+- Match real hardware characteristics
+- Document mock behavior
+- Make mocks configurable
+
+❌ **DON'T**:
+- Generate perfect/deterministic data
+- Ignore timing constraints
+- Skip validation
+
+---
 
 ## Troubleshooting
 
-### Tests Fail Locally But Pass in CI
+### Tests Won't Run
 
-- Check Python version matches
-- Check dependencies are installed
-- Check ROS 2 environment is sourced
+**Issue**: `ImportError: No module named 'pytest'`
 
-### Bench Tests Skip
+**Fix**:
+```bash
+pip install pytest pytest-cov pytest-mock pytest-timeout
+```
 
-- Check if on Jetson: `test -f /etc/nv_tegra_release`
-- Set `FORCE_BENCH=1` to force run
-- Check hardware is connected
+**Issue**: `ImportError: No module named 'rclpy'`
+
+**Fix**:
+```bash
+source /opt/ros/humble/setup.bash
+```
+
+**Issue**: `No nodes found`
+
+**Fix**:
+```bash
+# Check ROS_DOMAIN_ID
+echo $ROS_DOMAIN_ID  # Should be 42 for tests
+
+# Ensure mock hardware is enabled
+export MOCK_HARDWARE=true
+```
 
 ### Integration Tests Fail
 
-- Verify ROS 2 is installed and sourced
-- Check workspace is built: `colcon build`
-- Verify nodes are installed: `ros2 pkg list`
+**Issue**: Timeout waiting for nodes
+
+**Fix**:
+- Increase timeout in test
+- Check if graph launched successfully
+- Verify ROS 2 domain is correct
+
+**Issue**: Nodes from previous tests still running
+
+**Fix**:
+```bash
+# Kill all ROS processes
+pkill -f ros2
+
+# Stop daemon
+ros2 daemon stop
+```
+
+### CI Failing
+
+**Issue**: Tests pass locally but fail in CI
+
+**Fix**:
+- Check GitHub Actions logs
+- Ensure all dependencies are in `requirements-dev.txt`
+- Verify ROS 2 packages are available in CI
+- Check for race conditions (timing issues)
+
+### Deployment Fails
+
+**Issue**: SSH connection fails
+
+**Fix**:
+```bash
+# Test SSH manually
+ssh nano@isaac-jetson.local
+
+# Check SSH keys
+ls ~/.ssh/
+
+# Verify known_hosts
+ssh-keyscan isaac-jetson.local >> ~/.ssh/known_hosts
+```
+
+**Issue**: Build fails on remote
+
+**Fix**:
+- Check remote ROS 2 installation
+- Verify dependencies are installed
+- Check disk space on robot
+
+---
+
+## Performance Targets
+
+### Unit Tests
+- **Total runtime**: < 30 seconds
+- **Individual test**: < 100ms
+- **Coverage**: > 80%
+
+### Integration Tests
+- **Total runtime**: < 5 minutes
+- **Individual test**: < 30 seconds
+- **Flakiness**: < 1%
+
+### CI Pipeline
+- **Total pipeline**: < 15 minutes
+- **Unit tests job**: < 2 minutes
+- **Integration tests job**: < 10 minutes
+- **Build test job**: < 5 minutes
+
+---
+
+## Future Enhancements
+
+- [ ] Hardware-in-the-loop (HIL) testing
+- [ ] Performance benchmarking tests
+- [ ] Stress testing framework
+- [ ] Chaos engineering for failure modes
+- [ ] Visual regression testing
+- [ ] Automated test data generation
+- [ ] Test result dashboards
+
+---
 
 ## See Also
 
-- [Development Workflow](../development/WORKFLOW.md)
-- [Node Management](../system/NODE_MANAGEMENT.md)
-- [CI/CD](../deployment/GITHUB_SETUP.md)
+- **GitHub Actions Docs**: `.github/workflows/`
+- **Pytest Documentation**: https://docs.pytest.org/
+- **Mock Hardware**: `tests/mocks/`
+- **Test Fixtures**: `tests/fixtures/`
+- **Deployment Guide**: `docs/deployment/DEPLOYMENT.md`
+
+---
+
+**Last Updated**: 2026-01-27  
+**Status**: Phase 6 Complete  
+**Next**: Hardware validation and performance benchmarking
