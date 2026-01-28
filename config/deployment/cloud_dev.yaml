@@ -1,0 +1,121 @@
+# Cloud Development Configuration
+# Development workstation with remote robot hardware
+# Use for: Remote development, cloud-based testing
+
+deployment:
+  name: "cloud_dev"
+  description: "Cloud development with remote hardware access"
+  
+  # Compute nodes
+  nodes:
+    # Cloud development machine
+    dev_workstation:
+      hostname: "dev.example.com"  # Your cloud instance
+      ip: "0.0.0.0"  # Public IP or VPN
+      ssh_user: "dev"
+      ros_domain_id: 0
+      
+      # Development tools and visualization
+      modules:
+        - foxglove_bridge
+        - vla_controller  # Develop VLA models in cloud
+        - action_executor
+        - planner
+      
+      # No direct hardware access
+      hardware:
+        remote: true
+    
+    # Remote robot (Pi + Jetson)
+    robot:
+      hostname: "robot.example.com"  # Robot's public IP or VPN
+      ip: "192.168.1.20"
+      ssh_user: "nano"
+      ros_domain_id: 0
+      
+      # Hardware nodes run on robot
+      modules:
+        - system_monitor
+        - health_monitor
+        - power_manager
+        - gpio_controller
+        - battery_monitor
+        - imu_processor
+        - chassis_controller
+        - calibration_manager
+        - visual_slam
+        - camera_calibration
+        - vision_pipeline
+        - audio_feature_extractor
+        - speech_recognition
+        - audio_pipeline
+        - realsense_camera
+        - nvblox_processor
+        - irobot_serial
+        - phat_motor_controller
+      
+      # Full hardware access
+      hardware:
+        - gpio
+        - i2c
+        - usb
+        - camera
+        - microphone
+        - gpu
+  
+  # Network configuration
+  network:
+    mode: "cloud"
+    discovery: "server"  # FastDDS discovery server on robot
+    discovery_server:
+      host: "robot"
+      ip: "robot.example.com"  # Public IP or VPN endpoint
+      port: 11811
+    require_sudo: false  # On dev machine
+    
+    # VPN or SSH tunnel recommended
+    tunnel:
+      enabled: true
+      type: "ssh"  # or "wireguard", "openvpn"
+      ssh_host: "robot.example.com"
+      ssh_port: 22
+      local_port: 11811
+      remote_port: 11811
+  
+  # Security
+  security:
+    encryption: true
+    authentication: true
+    allowed_ips:
+      - "10.0.0.0/8"  # VPN range
+      - "192.168.0.0/16"  # Local range
+  
+  # Launch configuration
+  launch:
+    # On dev workstation
+    dev_command: "ros2 launch isaac_robot cloud_dev.launch.py"
+    dev_args:
+      role: "developer"
+      deployment: "cloud_dev"
+      remote_host: "robot.example.com"
+    
+    # On robot (can be started via SSH)
+    robot_command: "ros2 launch isaac_robot distributed.launch.py"
+    robot_args:
+      host: "robot"
+      deployment: "cloud_dev"
+      allow_remote: "true"
+  
+  # Development tools
+  development:
+    visualization:
+      foxglove_port: 8765
+      rviz: true
+    
+    monitoring:
+      prometheus: false
+      grafana: false
+    
+    logging:
+      remote_logging: true
+      log_level: "DEBUG"

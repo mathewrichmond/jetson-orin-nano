@@ -1,0 +1,176 @@
+# Jetson Orin Nano Graph Configuration
+# Nodes that run on the Jetson in distributed deployment
+# Focus: Vision, audio, VLA processing, GPU-accelerated tasks
+
+robot:
+  # System monitoring (Jetson-specific)
+  system_monitor:
+    enabled: true
+    package: system_monitor
+    node: system_monitor_node
+    namespace: /jetson
+    parameters:
+      update_rate: 5.0
+      temp_warning_threshold: 70.0
+      temp_critical_threshold: 85.0
+      gpu_monitoring: true
+
+  health_monitor:
+    enabled: true
+    package: health_monitor
+    node: health_monitor_node
+    namespace: /jetson
+    parameters:
+      graph_config: "jetson_graph.yaml"
+      group: "all"
+      health_publish_rate: 1.0
+
+  # Power Management (GPU control on Jetson)
+  power_manager:
+    enabled: true
+    package: power_management
+    node: power_manager_node
+    namespace: /jetson
+    parameters:
+      initial_mode: "AUTO"
+      battery_full_threshold: 45.0
+      battery_balanced_threshold: 30.0
+      temp_throttle_threshold: 75.0
+
+  gpio_controller:
+    enabled: true
+    package: power_management
+    node: gpio_controller_node
+    namespace: /jetson
+    composable: false
+    parameters:
+      gpio_mode: "BOARD"
+      mock_mode: false
+
+  # Vision Pipeline (GPU-accelerated)
+  visual_slam:
+    enabled: true
+    package: vision_pipeline
+    node: visual_slam_node
+    namespace: /vision
+    parameters:
+      camera_name: "camera_front"
+      use_depth: true
+      use_imu: true
+      rtabmap_enabled: false
+      update_rate: 10.0
+
+  camera_calibration:
+    enabled: true
+    package: vision_pipeline
+    node: camera_calibration_node
+    namespace: /vision
+    parameters:
+      camera_names: ["camera_front", "camera_rear"]
+      calibration_window_sec: 30.0
+
+  vision_pipeline:
+    enabled: true
+    package: vision_pipeline
+    node: vision_pipeline_node
+    namespace: /jetson
+    parameters:
+      initial_mode: "FULL"
+      auto_mode_switching: true
+
+  # Audio Pipeline
+  audio_feature_extractor:
+    enabled: true
+    package: audio_pipeline
+    node: audio_feature_extractor_node
+    namespace: /audio
+    parameters:
+      audio_topic: "/sensor_fusion/audio/raw"
+      sample_rate: 16000
+      mfcc_coefficients: 13
+
+  speech_recognition:
+    enabled: false  # Optional
+    package: audio_pipeline
+    node: speech_recognition_node
+    namespace: /audio
+    parameters:
+      recognition_engine: "placeholder"
+
+  audio_pipeline:
+    enabled: true
+    package: audio_pipeline
+    node: audio_pipeline_node
+    namespace: /jetson
+    parameters:
+      initial_mode: "FULL"
+      enable_feature_extraction: true
+
+  # VLA Planner (GPU-accelerated)
+  vla_controller:
+    enabled: false  # Enable when VLA model available
+    package: vla_planner
+    node: vla_controller_node
+    namespace: /vla
+    parameters:
+      model_type: "placeholder"
+      device: "cuda"
+      inference_rate: 10.0
+
+  action_executor:
+    enabled: false
+    package: vla_planner
+    node: action_executor_node
+    namespace: /vla
+
+  planner:
+    enabled: false
+    package: vla_planner
+    node: planner_node
+    namespace: /vla
+
+  # Hardware Drivers (Jetson-connected)
+  realsense_camera:
+    enabled: true
+    package: realsense_camera
+    node: realsense_camera_node
+    namespace: /hardware
+    parameters:
+      enable_color: true
+      enable_depth: true
+      color_fps: 30
+      depth_fps: 30
+
+  nvblox_processor:
+    enabled: true
+    package: nvblox_processor
+    node: nvblox_processor_node
+    namespace: ""
+    parameters:
+      camera_names: ["camera_front", "camera_rear"]
+      voxel_size: 0.05
+
+  # Visualization
+  foxglove_bridge:
+    enabled: true
+    package: foxglove_bridge
+    node: foxglove_bridge
+    namespace: ""
+    parameters:
+      port: 8765
+      address: "0.0.0.0"
+
+groups:
+  all:
+    - system_monitor
+    - health_monitor
+    - power_manager
+    - gpio_controller
+    - visual_slam
+    - camera_calibration
+    - vision_pipeline
+    - audio_feature_extractor
+    - audio_pipeline
+    - realsense_camera
+    - nvblox_processor
+    - foxglove_bridge

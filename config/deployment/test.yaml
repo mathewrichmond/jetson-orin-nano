@@ -1,0 +1,84 @@
+# Test Deployment Configuration
+# Mock hardware, no real sensors/actuators
+# Use for: Unit testing, CI/CD, development without hardware
+
+deployment:
+  name: "test"
+  description: "Test environment with mock hardware"
+  
+  # Compute nodes
+  nodes:
+    test_host:
+      hostname: "localhost"
+      ip: "127.0.0.1"
+      ssh_user: "test"
+      ros_domain_id: 42  # Separate domain for testing
+      
+      # All modules with mock parameters
+      modules:
+        - system_monitor
+        - health_monitor
+        - power_manager
+        - gpio_controller  # Mock GPIO
+        - battery_monitor
+        - imu_processor
+        - chassis_controller
+        - calibration_manager
+        - visual_slam
+        - camera_calibration
+        - vision_pipeline
+        - audio_feature_extractor
+        - speech_recognition
+        - audio_pipeline
+        - vla_controller
+        - action_executor
+        - planner
+      
+      # Mock hardware (no real devices)
+      hardware:
+        mock: true
+  
+  # Network configuration
+  network:
+    mode: "local"
+    discovery: "multicast"
+    require_sudo: false
+  
+  # Mock hardware parameters
+  mock_hardware:
+    gpio:
+      enabled: true
+      mock_mode: true
+    
+    camera:
+      enabled: true
+      mock_mode: true
+      mock_image_path: "/opt/isaac-robot/test/fixtures/camera"
+    
+    microphone:
+      enabled: true
+      mock_mode: true
+      mock_audio_path: "/opt/isaac-robot/test/fixtures/audio"
+    
+    imu:
+      enabled: true
+      mock_mode: true
+      mock_frequency: 50.0
+    
+    motors:
+      enabled: true
+      mock_mode: true
+  
+  # Launch configuration
+  launch:
+    command: "ros2 launch isaac_robot test.launch.py"
+    args:
+      deployment: "test"
+      mock_hardware: "true"
+      headless: "true"
+  
+  # Testing parameters
+  testing:
+    timeout_sec: 300
+    expected_nodes: 15
+    health_check_interval: 5.0

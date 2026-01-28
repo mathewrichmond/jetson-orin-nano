@@ -18,6 +18,8 @@ NC='\033[0m'
 # Configuration
 SETUP_LOG="${SETUP_LOG:-$SCRIPT_DIR/.setup.log}"
 SETUP_STATE="${SETUP_STATE:-$SCRIPT_DIR/.setup_state}"
+DEPLOYMENT="${DEPLOYMENT:-local}"
+SETUP_NETWORK="${SETUP_NETWORK:-auto}"
 
 # Detect environment
 detect_environment() {
@@ -285,7 +287,62 @@ step_install_precommit() {
     mark_step_complete "install_precommit"
 }
 
-# Step 7: Setup Bluetooth (optional, only on Jetson)
+# Step 7: Setup Network Configuration
+step_setup_network() {
+    if check_step "setup_network"; then
+        log "Skipping: Network already configured"
+        return 0
+    fi
+
+    log_step "7" "14" "Setting up network configuration"
+
+    # Check if network setup is needed based on deployment
+    if [ "$SETUP_NETWORK" = "false" ]; then
+        log "Network setup disabled (SETUP_NETWORK=false)"
+        mark_step_complete "setup_network"
+        return 0
+    fi
+
+    # Auto-detect if network setup is needed
+    if [ "$SETUP_NETWORK" = "auto" ]; then
+        DEPLOYMENT_CONFIG="$SCRIPT_DIR/config/deployment/${DEPLOYMENT}.yaml"
+        
+        if [ -f "$DEPLOYMENT_CONFIG" ]; then
+            # Check if deployment requires sudo for network
+            if grep -q "require_sudo: true" "$DEPLOYMENT_CONFIG" 2>/dev/null; then
+                log "Deployment $DEPLOYMENT requires network configuration"
+                SETUP_NETWORK="true"
+            else
+                log "Deployment $DEPLOYMENT does not require network configuration"
+                SETUP_NETWORK="false"
+            fi
+        else
+            log "No deployment config found, skipping network setup"
+            SETUP_NETWORK="false"
+        fi
+    fi
+
+    if [ "$SETUP_NETWORK" = "true" ]; then
+        log "Running network setup script..."
+        
+        # Check if network setup script exists
+        NETWORK_SCRIPT="$SCRIPT_DIR/scripts/network/setup_network.sh"
+        if [ -f "$NETWORK_SCRIPT" ]; then
+            if check_root; then
+                bash "$NETWORK_SCRIPT" "$DEPLOYMENT"
+            else
+                sudo bash "$NETWORK_SCRIPT" "$DEPLOYMENT"
+            fi
+            log "Network configuration complete"
+        else
+            log "Warning: Network setup script not found: $NETWORK_SCRIPT"
+        fi
+    fi
+
+    mark_step_complete "setup_network"
+}
+
+# Step 8: Setup Bluetooth (optional, only on Jetson)
 step_setup_bluetooth() {
     if [ "$ENV_TYPE" != "jetson" ]; then
         return 0
@@ -527,7 +584,7 @@ step_build_ros2_packages() {
         return 0
     fi
 
-    log_step "13" "13" "Building ROS 2 packages"
+    log_step "14" "14" "Building ROS 2 packages"
 
     # Check if ROS 2 is installed
     if [ ! -f "/opt/ros/humble/setup.bash" ]; then
@@ -637,6 +694,7 @@ main() {
     step_setup_ros2_workspace
     step_setup_venv
     step_install_precommit
+    step_setup_network
     step_setup_bluetooth
     step_setup_wifi
     step_install_realsense

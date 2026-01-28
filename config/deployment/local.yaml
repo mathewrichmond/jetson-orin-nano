@@ -1,0 +1,62 @@
+# Local Deployment Configuration
+# Single host - all nodes run on Jetson Orin Nano
+# Use for: Development, testing without distributed setup
+
+deployment:
+  name: "local"
+  description: "Single-host deployment on Jetson Orin Nano"
+  
+  # Compute nodes
+  nodes:
+    jetson:
+      hostname: "isaac.local"  # or localhost
+      ip: "127.0.0.1"
+      ssh_user: "nano"
+      ros_domain_id: 0
+      
+      # Modules to run on this host
+      modules:
+        - system_monitor
+        - health_monitor
+        - power_manager
+        - gpio_controller
+        - battery_monitor
+        - imu_processor
+        - chassis_controller
+        - calibration_manager
+        - visual_slam
+        - camera_calibration
+        - vision_pipeline
+        - audio_feature_extractor
+        - speech_recognition
+        - audio_pipeline
+        - vla_controller
+        - action_executor
+        - planner
+        - realsense_camera
+        - nvblox_processor
+        - irobot_serial
+        - phat_motor_controller
+        - foxglove_bridge
+      
+      # Hardware access
+      hardware:
+        - gpio
+        - i2c
+        - usb
+        - camera
+        - microphone
+  
+  # Network configuration
+  network:
+    mode: "local"
+    discovery: "multicast"  # Simple multicast discovery
+    require_sudo: false
+  
+  # Launch command
+  launch:
+    command: "ros2 launch isaac_robot graph.launch.py"
+    args:
+      graph: "modular_graph.yaml"
+      group: "all"
+      deployment: "local"

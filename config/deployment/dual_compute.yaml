@@ -1,0 +1,119 @@
+# Dual-Compute Deployment Configuration
+# Raspberry Pi 4 + Jetson Orin Nano
+# Use for: Production deployment, distributed robotics
+
+deployment:
+  name: "dual_compute"
+  description: "Distributed deployment across Pi 4 and Jetson Orin Nano"
+  
+  # Compute nodes
+  nodes:
+    # Raspberry Pi 4 - Chassis control and power management
+    pi:
+      hostname: "isaac-pi.local"
+      ip: "192.168.1.10"  # Static IP recommended
+      ssh_user: "pi"
+      ros_domain_id: 0
+      
+      # Modules to run on Pi
+      modules:
+        - system_monitor
+        - health_monitor
+        - battery_monitor
+        - imu_processor
+        - chassis_controller
+        - calibration_manager
+        - irobot_serial
+        - phat_motor_controller
+      
+      # Hardware access (Pi-specific)
+      hardware:
+        - gpio
+        - i2c
+        - usb
+      
+      # Resource limits
+      resources:
+        memory_limit: "3GB"
+        cpu_limit: "4"
+    
+    # Jetson Orin Nano - Vision, audio, VLA processing
+    jetson:
+      hostname: "isaac-jetson.local"
+      ip: "192.168.1.20"  # Static IP recommended
+      ssh_user: "nano"
+      ros_domain_id: 0
+      
+      # Modules to run on Jetson
+      modules:
+        - system_monitor
+        - health_monitor
+        - power_manager
+        - gpio_controller
+        - visual_slam
+        - camera_calibration
+        - vision_pipeline
+        - audio_feature_extractor
+        - speech_recognition
+        - audio_pipeline
+        - vla_controller
+        - action_executor
+        - planner
+        - realsense_camera
+        - nvblox_processor
+        - foxglove_bridge
+      
+      # Hardware access (Jetson-specific)
+      hardware:
+        - gpio
+        - i2c
+        - usb
+        - camera
+        - microphone
+        - gpu
+      
+      # Resource limits
+      resources:
+        memory_limit: "6GB"
+        cpu_limit: "6"
+        gpu: "enabled"
+  
+  # Network configuration
+  network:
+    mode: "distributed"
+    discovery: "server"  # FastDDS discovery server
+    discovery_server:
+      host: "jetson"
+      ip: "192.168.1.20"
+      port: 11811
+    require_sudo: true  # For network interface configuration
+    
+    # Network interface configuration
+    interfaces:
+      pi:
+        interface: "eth0"
+        static_ip: "192.168.1.10/24"
+        gateway: "192.168.1.1"
+      jetson:
+        interface: "eth0"
+        static_ip: "192.168.1.20/24"
+        gateway: "192.168.1.1"
+  
+  # Launch configuration
+  launch:
+    # Launch on Pi
+    pi_command: "ros2 launch isaac_robot distributed.launch.py"
+    pi_args:
+      host: "pi"
+      deployment: "dual_compute"
+    
+    # Launch on Jetson
+    jetson_command: "ros2 launch isaac_robot distributed.launch.py"
+    jetson_args:
+      host: "jetson"
+      deployment: "dual_compute"
+  
+  # Synchronization
+  sync:
+    time_sync: true  # Enable NTP sync
+    ntp_server: "192.168.1.1"  # or pool.ntp.org

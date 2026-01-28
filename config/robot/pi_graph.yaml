@@ -1,0 +1,102 @@
+# Raspberry Pi 4 Graph Configuration
+# Nodes that run on the Raspberry Pi in distributed deployment
+# Focus: Chassis control, power management, low-level hardware
+
+robot:
+  # System monitoring (Pi-specific)
+  system_monitor:
+    enabled: true
+    package: system_monitor
+    node: system_monitor_node
+    namespace: /rpi
+    parameters:
+      update_rate: 2.0  # Lower rate for Pi
+      temp_warning_threshold: 70.0
+      temp_critical_threshold: 80.0  # Pi runs hotter
+
+  health_monitor:
+    enabled: true
+    package: health_monitor
+    node: health_monitor_node
+    namespace: /rpi
+    parameters:
+      graph_config: "pi_graph.yaml"
+      group: "all"
+      health_publish_rate: 1.0
+
+  # Power Management (Battery monitoring only on Pi)
+  battery_monitor:
+    enabled: true
+    package: power_management
+    node: battery_monitor_node
+    namespace: /rpi
+    parameters:
+      voltage_low_threshold: 11.0
+      voltage_critical_threshold: 10.5
+      capacity_estimation_enabled: true
+      runtime_estimation_enabled: true
+
+  # Chassis Control (Primary responsibility of Pi)
+  imu_processor:
+    enabled: true
+    package: chassis_control
+    node: imu_processor_node
+    namespace: /rpi
+    parameters:
+      raw_imu_topic: "/hardware/phat/imu"
+      filtered_imu_topic: "/rpi/imu/filtered"
+      publish_rate: 50.0
+      kalman_filter_enabled: true
+
+  chassis_controller:
+    enabled: true
+    package: chassis_control
+    node: chassis_controller_node
+    namespace: /rpi
+    parameters:
+      publish_rate: 50.0
+      max_linear_velocity: 0.5
+      max_angular_velocity: 2.0
+
+  calibration_manager:
+    enabled: true
+    package: chassis_control
+    node: calibration_manager_node
+    namespace: /rpi
+    parameters:
+      calibration_file: "/home/pi/.config/robot/calibration.yaml"
+      auto_save_interval_sec: 300.0
+
+  # Hardware Drivers (Pi-connected hardware)
+  irobot_serial:
+    enabled: true
+    package: irobot_serial
+    node: irobot_serial_node
+    namespace: /hardware
+    parameters:
+      serial_port: '/dev/ttyUSB0'
+      baudrate: 115200
+      publish_rate: 10.0
+
+  phat_motor_controller:
+    enabled: true
+    composable: false
+    package: phat_motor_controller
+    node: phat_motor_controller_node
+    namespace: /hardware
+    parameters:
+      i2c_bus: 1  # Pi uses bus 1 (Jetson uses bus 7)
+      accelerometer_address: 0x69
+      enable_accelerometer: true
+      publish_rate: 50.0
+
+groups:
+  all:
+    - system_monitor
+    - health_monitor
+    - battery_monitor
+    - imu_processor
+    - chassis_controller
+    - calibration_manager
+    - irobot_serial
+    - phat_motor_controller

@@ -1,0 +1,102 @@
+# Simulation Deployment Configuration
+# Gazebo or Isaac Sim environment
+# Use for: Algorithm development, testing in simulation
+
+deployment:
+  name: "sim"
+  description: "Simulation environment (Gazebo/Isaac Sim)"
+  
+  # Compute nodes
+  nodes:
+    sim_host:
+      hostname: "localhost"
+      ip: "127.0.0.1"
+      ssh_user: "sim"
+      ros_domain_id: 1
+      
+      # Modules (simulation-compatible subset)
+      modules:
+        - system_monitor
+        - health_monitor
+        - power_manager
+        - imu_processor
+        - chassis_controller
+        - calibration_manager
+        - visual_slam
+        - camera_calibration
+        - vision_pipeline
+        - audio_feature_extractor
+        - audio_pipeline
+        - vla_controller
+        - action_executor
+        - planner
+      
+      # Simulated hardware
+      hardware:
+        simulation: true
+  
+  # Network configuration
+  network:
+    mode: "local"
+    discovery: "multicast"
+    require_sudo: false
+  
+  # Simulation configuration
+  simulation:
+    engine: "gazebo"  # gazebo, isaac_sim, or webots
+    
+    # Gazebo configuration
+    gazebo:
+      world: "isaac_robot_world.sdf"
+      gui: true
+      headless: false
+    
+    # Isaac Sim configuration (alternative)
+    isaac_sim:
+      scene: "isaac_robot_scene.usd"
+      headless: false
+      physics_dt: 0.01
+    
+    # Robot model
+    robot:
+      urdf: "/opt/isaac-robot/models/isaac_robot.urdf"
+      spawn_x: 0.0
+      spawn_y: 0.0
+      spawn_z: 0.1
+    
+    # Sensor simulation
+    sensors:
+      camera:
+        enabled: true
+        fps: 30
+        resolution: [640, 480]
+      
+      depth_camera:
+        enabled: true
+        fps: 30
+        resolution: [640, 480]
+        range: [0.1, 10.0]
+      
+      imu:
+        enabled: true
+        frequency: 50.0
+        noise: 0.01
+      
+      microphone:
+        enabled: false  # Audio sim not yet supported
+  
+  # Launch configuration
+  launch:
+    # Launch simulator first
+    sim_command: "ros2 launch isaac_robot_sim gazebo.launch.py"
+    sim_args:
+      world: "isaac_robot_world.sdf"
+      gui: "true"
+    
+    # Launch robot nodes
+    robot_command: "ros2 launch isaac_robot graph.launch.py"
+    robot_args:
+      graph: "modular_graph.yaml"
+      group: "all"
+      deployment: "sim"
+      use_sim_time: "true"

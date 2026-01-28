@@ -1,6 +1,6 @@
 # Modular Architecture - Quick Start
 
-**Status**: Phases 1-4 Complete ✅ | Ready for Phase 5 (Distributed Deployment) or Hardware Testing
+**Status**: Phases 1-5 Complete ✅ | Ready for Phase 6 (Integration Testing) or Hardware Deployment
 
 ---
 
@@ -137,15 +137,24 @@ cd src/modules/chassis_control/test && ./run_all_tests.sh
 
 ## Next Steps
 
-### Option 1: Continue to Phase 5 (Distributed Deployment) ⭐ RECOMMENDED
+### Option 1: Continue to Phase 6 (Integration Testing) ⭐ RECOMMENDED
 ```
-Configure FastDDS discovery server
-Create host-specific graph configurations
-Deploy to dual-compute (Pi + Jetson)
-Test cross-host communication
+Hardware integration testing
+Performance benchmarking
+Failure mode testing
+Production readiness validation
 ```
 
-### Option 2: Integrate Real Models
+### Option 2: Deploy to Dual-Compute (When Pi Ready)
+```
+# On both hosts
+sudo ./scripts/network/setup_network.sh dual_compute
+
+# Launch distributed system
+./scripts/deployment/deploy.sh dual_compute launch
+```
+
+### Option 3: Integrate Real Models
 ```
 Install Whisper for speech recognition
 Install OpenVLA/RT-1 for VLA control
@@ -177,7 +186,8 @@ git push origin main
 
 ---
 
-**Status**: ✅ Phase 4 Complete | 4 of 6 Phases Done (67%)  
+**Status**: ✅ Phase 5 Complete | 5 of 6 Phases Done (83%)  
 **Build**: ✅ All packages compile | ✅ Launch files installed  
-**Test**: ✅ Smoke tests pass | ⏳ Hardware tests pending
-**Next**: Phase 5 (Distributed Deployment) or Model Integration
+**Deploy**: ✅ 5 deployment configs | ✅ Network setup with sudo
+**Test**: ✅ Smoke tests pass | ⏳ Hardware tests pending  
+**Next**: Phase 6 (Integration Testing) or Model Integration
