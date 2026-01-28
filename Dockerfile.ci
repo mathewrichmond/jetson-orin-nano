@@ -1,0 +1,35 @@
+# Lightweight Docker image for CI testing
+# Fast build, includes only Python dependencies for lint + unit tests
+# No ROS 2, no hardware dependencies
+
+FROM ubuntu:22.04
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install Python and basic tools
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy only Python dependencies first (for layer caching)
+COPY pyproject.toml ./
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -e ".[dev]"
+
+# Copy source code
+COPY . .
+
+# Set environment
+ENV PYTHONPATH="/workspace/src:/workspace:$PYTHONPATH"
+
+# Default: Run bash
+CMD ["/bin/bash"]

@@ -54,14 +54,23 @@ repos:
       - id: bandit
         args: ['-r', '.', '-ll']
 
-  # Run unit tests (fast, no hardware required)
-  # Note: Disabled by default for speed, enable if needed
-  # - repo: local
-  #   hooks:
-  #     - id: unit-tests
-  #       name: Unit Tests
-  #       entry: bash -c './scripts/testing/run_tests.sh unit || exit 1'
-  #       language: system
-  #       pass_filenames: false
-  #       always_run: false
-  #       stages: [commit]
+  # Docker-based lint and unit tests for CI consistency
+  - repo: local
+    hooks:
+      - id: docker-lint
+        name: Docker Lint Tests
+        entry: bash -c './scripts/testing/docker_test.sh lint'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+        verbose: true
+      
+      - id: docker-unit-tests
+        name: Docker Unit Tests
+        entry: bash -c './scripts/testing/docker_test.sh unit'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+        verbose: true

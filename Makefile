@@ -1,17 +1,29 @@
 # Makefile for Isaac Robot System
 # Provides convenient shortcuts for common tasks
 
+.PHONY: help docker-build docker-lint docker-unit docker-test pre-commit-install pre-commit-test
+
+# Docker CI image
+DOCKER_IMAGE := isaac-robot-ci:local
+
 .PHONY: help setup setup-docker build-docker run-docker clean reset test
 
 help:
 	@echo "Isaac Robot System - Makefile Commands"
+	@echo ""
+	@echo "Quick Start (CI Testing):"
+	@echo "  make docker-test        - Run lint + unit tests in Docker (CI consistency)"
+	@echo "  make docker-lint        - Run only lint in Docker"
+	@echo "  make docker-unit        - Run only unit tests in Docker"
+	@echo "  make pre-commit-install - Install pre-commit hooks (auto-run docker tests)"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make setup              - Run setup script"
 	@echo "  make setup-docker       - Build and setup Docker environment"
 	@echo ""
 	@echo "Docker:"
-	@echo "  make build-docker       - Build Docker image"
+	@echo "  make docker-build       - Build lightweight CI Docker image"
+	@echo "  make build-docker       - Build full Docker image"
 	@echo "  make run-docker         - Run Docker container"
 	@echo "  make shell-docker       - Run Docker container with shell"
 	@echo ""
@@ -24,6 +36,35 @@ help:
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make reset              - Reset setup state"
 	@echo "  make update-packages    - Update system packages"
+
+# === Docker CI Commands (Fast local testing) ===
+
+docker-build: ## Build lightweight CI Docker image
+	@echo "Building CI Docker image..."
+	docker build -f Dockerfile.ci -t $(DOCKER_IMAGE) .
+	@echo "✅ Docker image built: $(DOCKER_IMAGE)"
+
+docker-lint: ## Run lint tests in Docker
+	@./scripts/testing/docker_test.sh lint
+
+docker-unit: ## Run unit tests in Docker
+	@./scripts/testing/docker_test.sh unit
+
+docker-test: ## Run lint + unit tests in Docker (pre-commit simulation)
+	@./scripts/testing/docker_test.sh all
+
+pre-commit-install: ## Install pre-commit hooks
+	@echo "Installing pre-commit hooks..."
+	@pip install --user pre-commit || pip3 install --user pre-commit
+	@pre-commit install
+	@echo "✅ Pre-commit hooks installed"
+	@echo "Hooks will run Docker tests before each commit"
+
+pre-commit-test: ## Test pre-commit hooks manually
+	@echo "Running pre-commit hooks on all files..."
+	@pre-commit run --all-files
+
+# === Setup ===
 
 setup:
 	@echo "Running setup..."
