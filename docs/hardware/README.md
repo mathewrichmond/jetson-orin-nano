@@ -34,6 +34,8 @@ This directory contains comprehensive hardware documentation for the Isaac robot
 
 | Document | Purpose |
 |----------|---------|
+| [MOBILE_POWER_DESIGN.md](MOBILE_POWER_DESIGN.md) | Mobile power system design (battery-powered operation) |
+| [POWER_MODULE_DESIGN.md](POWER_MODULE_DESIGN.md) | Custom power module PCB design (DC-DC converters) |
 | [CAMERA_FRAME_SYNC.md](CAMERA_FRAME_SYNC.md) | Hardware camera synchronization |
 | [SERVO_SAFETY.md](SERVO_SAFETY.md) | Servo safety guidelines |
 | [BENCH_SETUP.md](BENCH_SETUP.md) | Bench testing configuration |
@@ -70,6 +72,8 @@ This directory contains comprehensive hardware documentation for the Isaac robot
 - Power budget and distribution
 - Communication interfaces (USB, I2C, Serial)
 - Troubleshooting guides
+
+**Related**: [MOBILE_POWER_DESIGN.md](MOBILE_POWER_DESIGN.md) for battery-powered mobile operation
 
 **Update When**:
 - Changing wiring or connections

@@ -128,7 +128,7 @@ This document provides an organized reference to all electrical components, wiri
 | **Depth Sensor** | Active stereo (850nm IR) | - |
 | **RGB Sensor** | 1920×1080 @ 30fps | Wider FOV than D435 |
 
-**Documentation**: 
+**Documentation**:
 - [realsense.md](realsense.md)
 - [CAMERA_FRAME_SYNC.md](CAMERA_FRAME_SYNC.md)
 
@@ -167,7 +167,7 @@ This document provides an organized reference to all electrical components, wiri
 
 #### Servo Motors (MG996R)
 
-**Model**: MG996R Digital Servo (4-pack)  
+**Model**: MG996R Digital Servo (4-pack)
 **Manufacturer**: Towerpro/compatible
 
 | Parameter | @ 4.8V | @ 6V (optimal) | @ 7.2V | Notes |
@@ -226,13 +226,15 @@ This document provides an organized reference to all electrical components, wiri
 | **Serial Connector** | 7-pin Mini-DIN | Requires adapter |
 
 **Pin Functions**:
-- Pin 1: Vpwr (14.4V, can power external devices)
+- Pin 1: Vpwr (14.4V, **200mA limit** - NOT suitable for powering Jetson)
 - Pin 3: RXD (to iRobot)
 - Pin 4: TXD (from iRobot)
 - Pin 5: BRC (baud rate change)
 - Pin 6/7: GND
 
 **USB-to-Serial Adapter**: FTDI or CH340-based, 5V/3.3V logic
+
+**Power Limitations**: The serial port Vpwr pin has a 200mA PTC fuse and is insufficient for powering the Jetson or other high-power devices. For mobile power, see [MOBILE_POWER_DESIGN.md](MOBILE_POWER_DESIGN.md) for direct battery connection options.
 
 **Documentation**: [irobot.md](irobot.md)
 
@@ -379,8 +381,11 @@ i2cget -y 7 0x69 0x00  # WHO_AM_I register
 
 #### iRobot Create 2 (independent)
 
-- **Battery**: 14.4V NiMH, ~3000mAh
+- **Battery**: 14.4V **Li-ion**, **6800mAh** (Maxofpowr ASMT01-01-107-US, upgraded from standard 3000mAh NiMH)
 - **Power**: Independent, internal battery
+- **Weight**: 0.6 kg
+- **Mobile Power**: See [MOBILE_POWER_DESIGN.md](MOBILE_POWER_DESIGN.md) for powering Jetson system from Create 2 battery
+- **Note**: Li-ion battery requires compatible charger and proper undervoltage protection (11V minimum)
 
 ### 4.2 Power Supply Selection
 
@@ -392,7 +397,7 @@ i2cget -y 7 0x69 0x00  # WHO_AM_I register
 - **Powers**: Jetson, USB hub (or separate hub adapter), all USB devices
 - **Example**: Standard Jetson power adapter + RSHTECH hub adapter
 
-**Supply 2: Servo System (6V)** 
+**Supply 2: Servo System (6V)**
 - **Output**: 6V @ 12A (72W) minimum
 - **Connector**: USB-C on SparkFun Auto pHAT
 - **Powers**: 4× MG996R servos via PCA9685
@@ -410,7 +415,7 @@ i2cget -y 7 0x69 0x00  # WHO_AM_I register
 
 If using a single supply, you would need:
 - **Output**: 12V @ 8A (96W) minimum
-- **Voltage regulators**: 
+- **Voltage regulators**:
   - 12V → 5V buck converter (25W) for main system
   - 12V → 6V buck converter (60W) for servos
 - **Disadvantage**: More complex, less isolation, harder to debug
@@ -698,7 +703,7 @@ ls -l /dev/ttyUSB* /dev/ttyACM*
 
 **Last Updated**: 2026-01-27
 
-**Next Steps**: 
+**Next Steps**:
 1. Verify all electrical connections match this documentation
 2. Run electrical verification tests
 3. Update with actual component part numbers and specifications
