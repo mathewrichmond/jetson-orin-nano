@@ -89,6 +89,43 @@ else
     echo -e "${YELLOW}⚠ Avahi daemon is not running${NC}"
 fi
 
+# Check NVMe/SSD (if present)
+echo -e "${GREEN}Checking NVMe SSD...${NC}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ISAAC_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [ -b /dev/nvme0n1 ]; then
+    echo "✓ NVMe device present: /dev/nvme0n1"
+    ROOT_DEV=$(findmnt -n -o SOURCE / 2>/dev/null | sed 's/p[0-9]*$//' || true)
+    NVME_ABS=$(readlink -f /dev/nvme0n1 2>/dev/null || echo "")
+    if [ -n "$ROOT_DEV" ] && [ -n "$NVME_ABS" ] && [ "$(readlink -f "$ROOT_DEV" 2>/dev/null)" = "$NVME_ABS" ]; then
+        echo "✓ Booted from NVMe SSD (root on NVMe)"
+    else
+        echo "  Boot device: $(findmnt -n -o SOURCE / 2>/dev/null || echo 'unknown') (SD card - NVMe available for migration)"
+    fi
+    # SMART health (requires smartmontools, may need sudo)
+    if command -v smartctl &>/dev/null; then
+        if smartctl -H /dev/nvme0 2>/dev/null | grep -qE "overall-health|PASSED|OK"; then
+            echo "✓ NVMe SMART health: OK"
+        else
+            echo -e "${YELLOW}⚠ NVMe SMART check skipped (run: sudo ./scripts/system/verify_ssd.sh for full verification)${NC}"
+        fi
+    else
+        echo "  smartmontools not installed (apt install smartmontools for SMART checks)"
+    fi
+    # Capacity (lsblk works without root; blockdev may need sudo)
+    if [ -b /dev/nvme0n1 ]; then
+        SIZE_GB=$(lsblk -b -d -n -o SIZE /dev/nvme0n1 2>/dev/null | awk '{printf "%d", $1/1024/1024/1024}')
+        if [ -n "$SIZE_GB" ] && [ "$SIZE_GB" -gt 0 ]; then
+            echo "  NVMe capacity: ${SIZE_GB}GB"
+        else
+            echo "  NVMe capacity: (run with sudo for full details)"
+        fi
+    fi
+    echo "  Full verification: sudo $ISAAC_ROOT/scripts/system/verify_ssd.sh"
+else
+    echo "  No NVMe device detected (optional - add NVMe for SSD migration)"
+fi
+
 echo ""
 echo "=========================================="
 echo "Health Check Complete"

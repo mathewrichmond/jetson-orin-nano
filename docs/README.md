@@ -31,6 +31,8 @@ This directory contains comprehensive documentation for the Isaac Robot System.
 |----------|-------------|
 | **architecture/REPOSITORY_STRUCTURE.md** | Repository organization and structure |
 | **development/PYPROJECT_MIGRATION.md** | Modern dependency management with pyproject.toml |
+| **setup/SSD_MIGRATION.md** | NVMe SSD migration and dual-boot setup |
+| **setup/PRODUCTION_SYSTEM_DESIGN.md** | Headless Docker host, synced mounts, microservices |
 
 ---
 

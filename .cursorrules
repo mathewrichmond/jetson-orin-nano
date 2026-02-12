@@ -71,7 +71,7 @@ This is a **robot control system** repository that:
 
 ## Important Notes
 
-- System currently runs on microSD card (may migrate to SSD later)
+- System runs on microSD; NVMe SSD migration supported (see docs/setup/SSD_MIGRATION.md)
 - Network uses dynamic IP with mDNS (isaac.local)
 - ROS 2 Humble is the primary framework
 - All scripts that modify system should check for root privileges

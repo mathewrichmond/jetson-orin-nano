@@ -6,7 +6,7 @@
 # Docker CI image
 DOCKER_IMAGE := isaac-robot-ci:local
 
-.PHONY: help setup setup-docker build-docker run-docker clean reset test
+.PHONY: help setup setup-docker build-docker run-docker clean reset test system-check
 
 help:
 	@echo "Isaac Robot System - Makefile Commands"
@@ -33,6 +33,7 @@ help:
 	@echo "  make test               - Run tests"
 	@echo ""
 	@echo "Maintenance:"
+	@echo "  make system-check       - Run full system health check"
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make reset              - Reset setup state"
 	@echo "  make update-packages    - Update system packages"
@@ -135,6 +136,9 @@ reset:
 	@echo "Resetting setup state..."
 	rm -f .setup_state .setup.log
 	@echo "Setup state reset. Run 'make setup' to reinstall."
+
+system-check: ## Run full system health check (hostname, disk, memory, temp, network, SSD)
+	@./scripts/monitoring/system_health_check.sh
 
 update-packages:
 	@echo "Updating packages..."
