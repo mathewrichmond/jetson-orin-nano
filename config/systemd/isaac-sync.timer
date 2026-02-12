@@ -1,0 +1,12 @@
+[Unit]
+Description=Isaac Robot Data Sync Timer
+Requires=isaac-sync.service
+
+[Timer]
+# Sync every hour
+OnBootSec=5min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

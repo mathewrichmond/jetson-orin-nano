@@ -1,0 +1,22 @@
+# Container-First Architecture Rules
+
+## System Design
+- Host: Minimal (drivers, Docker, GPU, network, PTP only)
+- Containers: All robot code (ROS 2, Python, application logic)
+- Storage: /data/{logs,config,models,sessions} with bind mounts
+
+## No Bare-Metal Code
+- ❌ NO ROS 2 on host
+- ❌ NO Python packages on host (except Docker tools)
+- ❌ NO ros2 launch commands on host
+- ❌ NO systemd services for ROS nodes
+
+## Container Management
+- Use docker-compose.production.yml
+- Helper: scripts/deployment/deploy_containers.sh
+- Auto-start: isaac-containers.service (systemd)
+
+## Documentation
+- Single source: SETUP.md
+- Architecture details: docs/setup/CONTAINER_FIRST_ARCHITECTURE.md
+- No migration guides, no update guides, no verbose docs

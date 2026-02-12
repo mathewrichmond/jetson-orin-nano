@@ -1,98 +1,28 @@
 # Documentation
 
-This directory contains comprehensive documentation for the Isaac Robot System.
+## Core Docs
 
----
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Articulated cameras, UDM worldgraph, digital twin
+- **[CALIBRATION.md](CALIBRATION.md)** - Fixture-based & auto-calibration
+- **[SSD_MIGRATION.md](SSD_MIGRATION.md)** - NVMe SSD setup
+- **[RECOVERY.md](RECOVERY.md)** - System recovery
 
-## Core Documentation
+## Root Docs
 
-### Quick Reference
+- **[README.md](../README.md)** - System overview & quick start
+- **[SETUP.md](../SETUP.md)** - Complete setup guide
 
-| Document | Description |
-|----------|-------------|
-| **QUICK_START.md** | ⭐ 3-step quick start (10 minutes) |
-| **MODULAR_QUICK_START.md** | ⭐ Detailed setup guide for development |
-| **development/LOCAL_TESTING.md** | ⭐ Fast local testing with Docker (30s feedback) |
-| **development/LOGGING.md** | ⭐ Data logging and session management |
-| **deployment/DEPLOYMENT.md** | Multi-environment deployment guide |
-| **testing/TESTING.md** | Testing framework guide |
+## Key Concepts
 
-### Project Status
+### Articulated Cameras
+Each camera has independent pan-tilt servos for active perception and object tracking.
 
-| Document | Description |
-|----------|-------------|
-| **architecture/IMPLEMENTATION_STATUS.md** | ⭐ TODOs, placeholders, and integration guide |
-| **archived/MODULAR_ARCHITECTURE_PROGRESS.md** | Overall project progress (100% complete) |
-| **archived/PHASES_COMPLETE.md** | Summary of all 6 completed phases |
+### UDM Worldgraph
+All sensor data projects into a unified digital twin (TSDF/occupancy). This enables:
+- Simulation-independent planning
+- Emulating different sensor configurations
+- Offline RL training from worldgraph
 
-### Technical Guides
-
-| Document | Description |
-|----------|-------------|
-| **architecture/REPOSITORY_STRUCTURE.md** | Repository organization and structure |
-| **development/PYPROJECT_MIGRATION.md** | Modern dependency management with pyproject.toml |
-| **setup/SSD_MIGRATION.md** | NVMe SSD migration and dual-boot setup |
-| **setup/PRODUCTION_SYSTEM_DESIGN.md** | Headless Docker host, synced mounts, microservices |
-
----
-
-## Topic-Specific Documentation
-
-### By Topic
-
-```
-architecture/     - System architecture and design
-deployment/       - Deployment configurations and guides  
-development/      - Development workflows, CI, local testing
-hardware/         - Hardware setup and configuration
-monitoring/       - System monitoring and diagnostics
-setup/            - Installation and setup guides
-testing/          - Testing strategies and tools
-visualization/    - Visualization setup (Foxglove, RViz)
-archived/         - Pre-modular architecture docs (historical)
-```
-
----
-
-## Getting Started
-
-**New to the project?** Start here:
-
-1. **QUICK_START.md** - 3-step quick start (10 minutes)
-2. **MODULAR_QUICK_START.md** - Detailed setup and build guide
-3. **development/LOCAL_TESTING.md** - Set up fast local testing
-4. **deployment/DEPLOYMENT.md** - Choose your deployment configuration
-
-**Looking for specific information?**
-
-- Quick start → `QUICK_START.md`
-- Data logging → `development/LOGGING.md`
-- Local testing → `development/LOCAL_TESTING.md`
-- CI/CD → `development/CI.md`
-- Hardware setup → `hardware/`
-- Deployment → `deployment/DEPLOYMENT.md`
-- Testing → `testing/TESTING.md`
-- Architecture → `architecture/`
-
----
-
-## Documentation Philosophy
-
-✅ **Comprehensive** - Detailed guides for all features  
-✅ **Practical** - Real examples and commands  
-✅ **Consolidated** - Single source of truth per topic  
-✅ **Maintained** - Updated with code changes  
-
----
-
-## Contributing
-
-When adding documentation:
-- Update existing docs rather than creating new ones
-- Place in appropriate subdirectory by topic
-- Follow existing formatting and structure
-- Keep it practical with examples
-
----
-
-**Last Updated**: 2026-01-28
+### Calibration
+- **Fixture-based**: Camera intrinsics, kinematic chains, servo zeros
+- **Auto-calibration**: Odometry, IMU biases, worldgraph consistency

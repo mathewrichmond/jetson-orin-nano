@@ -1,0 +1,8 @@
+system_updates
+install_docker
+install_drivers
+configure_gpu
+setup_ptp
+setup_network
+setup_production_data
+setup_container_deploy

@@ -1,323 +1,128 @@
-# Jetson Orin Nano - Robot Target Implementation
+# Isaac Robot - Articulated Cameras with UDM Worldgraph
 
-Docker-first target implementation for autonomous mobile robot on Jetson Orin Nano, integrating with the [robotics platform](../robotics).
+Robot system with independently actuated cameras projecting into a unified digital twin for simulation-independent planning.
 
-## Architecture
+## Key Design
 
-**Docker-First Design** - Host provides hardware access, containers provide functionality:
+### Problem
+- **Articulated cameras**: Pan-tilt servos per camera (for tracking/looking)
+- **RealSense depth**: Built-in depth sensing (not stereo)
+- **Simulation challenge**: Moving cameras make planning/simulation hard
+
+### Solution: UDM Worldgraph
+Project all sensor data into a **unified digital twin** (UDM worldgraph):
+- Plan/simulate independent of sensor poses
+- Run pre-trained models with different sensor configs
+- Generate offline RL training data
 
 ```
-┌─────────────────────────────────────┐
-│ Host (Minimal)                      │
-│ - JetPack + NVIDIA drivers          │
-│ - Docker + NVIDIA runtime           │
-│ - Device permissions (udev)         │
-│ - Network (mDNS, WiFi)              │
-└─────────────────┬───────────────────┘
-                  │
-        ┌─────────┴──────────┐
-        │                    │
-┌───────▼────────┐  ┌────────▼────────┐
-│   Perception   │  │    Control      │
-│   Container    │  │   Container     │
-│                │  │                 │
-│ - ROS2 Humble  │  │ - ROS2 Humble   │
-│ - RealSense SDK│  │ - PyTorch       │
-│ - nvblox TSDF  │  │ - VLA model     │
-│ - Cameras      │  │ - Servo control │
-└────────────────┘  └─────────────────┘
+Articulated Cameras → UDM Worldgraph → Virtual Sensors
+                           ↓
+                     Planning/Models
 ```
-
-**Integration**: Uses [robotics_sdk](../robotics/common/robotics_sdk) base classes to implement `PerceptionBase` and `ControlBase`.
 
 ## Quick Start
 
-### 1. Host Setup (One-Time)
-
 ```bash
-git clone <repository-url>
-cd jetson-orin-nano
+# 1. Setup host
+./setup-host.sh
 
-# Run minimal host setup
-./setup.sh
-
-# Reboot for group membership
+# 2. Reboot
 sudo reboot
-```
 
-### 2. Configure Robot
-
-```bash
-# Create environment file
-cp .env.example .env
-nano .env
-
-# Set:
-# - ROBOT_ID=jetson-01
-# - ZENOH_ROUTER=tcp/192.168.1.100:7447 (server IP)
-# - Camera serials from: rs-enumerate-devices
-
-# Edit robot config
-nano config/robot_config.yaml
-```
-
-### 3. Build and Start
-
-```bash
-# Build containers
-docker compose build
-
-# Start robot
-docker compose up -d
-
-# Monitor logs
-docker compose logs -f perception control
-```
-
-### 4. Verify Registration
-
-```bash
-# Check robot registered with dispatch service
-curl http://192.168.1.100:5000/api/v1/robots
-
-# Should show jetson-01 with capabilities
-```
-
-### 5. Test Mission
-
-```bash
-# Submit test mission
-curl -X POST http://192.168.1.100:5000/api/v1/missions \
-  -H "Content-Type: application/json" \
-  -d '{"command": "Look around", "required_capabilities": ["pan_tilt_camera"]}'
-```
-
-## Repository Structure
-
-```
-jetson-orin-nano/
-├── perception/              # Perception container
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── src/
-│       └── perception_main.py  # Implements PerceptionBase
-├── control/                 # Control container
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── src/
-│       └── control_main.py     # Implements ControlBase
-├── config/
-│   └── robot_config.yaml       # Robot-specific configuration
-├── docs/
-│   ├── setup/
-│   │   └── DOCKER_FIRST_SETUP.md  # Complete bringup guide
-│   ├── hardware/               # Hardware setup guides
-│   └── architecture/           # System design
-├── scripts/
-│   ├── system/                 # Minimal host scripts
-│   │   ├── setup_wifi.sh       # WiFi configuration
-│   │   └── setup_bluetooth.sh  # Bluetooth pairing
-│   └── hardware/
-│       └── setup_hardware.sh   # Hardware verification
-├── setup.sh                    # Minimal host setup (~150 lines)
-├── docker-compose.yml          # Production orchestration
-└── .env.example                # Configuration template
-```
-
-## Hardware
-
-**Supported**:
-- 2x Intel RealSense D435i cameras (stereo, depth, IMU)
-- Pan-tilt mounts (Dynamixel servos)
-- Mobile base (differential drive)
-- iRobot Create chassis (optional)
-
-**Requirements**:
-- Jetson Orin Nano with JetPack 5.x
-- 256GB+ SSD (boot drive + data)
-- USB 3.0 for cameras
-- Serial/I2C for actuators
-
-## Key Features
-
-### Docker-First Benefits
-
-**Before (Host-Based)**:
-- 737-line setup.sh
-- 40+ script files
-- System package conflicts
-- Difficult to update
-
-**After (Docker-First)**:
-- 150-line setup.sh (host only)
-- Isolated dependencies
-- Easy updates (rebuild container)
-- Reproducible builds
-
-### Integration with Robotics Platform
-
-- **Perception**: Publishes TSDF, ESDF, pose to `/robot/{robot_id}/perception/*`
-- **Control**: Subscribes to missions from dispatch, sends subsystem commands
-- **Capabilities**: Registers with dispatch service for automatic task routing
-- **Logging**: Streams to centralized MCAP logging service
-- **Digital Twin**: Contributes to shared 3D world representation
-
-### Continuous Learning
-
-- Novel scenario detection triggers active learning
-- MCAP logs uploaded for VLA retraining
-- Model updates deployed via volume mount (`/data/models/`)
-
-## Daily Operation
-
-### Start Robot
-
-```bash
-docker compose up -d
-```
-
-### Stop Robot
-
-```bash
-docker compose down
-```
-
-### View Logs
-
-```bash
-docker compose logs -f perception control
-```
-
-### Update Code
-
-```bash
-git pull
+# 3. Build & deploy
 docker compose build
 docker compose up -d
 ```
 
-### Update Model
+## Calibration
+
+### Factory Calibration (One-Time)
 
 ```bash
-# Copy new VLA model
-scp new_model.pth jetson-01.local:/data/models/vla_latest.pth
+# Camera intrinsics (per camera)
+./calibrate.sh camera-intrinsics --camera left
+./calibrate.sh camera-intrinsics --camera right
 
-# Restart control
-docker compose restart control
+# Kinematic chain (base → pan → tilt → camera)
+./calibrate.sh camera-kinematics --camera left --markers
+./calibrate.sh camera-kinematics --camera right --markers
+
+# Servo zero positions
+./calibrate.sh servo-calibration --camera left --home
+./calibrate.sh servo-calibration --camera right --home
 ```
 
-### Auto-Start on Boot
+### Field Calibration (Auto)
 
 ```bash
-./scripts/system/install_services.sh
-sudo reboot  # Test auto-start
+# Odometry (robot base motion)
+./calibrate.sh odometry --start
+# Drive robot 2-3 minutes
+./calibrate.sh odometry --stop
+```
+
+See [docs/CALIBRATION.md](docs/CALIBRATION.md) for complete guide.
+
+## Calibration Data Storage
+
+All calibration persists in `/data/config/`:
+
+```
+/data/config/
+├── calibration/
+│   ├── factory_calibration.yaml       # Main calibration
+│   ├── odometry_calibration.yaml      # Wheel params
+│   └── runtime_calibration.yaml       # Auto-updates
+│
+├── calibration_history/               # Versioned backups
+│   ├── factory_calibration_20260212.yaml
+│   └── odometry_calibration_20260215.yaml
+│
+└── calibration_sessions/              # Raw data
+    ├── camera_intrinsics_left_*/
+    └── odometry_*/
+```
+
+**Persistence**:
+- Survives reboots (stored on NVMe)
+- Synced hourly to remote backup
+- Versioned automatically on updates
+- Mounted read-write in containers
+
+**Loading**: System loads from `/data/config/calibration/` at startup
+
+## Management
+
+```bash
+./deploy.sh [command]
+# Commands: build, start, stop, restart, logs, status
+```
+
+## System Components
+
+**One Container**: `robot-control`
+- Chassis control
+- Camera pipeline (RealSense)
+- Servo control (pan-tilt)
+- Forward kinematics
+- SLAM/odometry
+- UDM worldgraph (projection & rendering)
+
+## Data Structure
+
+```
+/data/
+├── config/              # Calibration (synced, versioned)
+├── worldgraph/          # TSDF maps (synced)
+├── logs/                # Runtime logs (synced)
+└── sessions/            # Recordings, calibration raw data
 ```
 
 ## Documentation
 
-- **[Docker-First Setup](docs/setup/DOCKER_FIRST_SETUP.md)** - Complete bringup guide
-- **[Hardware Verification](docs/hardware/VERIFICATION.md)** - Test all hardware
-- **[Troubleshooting](docs/setup/DOCKER_FIRST_SETUP.md#troubleshooting)** - Common issues
-- **[Architecture](docs/architecture/)** - System design
-
-## Development
-
-### Local Testing
-
-```bash
-# Build for x86 (on laptop)
-docker buildx build --platform linux/amd64 ./perception
-
-# Test perception logic without hardware
-docker compose run --rm perception python3 -m pytest
-```
-
-### Live Development
-
-```bash
-# Mount robotics framework locally
-# Edit docker-compose.yml:
-# volumes:
-#   - ../robotics:/robotics:ro
-
-# Rebuild
-docker compose build --no-cache
-docker compose up
-```
-
-### Hardware Verification
-
-```bash
-# Test camera access
-docker compose run --rm perception bash
-rs-enumerate-devices
-
-# Test servo access
-docker compose run --rm control bash
-python3 -c "import serial; print(serial.Serial('/dev/ttyUSB0'))"
-
-# Test GPU
-docker run --rm --gpus all nvcr.io/nvidia/l4t-base:r35.2.1 nvidia-smi
-```
-
-## Migration from Host-Based
-
-See [Docker-First Setup Guide](docs/setup/DOCKER_FIRST_SETUP.md#migration-from-host-based-setup) for migration instructions.
-
-**Summary**:
-1. Backup existing ROS2 workspace
-2. Run new setup.sh (installs Docker only)
-3. Move code to `perception/src/` and `control/src/`
-4. Update imports to use `robotics_sdk`
-5. Build and test containers
-
-## Troubleshooting
-
-### Camera Not Found
-
-```bash
-# Check USB
-lsusb | grep Intel
-
-# Check permissions
-groups $USER  # Should include: video, plugdev
-
-# Test in container
-docker compose run --rm perception rs-enumerate-devices
-```
-
-### GPU Not Accessible
-
-```bash
-# Test NVIDIA runtime
-docker run --rm --gpus all nvcr.io/nvidia/l4t-base:r35.2.1 nvidia-smi
-
-# Check daemon config
-cat /etc/docker/daemon.json
-```
-
-### Robot Not Registering
-
-```bash
-# Check Zenoh connection
-docker compose logs control | grep "Registered capabilities"
-
-# Test server connectivity
-nc -zv 192.168.1.100 7447
-
-# Check .env
-cat .env | grep ZENOH_ROUTER
-```
-
-See [full troubleshooting guide](docs/setup/DOCKER_FIRST_SETUP.md#troubleshooting).
-
-## Support
-
-- **Issues**: Open GitHub issue
-- **Docs**: See `docs/` directory
-- **Platform**: See [robotics framework](../robotics)
-- **Hardware**: See `docs/hardware/`
-
-## License
-
-MIT
+- **[docs/CALIBRATION.md](docs/CALIBRATION.md)** - Complete calibration & storage
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
+- [SETUP.md](SETUP.md) - Setup guide
+- [docs/SSD_MIGRATION.md](docs/SSD_MIGRATION.md) - NVMe setup
+- [docs/RECOVERY.md](docs/RECOVERY.md) - Recovery procedures

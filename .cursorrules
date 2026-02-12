@@ -1,327 +1,88 @@
-# Isaac Robot System - Cursor AI Rules
+# Isaac Robot - Articulated Cameras with UDM Worldgraph
 
-This repository contains the software stack for the Isaac robot system running on a Jetson Orin Nano.
+## System Design
 
-## Repository Purpose
+**Articulated cameras** (pan-tilt servos) → **UDM worldgraph** (digital twin) → **Virtual sensors** (any config)
 
-This is a **robot control system** repository that:
-- Manages system setup and hardware integration for a Jetson Orin Nano
-- Implements a VLA (Vision-Language-Action) model controller
-- Integrates Realsense cameras, motor controllers, and other hardware
-- Provides system monitoring, logging, and control mode switching
-- Supports sub-module controllers (Raspberry Pi, etc.)
+### Key Concepts
+- Real sensors (moving) project INTO worldgraph
+- Worldgraph is canonical representation (ground truth)
+- Virtual sensors render FROM worldgraph (simulation, planning, models)
+- Enables pre-trained models, offline RL, sensor-independent planning
 
-## Key Principles
+### Components
+- **robot-control** (one container): Chassis, cameras, servos, kinematics, SLAM, worldgraph
+- Future: VLA inference, high-level planner (operate on worldgraph, not raw sensors)
 
-1. **Safety First**: This is a robot system. All code changes must consider safety implications.
-2. **Stability**: The system should be self-updating, self-cleaning, and self-restoring where possible.
-3. **Documentation**: Code should be well-documented for both humans and AI tools.
-4. **Modularity**: Hardware drivers, control modes, and utilities should be modular and reusable.
-5. **Organization**: Keep repo clean - NO ad-hoc docs or scripts at root level. Use `docs/` subdirectories and `Makefile`.
+## Calibration
 
-## Directory Structure
+### Fixture-Based (One-Time)
+- Camera intrinsics (per camera, checkerboard)
+- Kinematic chain (base → pan → tilt → camera, marker-based)
+- Servo zero positions (homing routine)
 
-- `scripts/`: Setup, installation, and maintenance scripts
-  - `system/`: OS-level setup (run with sudo)
-  - `hardware/`: Hardware-specific installation
-  - `monitoring/`: Health checks and diagnostics
-  - `maintenance/`: Self-updating, cleaning, recovery
+### Auto-Calibration (Runtime)
+- Odometry (SLAM ground truth)
+- IMU biases (zero-velocity updates)
+- Worldgraph consistency (multi-view fusion)
 
-- `src/`: Source code (ROS 2 packages)
-  - `vla_controller/`: VLA model implementation
-  - `hardware_drivers/`: Hardware driver wrappers
-  - `control_modes/`: Control mode implementations
-  - `utils/`: Shared utilities
+Tool: `./calibrate.sh [command]`
 
-- `docs/`: Documentation
-  - `architecture/`: System design docs
-  - `hardware/`: Hardware setup guides
-  - `setup/`: Installation documentation
-  - `api/`: API reference
+## Architecture
 
-- `config/`: Configuration files (YAML, JSON, etc.)
-- `hardware/`: Hardware-specific setup and configs
-- `monitoring/`: Monitoring infrastructure
-- `logging/`: Logging configuration and scripts
-- `control/`: Control system definitions
-
-## Code Style Guidelines
-
-- **Python**: Follow PEP 8, use type hints, docstrings for all functions
-  - **Imports**: ALL imports MUST be at the top of the file, grouped as:
-    1. Standard library imports
-    2. Third-party imports (ROS 2, numpy, etc.)
-    3. Local/package imports
-  - **CRITICAL**: Never place imports inside functions, conditionals, or anywhere other than the top of the file
-  - Use `isort` with `black` profile for import sorting
-  - If an import is conditionally needed, use it at the top and handle the import error, or restructure the code
-- **Bash**: Use `set -e` for error handling, check for root when needed
-- **ROS 2**: Follow ROS 2 conventions, use proper package structure
-- **C++**: Follow ROS 2 C++ style guide if used
-
-## Configuration Management
-
-- **All node configs**: Must be stored in `config/` directory, organized by category:
-  - `config/hardware/` - Hardware driver configs (cameras, motors, etc.)
-  - `config/system/` - System node configs (monitors, services, etc.)
-  - `config/robot/` - Robot graph configurations
-  - `config/control/` - Control mode configs
-- **No package-specific configs**: Configs should not live in `src/<package>/config/`
-- **Config resolution**: Launch files should check centralized `config/` first, then fall back to package configs for backward compatibility
-
-## Important Notes
-
-- System runs on microSD; NVMe SSD migration supported (see docs/setup/SSD_MIGRATION.md)
-- Network uses dynamic IP with mDNS (isaac.local)
-- ROS 2 Humble is the primary framework
-- All scripts that modify system should check for root privileges
-- Logging should be structured and centralized
-- Control mode switching must include safety checks
-
-## Hardware Considerations
-
-- Jetson Orin Nano has limited resources - optimize for performance
-- Thermal management is important - monitor temperatures
-- Power consumption matters - consider power modes
-- USB devices (Realsense) need proper power and bandwidth allocation
-
-## When Writing Code
-
-1. **Check existing patterns**: Look at similar code in the repo first
-2. **Add error handling**: Robot systems need robust error handling
-3. **Add logging**: Use structured logging for debugging
-4. **Document assumptions**: Note hardware requirements, dependencies
-5. **Consider safety**: Add safety checks for hardware operations
-6. **Test incrementally**: Test hardware integration step-by-step
-7. **Keep repo clean**: NO ad-hoc docs or scripts at root - see Documentation Policies and Script Management
-
-## Node and Graph Management
-
-**CRITICAL**: Use ROS 2 launch + systemd as the single source of truth. Avoid multiple instances.
-
-- **Primary method (production)**: systemd user service `isaac-robot.service`
-  - Start: `systemctl --user start isaac-robot.service`
-  - Stop: `systemctl --user stop isaac-robot.service`
-  - Logs: `journalctl --user -u isaac-robot.service -f`
-- **Primary method (development)**: `ros2 launch isaac_robot graph.launch.py`
-  - Use the graph config + group parameters from `config/robot/modular_graph.yaml`
-- **Avoid multiple instances**:
-  - Before launching, stop systemd service and ensure no `ros2 launch`/container processes are running.
-  - Never run both systemd and a manual `ros2 launch` concurrently.
-- **Adding nodes**: Add to `config/robot/modular_graph.yaml` (or other graph configs) and launch via systemd/launch.
-- **Systemd integration**: `scripts/system/start_robot.sh` is the entry point used by systemd.
-
-When writing code or documentation:
-- Reference **systemd + `ros2 launch`** as the primary management method.
-- Only mention `ros2 run` for initial node development before adding to the graph.
-
-## Common Tasks
-
-- **Adding hardware**: Create setup script in `scripts/hardware/`, add driver in `src/hardware_drivers/`, add to graph config in `config/robot/robot_graph.yaml`, document in `docs/hardware/`
-- **Adding control mode**: Implement in `src/control_modes/`, add config in `config/control/`, add to graph config, document switching logic
-- **System changes**: Update `scripts/system/` and document in `docs/setup/`
-- **Monitoring**: Add checks to `scripts/monitoring/` and infrastructure in `monitoring/`
-- **Launching nodes**: Use systemd (`isaac-robot.service`) or `ros2 launch` for development. Avoid ad hoc `ros2 run` for production.
-
-## File Naming Conventions
-
-- Scripts: `snake_case.sh` or `kebab-case.sh`
-- Python: `snake_case.py`
-- ROS packages: `snake_case` (lowercase, underscores)
-- Config files: `kebab-case.yaml` or `snake_case.json`
-- Documentation: `UPPERCASE.md` for main docs, `kebab-case.md` for specific topics
-
-## Documentation Policies
-
-**CRITICAL**: Follow these rules to prevent documentation sprawl and ad-hoc files:
-
-### 1. Location Rules (STRICT)
-
-**ALLOWED at root level**:
-- `README.md` - Project overview only
-- `CONTRIBUTING.md` - Contribution guidelines only
-- `setup.sh` - Main system setup script only
-- `Makefile` - Build and common commands only
-
-**FORBIDDEN at root level**:
-- ❌ **NO ad-hoc documentation** (CLEANUP_*.md, FIXES*.md, SETUP_*.md, STATUS*.md, etc.)
-- ❌ **NO temporary/summary docs** (SUMMARY.md, NOTES.md, TODO.md, LOG.md, etc.)
-- ❌ **NO ad-hoc scripts** (quick_*.sh, setup_*.sh, test_*.sh, run_*.sh, etc.)
-- ❌ **NO duplicate quick starts** (QUICK_START_*.md, *_QUICK_START.md, etc.)
-- ❌ **NO status/tracking files** (except .gitignore, .setup_state, etc.)
-
-**ALL documentation MUST go in `docs/` subdirectories**:
-- `docs/setup/` - Setup and installation guides
-- `docs/development/` - Development workflow, CI, local testing
-- `docs/deployment/` - Deployment and multi-environment configs
-- `docs/hardware/` - Hardware setup and configuration
-- `docs/testing/` - Testing strategies and tools
-- `docs/monitoring/` - Monitoring and diagnostics
-- `docs/architecture/` - System architecture and design
-- `docs/visualization/` - Visualization setup
-- `docs/archived/` - Deprecated/historical docs (clearly marked)
-
-### 2. Before Creating ANY File
-
-**ALWAYS ask these questions**:
-1. Does this file belong in `docs/` instead of root?
-2. Can I update an existing doc instead?
-3. Is this a temporary file that will clutter the repo?
-4. Should this be a `Makefile` command instead of a script?
-5. Am I creating duplicate documentation?
-
-**If creating documentation**:
-- ✅ Check `docs/README.md` for existing docs on this topic
-- ✅ Update existing doc if one exists
-- ✅ Place in appropriate `docs/` subdirectory
-- ✅ Add reference to `docs/README.md` if it's a major doc
-- ❌ NEVER create root-level ad-hoc docs
-- ❌ NEVER create temporary summary/log files
-
-**If creating a script**:
-- ✅ Check if it belongs in `scripts/` subdirectory
-- ✅ Check if it should be a `Makefile` command instead
-- ✅ Use existing patterns from `scripts/` subdirectories
-- ❌ NEVER create root-level ad-hoc scripts
-- ❌ NEVER create one-off helper scripts at root
-
-### 3. Consolidation Rules
-
-- **Prefer updating existing docs** over creating new ones
-- **Merge redundant content** into single authoritative docs
-- **Remove deprecated docs** - move to `docs/archived/` with clear README
-- **One doc per topic** - no duplicate QUICK_START.md files
-- **Use Makefile for common commands** - not ad-hoc scripts
-
-### 4. Common Commands (Use Makefile)
-
-**Instead of creating ad-hoc scripts, add to Makefile**:
-- `make pre-commit-install` - Setup pre-commit hooks
-- `make docker-build` - Build Docker CI image
-- `make docker-test` - Run all tests in Docker
-- `make docker-lint` - Run lint checks in Docker
-- `make docker-unit` - Run unit tests in Docker
-
-**NEVER create these at root**:
-- ❌ `quick_start.sh` → Use `make` commands
-- ❌ `setup_precommit.sh` → Use `make pre-commit-install`
-- ❌ `run_tests.sh` → Use `make docker-test`
-- ❌ `build_docker.sh` → Use `make docker-build`
-
-### 5. Documentation Checklist
-
-**Before committing documentation**:
-- [ ] Is it in the correct `docs/` subdirectory?
-- [ ] Did I check for existing docs to update?
-- [ ] Is this the single source of truth for this topic?
-- [ ] Did I update `docs/README.md` if needed?
-- [ ] Did I avoid creating root-level ad-hoc files?
-- [ ] Did I avoid creating temporary/summary files?
-- [ ] Will this file still be useful in 6 months?
-
-### 6. Key Documentation Files
-
-**Main Documentation**:
-- `docs/README.md` - Documentation index (START HERE)
-- `docs/QUICK_START.md` - 3-step quick start
-- `docs/MODULAR_QUICK_START.md` - Detailed setup guide
-- `docs/PRE_COMMIT_DOCKER.md` - Local testing setup
-- `docs/deployment/DEPLOYMENT.md` - Deployment guide
-- `docs/testing/TESTING.md` - Testing guide
-- `docs/architecture/IMPLEMENTATION_STATUS.md` - TODOs and integration points
-
-**Development Workflow**:
-- `docs/development/CI.md` - CI status and local alternatives
-- `docs/development/WORKFLOW.md` - Development workflow
-- `docs/development/DEVELOPMENT_ENVIRONMENT.md` - Dev environment setup
-
-**NEVER create duplicate/competing versions of these**
-
-## Script Management
-
-**CRITICAL**: Keep scripts organized and avoid ad-hoc root-level scripts.
-
-### Script Locations
-
-**Organized scripts** (in `scripts/` subdirectories):
-- `scripts/system/` - System-level setup and configuration (sudo scripts)
-- `scripts/hardware/` - Hardware installation and setup
-- `scripts/monitoring/` - Health checks and diagnostics
-- `scripts/maintenance/` - Self-updating, cleaning, recovery
-- `scripts/testing/` - Testing utilities and Docker helpers
-- `scripts/deployment/` - Deployment automation
-
-**Common commands** (in `Makefile`):
-- Build commands (`make build`, `make clean`)
-- Test commands (`make test`, `make docker-test`, etc.)
-- Setup commands (`make pre-commit-install`)
-- Docker commands (`make docker-build`, `make docker-lint`)
-
-**NEVER create at root level**:
-- ❌ Ad-hoc scripts (quick_*.sh, setup_*.sh, run_*.sh, test_*.sh)
-- ❌ One-off helper scripts
-- ❌ Temporary automation scripts
-- ❌ Duplicate functionality scripts
-
-### Before Creating a Script
-
-**Ask these questions**:
-1. Should this be a `Makefile` command instead?
-2. Does a similar script already exist in `scripts/`?
-3. Which `scripts/` subdirectory does this belong in?
-4. Will this script be used more than once?
-5. Is this duplicating existing functionality?
-
-**If it should be a script**:
-- ✅ Place in appropriate `scripts/` subdirectory
-- ✅ Follow naming convention (`snake_case.sh` or `kebab-case.sh`)
-- ✅ Add shebang (`#!/bin/bash`)
-- ✅ Add error handling (`set -e`)
-- ✅ Add description comment at top
-- ✅ Make executable (`chmod +x`)
-- ❌ NEVER place at root level
-- ❌ NEVER create temporary/ad-hoc scripts
-
-**If it should be a Makefile command**:
-- ✅ Add to `Makefile` with clear target name
-- ✅ Add help text with `## Comment`
-- ✅ Keep command simple or call script in `scripts/`
-- ✅ Group related commands together
-
-### Examples
-
-**GOOD** (organized):
-```bash
-# Makefile command for common task
-make pre-commit-install
-
-# Script in proper location
-scripts/testing/docker_test.sh
-
-# Script in system subdirectory
-scripts/system/setup_network.sh
+```
+Cameras (pan-tilt) → Forward Kinematics → World Pose
+                           ↓
+                  Depth + RGB + Pose
+                           ↓
+                   UDM Worldgraph (TSDF)
+                           ↓
+                  Inverse Rendering
+                           ↓
+              Virtual Sensors (any config)
+                           ↓
+                  Models/Planning/Training
 ```
 
-**BAD** (ad-hoc):
-```bash
-# Root-level ad-hoc scripts (DON'T DO THIS)
-./quick_start.sh          # Should be: make pre-commit-install
-./setup_precommit.sh      # Should be: make pre-commit-install
-./run_tests.sh            # Should be: make docker-test
-./build_docker.sh         # Should be: make docker-build
-./deploy_now.sh           # Should be: scripts/deployment/deploy.sh
+## Files
+
+```
+/
+├── setup-host.sh              # Minimal host (drivers, Docker, GPU, PTP)
+├── deploy.sh                  # Container management
+├── calibrate.sh               # Calibration tool
+├── docker-compose.yml         # Service definition
+├── docker/
+│   ├── Dockerfile.robot-control
+│   └── entrypoint.sh
+├── README.md                  # This design
+├── SETUP.md                   # Setup guide
+└── docs/
+    ├── ARCHITECTURE.md        # Complete architecture
+    ├── CALIBRATION.md         # Calibration guide
+    ├── SSD_MIGRATION.md       # NVMe setup
+    └── RECOVERY.md            # Recovery
 ```
 
-### Script Checklist
+## Rules
 
-**Before creating a script**:
-- [ ] Can this be a `Makefile` command instead?
-- [ ] Is there an existing script I can update?
-- [ ] Which `scripts/` subdirectory does this belong in?
-- [ ] Does this script have a clear, singular purpose?
-- [ ] Is it properly documented with comments?
-- [ ] Did I avoid creating it at root level?
+- Container-first: All robot code in containers
+- Worldgraph-centric: Canonical representation, not raw sensors
+- Autonomous services: Each container independent
+- Minimal documentation: README, SETUP, ARCHITECTURE, CALIBRATION only
 
-## License
+## Development
 
-This project is licensed under the MIT License - see LICENSE file for details.
+```bash
+docker compose build
+docker compose restart
+docker compose logs -f
+docker exec -it isaac-robot-control bash
+```
+
+## Storage
+
+- `/data/config/` - Calibration files (synced)
+- `/data/worldgraph/` - TSDF maps
+- `/data/logs/` - Runtime logs (synced)
+- `/data/sessions/` - Calibration sessions
