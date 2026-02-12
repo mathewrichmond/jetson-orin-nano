@@ -11,18 +11,17 @@ Runs VLA (Vision-Language-Action) model inference:
 
 # Standard library
 import time
-from typing import Dict, List, Optional
+from typing import Optional
 
 # Third-party
+# Local
+from custom_msgs.msg import PowerRequest
+from geometry_msgs.msg import Twist
+from isaac_utils import HealthStatusPublisher, InputWatchdog
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32MultiArray, String
-
-# Local
-from custom_msgs.msg import PowerRequest
-from isaac_utils import HealthStatusPublisher, InputWatchdog
 
 
 class VLAControllerNode(Node):
@@ -36,26 +35,26 @@ class VLAControllerNode(Node):
         self.declare_parameter("model_type", "placeholder")  # placeholder, openvla, rt1, etc.
         self.declare_parameter("device", "cuda")  # cuda, cpu
         self.declare_parameter("inference_rate", 10.0)  # Hz
-        
+
         # Input topic parameters
         self.declare_parameter("vision_features_topic", "/sensor_fusion/vlm_features")
         self.declare_parameter("audio_features_topic", "/audio/features/mfcc")
         self.declare_parameter("robot_state_topic", "/rpi/chassis/pose_estimate")
         self.declare_parameter("transcription_topic", "/audio/transcription")
-        
+
         # Output topic parameters
         self.declare_parameter("action_topic", "/vla/actions")
         self.declare_parameter("cmd_vel_topic", "/control/cmd_vel")
-        
+
         # Model parameters
         self.declare_parameter("action_horizon", 10)  # Number of future actions to predict
         self.declare_parameter("context_window", 5)  # Number of past observations to use
         self.declare_parameter("confidence_threshold", 0.5)  # Min confidence to execute action
-        
+
         # Power management
         self.declare_parameter("request_gpu", True)
         self.declare_parameter("gpu_priority", 4)  # Highest priority
-        
+
         # Health monitoring
         self.declare_parameter("health_topic", f"health/{self.get_name()}")
         self.declare_parameter("health_publish_rate", 1.0)
@@ -89,42 +88,43 @@ class VLAControllerNode(Node):
         self.inference_count = 0
 
         # Publishers
-        self.action_pub = self.create_publisher(
-            Float32MultiArray, self.action_topic, 10
-        )
-        self.cmd_vel_pub = self.create_publisher(
-            Twist, self.cmd_vel_topic, 10
-        )
-        self.power_request_pub = self.create_publisher(
-            PowerRequest, "/jetson/power/request", 10
-        )
+        self.action_pub = self.create_publisher(Float32MultiArray, self.action_topic, 10)
+        self.cmd_vel_pub = self.create_publisher(Twist, self.cmd_vel_topic, 10)
+        self.power_request_pub = self.create_publisher(PowerRequest, "/jetson/power/request", 10)
 
         # Subscribers
         self.vision_sub = self.create_subscription(
             String,  # TODO: Replace with actual VLM features message type
             self.vision_features_topic,
             self._vision_callback,
-            10
+            10,
         )
         self.audio_sub = self.create_subscription(
-            Float32MultiArray,
-            self.audio_features_topic,
-            self._audio_callback,
-            10
+            Float32MultiArray, self.audio_features_topic, self._audio_callback, 10
         )
         self.robot_state_sub = self.create_subscription(
             # TODO: Replace with actual Pose message type
             String,
             self.robot_state_topic,
             self._robot_state_callback,
-            10
+            10,
         )
         self.transcription_sub = self.create_subscription(
-            String,
-            self.transcription_topic,
-            self._transcription_callback,
-            10
+            String, self.transcription_topic, self._transcription_callback, 10
         )
+
+        # Platform mission command subscription
+        self.command_sub = self.create_subscription(
+            String, "/vla/command", self._command_callback, 10
+        )
+
+        # Current mission command
+        self.current_command: Optional[str] = None
+        self.command_timestamp = 0.0
+
+        # Execution feedback publisher
+        self.execution_feedback_pub = self.create_publisher(String, "/vla/execution_feedback", 10)
+        self.plan_status_pub = self.create_publisher(String, "/vla/plan_status", 10)
 
         # Health monitoring
         self.health = HealthStatusPublisher(self, health_topic, health_rate)
@@ -144,7 +144,7 @@ class VLAControllerNode(Node):
 
         # Load model
         self._load_model()
-        
+
         # Request GPU power
         if self.request_gpu:
             self._request_gpu_power()
@@ -174,7 +174,7 @@ class VLAControllerNode(Node):
             else:
                 self.get_logger().error(f"Unknown model type: {self.model_type}")
                 self.model_loaded = False
-                
+
         except Exception as e:
             self.get_logger().error(f"Error loading model: {e}")
             self.model_loaded = False
@@ -189,10 +189,10 @@ class VLAControllerNode(Node):
             request.priority = self.gpu_priority
             request.timeout_sec = 0.0  # Indefinite
             request.reason = "VLA model inference"
-            
+
             self.power_request_pub.publish(request)
             self.get_logger().info("Requested GPU power for VLA inference")
-            
+
         except Exception as e:
             self.get_logger().warn(f"Error requesting GPU power: {e}")
 
@@ -212,6 +212,50 @@ class VLAControllerNode(Node):
     def _transcription_callback(self, msg):
         """Store latest speech transcription"""
         self.last_transcription = msg.data
+
+    def _command_callback(self, msg):
+        """
+        Handle incoming mission command from platform.
+
+        Args:
+            msg: String message containing natural language command
+        """
+        command = msg.data
+        self.current_command = command
+        self.command_timestamp = time.time()
+
+        self.get_logger().info(f"[VLA] Received command: {command}")
+
+        # Publish planning status
+        status_msg = String()
+        status_msg.data = f"Planning action sequence for: {command}"
+        self.plan_status_pub.publish(status_msg)
+
+        # In a real implementation, this would:
+        # 1. Parse the natural language command
+        # 2. Query the digital twin for context
+        # 3. Generate action sequence
+        # 4. Begin execution
+
+        # For now, publish mock feedback
+        feedback_msg = String()
+        feedback_msg.data = f"Processing command: {command}"
+        self.execution_feedback_pub.publish(feedback_msg)
+
+        # After some processing, publish completion
+        # (In real implementation, this would happen after actual execution)
+        self.create_timer(
+            2.0, lambda: self._publish_completion(command), one_shot=True  # Mock 2-second execution
+        )
+
+    def _publish_completion(self, command: str):
+        """Publish mission completion feedback."""
+        feedback_msg = String()
+        feedback_msg.data = f"Mission complete: {command}"
+        self.execution_feedback_pub.publish(feedback_msg)
+
+        self.get_logger().info(f"[VLA] Completed command: {command}")
+        self.current_command = None
 
     def _inference_callback(self):
         """Run VLA model inference"""
@@ -237,7 +281,7 @@ class VLAControllerNode(Node):
     def _run_inference(self) -> Optional[np.ndarray]:
         """
         Run VLA model inference (placeholder implementation)
-        
+
         Real implementation would:
         1. Prepare multimodal input (vision, audio, language, proprioception)
         2. Run model forward pass
@@ -249,18 +293,18 @@ class VLAControllerNode(Node):
                 # Mock inference: return simple forward motion
                 # Action format: [linear_x, linear_y, angular_z, gripper, ...]
                 actions = np.array([0.1, 0.0, 0.0, 0.0], dtype=np.float32)
-                
+
                 # Add some variation based on transcription (demo)
                 if "stop" in self.last_transcription.lower():
                     actions[0] = 0.0
                 elif "turn" in self.last_transcription.lower():
                     actions[2] = 0.5
-                
+
                 return actions
             else:
                 # Real model inference would go here
                 return None
-                
+
         except Exception as e:
             self.get_logger().warn(f"Error running inference: {e}")
             return None
@@ -295,7 +339,7 @@ def main(args=None):
     """Main entry point"""
     rclpy.init(args=args)
     node = VLAControllerNode()
-    
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

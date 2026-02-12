@@ -1,0 +1,24 @@
+# Control Container Requirements
+
+# Robotics framework
+# robotics_sdk (installed via Dockerfile from git or local mount)
+# robotics_common (installed via Dockerfile from git or local mount)
+
+# ROS2 dependencies (already in base image)
+# ros-humble-ros-base
+
+# ML/VLA dependencies (PyTorch already in base image)
+# torch>=2.0.0 (included in l4t-pytorch base)
+transformers>=4.30.0
+# Add VLA-specific requirements (Octo, OpenVLA, etc.)
+
+# Communication
+zenoh>=0.10.0
+
+# Hardware control
+pyserial>=3.5  # For servo controllers
+smbus2>=0.4.2  # For I2C devices
+
+# Utilities
+pyyaml>=6.0
+numpy>=1.24.0

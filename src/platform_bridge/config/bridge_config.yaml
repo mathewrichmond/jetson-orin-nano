@@ -1,0 +1,279 @@
+# ROS 2 to Zenoh Bridge Configuration
+# Maps ROS 2 topics to Zenoh key expressions for cross-platform communication
+#
+# This configuration is used by zenoh-bridge-dds to selectively bridge topics
+# from the Jetson's ROS 2 network to the platform's Zenoh network
+
+# Robot identification (replaced at runtime with actual robot_id)
+robot_id: "${ROBOT_ID:-jetson-01}"
+
+# Bridge mode
+# "auto" - Auto-discover topics and bridge all
+# "selective" - Only bridge topics listed below (recommended)
+mode: "selective"
+
+# Topic mappings
+# Format:
+#   ros2_topic: ROS 2 topic name (with namespace)
+#   zenoh_key: Zenoh key expression (supports ${robot_id} substitution)
+#   direction: "ros2_to_zenoh", "zenoh_to_ros2", or "bidirectional"
+#   message_type: ROS 2 message type
+#   qos: ROS 2 QoS profile (optional)
+#   compression: Compression type (optional): "none", "zstd", "lz4"
+
+topics:
+  # ============================================================================
+  # PERCEPTION OUTPUTS (ROS 2 → Zenoh)
+  # ============================================================================
+  
+  # Camera RGB images
+  - ros2_topic: "/hardware/camera_front/color/image_raw"
+    zenoh_key: "/robot/${robot_id}/sensors/camera/left/image"
+    direction: "ros2_to_zenoh"
+    message_type: "sensor_msgs/Image"
+    compression: "none"  # Already JPEG compressed by RealSense
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  - ros2_topic: "/hardware/camera_rear/color/image_raw"
+    zenoh_key: "/robot/${robot_id}/sensors/camera/right/image"
+    direction: "ros2_to_zenoh"
+    message_type: "sensor_msgs/Image"
+    compression: "none"
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  # Camera depth images
+  - ros2_topic: "/hardware/camera_front/aligned_depth_to_color/image_raw"
+    zenoh_key: "/robot/${robot_id}/sensors/depth/left/depth"
+    direction: "ros2_to_zenoh"
+    message_type: "sensor_msgs/Image"
+    compression: "lz4"  # Compress depth data
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  - ros2_topic: "/hardware/camera_rear/aligned_depth_to_color/image_raw"
+    zenoh_key: "/robot/${robot_id}/sensors/depth/right/depth"
+    direction: "ros2_to_zenoh"
+    message_type: "sensor_msgs/Image"
+    compression: "lz4"
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  # nvblox outputs (via adapter node, not direct bridge)
+  # These are published by the platform_bridge adapter to Zenoh
+  # - TSDF updates: TSDFUpdate.msg serialized
+  # - ESDF: ESDF.msg serialized
+  # - Pose estimates: RobotPose.msg serialized
+  
+  # IMU data
+  - ros2_topic: "/hardware/phat/imu"
+    zenoh_key: "/robot/${robot_id}/sensors/imu"
+    direction: "ros2_to_zenoh"
+    message_type: "sensor_msgs/Imu"
+    compression: "none"
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 10
+  
+  # Odometry
+  - ros2_topic: "/rpi/chassis/odometry"
+    zenoh_key: "/robot/${robot_id}/sensors/odometry"
+    direction: "ros2_to_zenoh"
+    message_type: "nav_msgs/Odometry"
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 10
+  
+  # Audio
+  - ros2_topic: "/sensor_fusion/audio/raw"
+    zenoh_key: "/robot/${robot_id}/sensors/audio"
+    direction: "ros2_to_zenoh"
+    message_type: "audio_common_msgs/AudioData"
+    compression: "none"  # Audio already compressed
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  # ============================================================================
+  # MISSION CONTROL (Zenoh → ROS 2)
+  # ============================================================================
+  
+  # Mission commands from dispatch service
+  # Note: These are converted by the platform_bridge adapter
+  # Zenoh message (Mission) → ROS 2 VLA command (String)
+  - ros2_topic: "/platform/mission/command"  # Internal topic for adapter
+    zenoh_key: "/robot/${robot_id}/mission/command"
+    direction: "zenoh_to_ros2"
+    message_type: "std_msgs/String"  # Adapter converts to VLA format
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 10
+  
+  # ============================================================================
+  # SUBSYSTEM COMMANDS (Zenoh → ROS 2)
+  # ============================================================================
+  
+  # Pan-tilt goals (from platform or VLA)
+  - ros2_topic: "/platform/pantilt/left/goal"
+    zenoh_key: "/robot/${robot_id}/subsystem/pan_tilt_left/goal"
+    direction: "zenoh_to_ros2"
+    message_type: "std_msgs/Float32MultiArray"  # [pan, tilt] in degrees
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 5
+  
+  - ros2_topic: "/platform/pantilt/right/goal"
+    zenoh_key: "/robot/${robot_id}/subsystem/pan_tilt_right/goal"
+    direction: "zenoh_to_ros2"
+    message_type: "std_msgs/Float32MultiArray"
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 5
+  
+  # Base velocity commands
+  - ros2_topic: "/platform/base/cmd_vel"
+    zenoh_key: "/robot/${robot_id}/subsystem/base/velocity"
+    direction: "zenoh_to_ros2"
+    message_type: "geometry_msgs/Twist"
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 5
+  
+  # ============================================================================
+  # STATUS OUTPUTS (ROS 2 → Zenoh)
+  # ============================================================================
+  
+  # Mission status/results (published by adapter after VLA execution)
+  - ros2_topic: "/platform/mission/status"
+    zenoh_key: "/robot/${robot_id}/mission/status"
+    direction: "ros2_to_zenoh"
+    message_type: "std_msgs/String"  # Adapter converts from VLA feedback
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "transient_local"
+      history: "keep_last"
+      depth: 10
+  
+  - ros2_topic: "/platform/mission/result"
+    zenoh_key: "/robot/${robot_id}/mission/result"
+    direction: "ros2_to_zenoh"
+    message_type: "std_msgs/String"
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "transient_local"
+      history: "keep_last"
+      depth: 10
+  
+  # Health monitoring
+  - ros2_topic: "/jetson/health/summary"
+    zenoh_key: "/robot/${robot_id}/health/summary"
+    direction: "ros2_to_zenoh"
+    message_type: "std_msgs/String"
+    compression: "none"
+    qos:
+      reliability: "reliable"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  # System status
+  - ros2_topic: "/jetson/system/status"
+    zenoh_key: "/robot/${robot_id}/system/status"
+    direction: "ros2_to_zenoh"
+    message_type: "std_msgs/String"
+    compression: "none"
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  # Power status
+  - ros2_topic: "/jetson/power/status"
+    zenoh_key: "/robot/${robot_id}/power/status"
+    direction: "ros2_to_zenoh"
+    message_type: "std_msgs/String"
+    compression: "none"
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+  
+  # Battery status
+  - ros2_topic: "/irobot/battery"
+    zenoh_key: "/robot/${robot_id}/battery/status"
+    direction: "ros2_to_zenoh"
+    message_type: "std_msgs/String"
+    compression: "none"
+    qos:
+      reliability: "best_effort"
+      durability: "volatile"
+      history: "keep_last"
+      depth: 1
+
+# Bridge performance settings
+performance:
+  # Message batching
+  batch_size: 10  # Batch up to N messages before sending
+  batch_timeout_ms: 10  # Send batch after N ms even if not full
+  
+  # Bandwidth management
+  max_bandwidth_mbps: 50  # Maximum bandwidth for bridge (Mbps)
+  priority_topics:  # High-priority topics (lower latency)
+    - "/robot/${robot_id}/mission/command"
+    - "/robot/${robot_id}/subsystem/*/goal"
+    - "/robot/${robot_id}/sensors/imu"
+  
+  # Buffer sizes
+  send_buffer_size: 1048576  # 1 MB
+  recv_buffer_size: 1048576
+
+# Discovery configuration
+discovery:
+  mode: "multicast"  # or "router" for explicit router address
+  multicast_address: "224.0.0.224"
+  multicast_port: 7446
+  router_address: "${ZENOH_ROUTER:-auto}"  # Explicit router or auto-discovery
+
+# Monitoring
+monitoring:
+  enable_metrics: true
+  metrics_topic: "/robot/${robot_id}/bridge/metrics"
+  log_level: "info"  # "debug", "info", "warn", "error"
+  log_topic_stats: true  # Log per-topic bandwidth/latency stats
+  stats_interval_sec: 10.0

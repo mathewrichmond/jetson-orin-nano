@@ -1,0 +1,205 @@
+# Jetson Robot Capability Descriptor
+# Defines the capabilities, sensors, and actuators for the Jetson-based robot
+# This file is used to register with the platform dispatch service
+
+# Robot identification
+robot_id: "jetson-01"  # Unique robot identifier (set via env var HOST_ID)
+robot_type: "pantilt_stereo_mobile"  # Robot type descriptor
+robot_name: "Isaac Robot - Prototype 1"  # Human-readable name
+
+# High-level capabilities
+# These are matched against mission requirements by the dispatch service
+capabilities:
+  # Vision capabilities
+  - vision_3d              # 3D reconstruction via nvblox
+  - vision_2d              # 2D image capture
+  - pan_tilt_cameras       # Independently articulated cameras
+  - stereo_vision          # Dual camera stereo
+  
+  # Navigation capabilities
+  - indoor_navigation      # Indoor waypoint navigation
+  - obstacle_avoidance     # Dynamic obstacle avoidance via ESDF
+  
+  # Detection capabilities
+  - object_detection       # Generic object detection
+  - screen_detection       # Screen/display detection
+  - person_detection       # Person detection
+  - text_recognition       # OCR and text recognition
+  
+  # Perception capabilities
+  - spatial_mapping        # Real-time TSDF mapping
+  - pose_estimation        # Visual SLAM pose estimation
+  - audio_capture          # Microphone audio capture
+  - speech_recognition     # Speech-to-text
+
+# Sensor specifications
+sensors:
+  # RGB-D Cameras
+  cameras:
+    - name: "left"
+      camera_id: "camera_front"  # ROS 2 topic namespace
+      type: "realsense_d435i"
+      has_rgb: true
+      has_depth: true
+      has_imu: true
+      resolution: [640, 480]  # Default resolution
+      frame_rate: 30  # Hz
+      # Pan-tilt articulation
+      is_articulated: true
+      pan_range: [-90.0, 90.0]  # degrees
+      tilt_range: [-45.0, 45.0]  # degrees
+      pan_speed: 30.0  # degrees/sec
+      tilt_speed: 30.0  # degrees/sec
+      # Depth specifications
+      depth_range: [0.2, 10.0]  # meters [min, max]
+      depth_accuracy: 0.02  # meters at 1m
+    
+    - name: "right"
+      camera_id: "camera_rear"  # ROS 2 topic namespace
+      type: "realsense_d435i"
+      has_rgb: true
+      has_depth: true
+      has_imu: true
+      resolution: [640, 480]
+      frame_rate: 30
+      is_articulated: true
+      pan_range: [-90.0, 90.0]
+      tilt_range: [-45.0, 45.0]
+      pan_speed: 30.0
+      tilt_speed: 30.0
+      depth_range: [0.2, 10.0]
+      depth_accuracy: 0.02
+  
+  # IMU
+  imu:
+    type: "icm20948"
+    rate: 100.0  # Hz
+    has_accelerometer: true
+    has_gyroscope: true
+    has_magnetometer: true
+    location: "phat_controller"  # Mounted on PHAT motor controller
+  
+  # Microphone
+  audio:
+    type: "usb_microphone"
+    channels: 1  # Mono
+    sample_rate: 16000  # Hz
+    bit_depth: 16
+
+# Actuator specifications
+actuators:
+  # Pan-tilt units
+  pan_tilt:
+    - name: "left_pantilt"
+      camera_id: "camera_front"
+      type: "dynamixel_ax12"  # Replace with actual servo type
+      pan_id: 1  # Servo ID for pan axis
+      tilt_id: 2  # Servo ID for tilt axis
+      pan_range: [-90.0, 90.0]
+      tilt_range: [-45.0, 45.0]
+      max_speed: 30.0  # degrees/sec
+      position_accuracy: 1.0  # degrees
+    
+    - name: "right_pantilt"
+      camera_id: "camera_rear"
+      type: "dynamixel_ax12"
+      pan_id: 3
+      tilt_id: 4
+      pan_range: [-90.0, 90.0]
+      tilt_range: [-45.0, 45.0]
+      max_speed: 30.0
+      position_accuracy: 1.0
+  
+  # Mobile base
+  base:
+    type: "differential_drive"  # iRobot Create2
+    controller: "irobot_create2"
+    max_velocity: 0.5  # m/s
+    max_angular_velocity: 1.0  # rad/s
+    wheel_diameter: 0.072  # meters
+    wheel_base: 0.235  # meters (distance between wheels)
+    has_odometry: true
+    odometry_accuracy: 0.05  # meters per meter traveled
+
+# Global frame origin
+# Used for multi-robot coordination and map merging
+global_frame_origin:
+  x: 0.0  # meters
+  y: 0.0
+  z: 0.0
+  reference: "Robot initial position at startup"
+  frame_id: "map"
+
+# Performance specifications
+performance:
+  # Processing capabilities
+  nvblox_rate: 10.0  # Hz - TSDF update rate
+  vla_inference_rate: 10.0  # Hz - VLA inference frequency
+  max_mission_duration: 300.0  # seconds - Maximum single mission duration
+  
+  # Power management
+  battery_capacity: 5200.0  # mAh (iRobot Create2 battery)
+  runtime_estimate: 90.0  # minutes at normal operation
+  charging_time: 180.0  # minutes to full charge
+  
+  # Computational resources
+  compute_platform: "jetson_orin_nano"
+  gpu_memory: 8192  # MB
+  cpu_cores: 6
+  gpu_enabled: true
+
+# Communication endpoints
+communication:
+  zenoh_router: "auto"  # Auto-discovery via multicast or set explicit address
+  topics:
+    # Perception outputs (published by robot)
+    tsdf_updates: "/robot/{robot_id}/perception/tsdf"
+    esdf: "/robot/{robot_id}/perception/esdf"
+    pose: "/robot/{robot_id}/perception/pose"
+    camera_left_rgb: "/robot/{robot_id}/sensors/camera/left/image"
+    camera_left_depth: "/robot/{robot_id}/sensors/depth/left/depth"
+    camera_right_rgb: "/robot/{robot_id}/sensors/camera/right/image"
+    camera_right_depth: "/robot/{robot_id}/sensors/depth/right/depth"
+    
+    # Control inputs (subscribed by robot)
+    mission_command: "/robot/{robot_id}/mission/command"
+    subsystem_pantilt_left: "/robot/{robot_id}/subsystem/pan_tilt_left/goal"
+    subsystem_pantilt_right: "/robot/{robot_id}/subsystem/pan_tilt_right/goal"
+    subsystem_base: "/robot/{robot_id}/subsystem/base/velocity"
+    
+    # Status outputs (published by robot)
+    mission_status: "/robot/{robot_id}/mission/status"
+    mission_result: "/robot/{robot_id}/mission/result"
+    health_status: "/robot/{robot_id}/health/summary"
+
+# VLA model configuration
+vla:
+  model_type: "octo"  # or "openvla", "rt1"
+  model_path: "/models/octo_finetuned.pt"  # Path to model checkpoint
+  input_mode: "tsdf_raycast"  # Input from ray-cast TSDF, not raw images
+  action_space:
+    - pan_tilt_left  # Left camera pan/tilt angles
+    - pan_tilt_right  # Right camera pan/tilt angles
+    - base_velocity  # Base linear/angular velocity
+    - camera_capture  # Discrete action: capture frame for analysis
+  
+  context_window: 10  # Number of past observations
+  action_horizon: 5  # Number of future actions to predict
+
+# Safety constraints
+safety:
+  # Velocity limits (enforced by action executor)
+  max_base_velocity: 0.3  # m/s (reduced from actuator max for safety)
+  max_angular_velocity: 0.8  # rad/s
+  
+  # ESDF-based collision avoidance
+  esdf_safety_distance: 0.3  # meters - minimum distance to obstacles
+  emergency_stop_distance: 0.15  # meters - trigger emergency stop
+  
+  # Pan-tilt mechanical limits with safety margins
+  pan_limit_margin: 5.0  # degrees - reduce range by this margin
+  tilt_limit_margin: 5.0  # degrees
+  
+  # Monitoring
+  watchdog_timeout: 5.0  # seconds - trigger safety stop if no commands
+  health_check_interval: 1.0  # seconds

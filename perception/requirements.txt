@@ -1,0 +1,21 @@
+# Perception Container Requirements
+
+# Robotics framework
+# robotics_sdk (installed via Dockerfile from git or local mount)
+# robotics_common (installed via Dockerfile from git or local mount)
+
+# ROS2 dependencies (already in base image)
+# ros-humble-ros-base
+
+# RealSense Python bindings
+pyrealsense2>=2.54.0
+
+# Computer vision
+numpy>=1.24.0
+opencv-python>=4.8.0
+
+# Communication
+zenoh>=0.10.0
+
+# Utilities
+pyyaml>=6.0

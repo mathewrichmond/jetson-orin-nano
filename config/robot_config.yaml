@@ -1,0 +1,98 @@
+# Robot Configuration - Jetson Orin Nano
+# Docker-first implementation
+
+robot_id: jetson-01
+
+# Capabilities advertised to dispatch service
+capabilities:
+  - pan_tilt_camera
+  - stereo_vision
+  - mobile_base
+  - object_detection
+  - screen_detection
+  - depth_perception
+
+# Sensor configuration
+sensors:
+  camera_left:
+    type: realsense_d435i
+    serial: "${CAMERA_LEFT_SERIAL}"  # From .env or rs-enumerate-devices
+    frame_id: camera_left_link
+    fps: 30
+    resolution: [640, 480]
+    enable_depth: true
+    enable_rgb: true
+    enable_imu: true
+  
+  camera_right:
+    type: realsense_d435i
+    serial: "${CAMERA_RIGHT_SERIAL}"
+    frame_id: camera_right_link
+    fps: 30
+    resolution: [640, 480]
+    enable_depth: true
+    enable_rgb: true
+    enable_imu: true
+
+# Actuator configuration
+actuators:
+  pan_tilt:
+    type: dynamixel_ax12
+    port: "${SERVO_PORT}"  # From .env, typically /dev/ttyUSB0
+    baudrate: 1000000
+    pan_id: 1
+    tilt_id: 2
+    pan_range: [-90, 90]  # degrees
+    tilt_range: [-45, 45]
+  
+  base:
+    type: differential_drive
+    left_motor: /dev/ttyACM0
+    right_motor: /dev/ttyACM1
+    wheel_separation: 0.235  # meters
+    wheel_diameter: 0.072
+
+# Perception configuration
+perception:
+  nvblox:
+    voxel_size: 0.05  # meters
+    truncation_distance: 0.4  # meters
+    update_rate: 10  # Hz
+    esdf_max_distance: 5.0
+    esdf_min_distance: 0.0
+    mesh_update_rate: 1  # Hz
+  
+  pose_estimation:
+    method: visual_inertial
+    imu_topic: /robot/jetson-01/sensors/imu
+    use_loop_closure: true
+
+# Control configuration
+control:
+  vla:
+    model_path: "${MODEL_PATH}"  # From .env, /data/models/vla_latest.pth
+    inference_rate: 5  # Hz
+    use_gpu: true
+    batch_size: 1
+  
+  safety:
+    max_linear_velocity: 0.5  # m/s
+    max_angular_velocity: 1.0  # rad/s
+    obstacle_distance_threshold: 0.3  # meters (from ESDF)
+    emergency_stop_distance: 0.15
+
+# Zenoh communication
+zenoh:
+  router: "${ZENOH_ROUTER}"  # From .env
+  domain_id: "${ROS_DOMAIN_ID}"  # From .env, typically 0
+
+# Logging
+logging:
+  level: INFO
+  mcap:
+    enabled: true
+    output_path: /data/mcap
+    topics:
+      - /robot/jetson-01/sensors/**
+      - /robot/jetson-01/perception/**
+      - /robot/jetson-01/mission/**

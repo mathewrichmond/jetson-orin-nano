@@ -1,243 +1,323 @@
-# Isaac - Jetson Orin Nano Robot System
+# Jetson Orin Nano - Robot Target Implementation
 
-This repository contains the complete software stack for the Isaac robot system running on a Jetson Orin Nano. The system integrates two RealSense cameras with hardware frame sync, a SparkFun Auto pHAT for servo control and IMU, an iRobot Create chassis, and a custom Vision-Language-Action (VLA) model as the primary controller.
+Docker-first target implementation for autonomous mobile robot on Jetson Orin Nano, integrating with the [robotics platform](../robotics).
 
-## 🎯 Purpose
+## Architecture
 
-This repository implements and manages:
-- **System Setup**: Automated installation of packages, drivers, and dependencies
-- **Hardware Integration**: Drivers and configuration for RealSense cameras, SparkFun Auto pHAT (servos and IMU), iRobot Create chassis, and USB microphone
-- **VLA Controller**: Custom Vision-Language-Action model for robot control
-- **System Monitoring**: Health checks, performance monitoring, and diagnostics
-- **Logging Infrastructure**: Centralized logging with future NFS support for shared storage
-- **Control Mode Switching**: Safe mode transitions and state management
-
-## 🎯 Configuration-Driven Approach
-
-This repository uses a **configuration-driven** approach for package management:
-- All packages are defined in YAML configuration files (`config/system/`)
-- Installation scripts read from these configurations
-- Easy to add/remove packages without editing scripts
-- Single source of truth for all dependencies
-
-See [Package Management Documentation](docs/development/PACKAGE_MANAGEMENT.md) for details.
-
-## 📁 Repository Structure
+**Docker-First Design** - Host provides hardware access, containers provide functionality:
 
 ```
-jetson-orin-nano/
-├── scripts/              # Setup and maintenance scripts
-│   ├── system/          # System-level setup (OS, ROS, packages)
-│   ├── hardware/        # Hardware-specific installation scripts
-│   ├── monitoring/      # System monitoring and health check scripts
-│   └── maintenance/     # Self-updating, cleaning, and recovery scripts
-├── src/                 # Source code
-│   ├── vla_controller/  # VLA model implementation and inference
-│   ├── hardware_drivers/ # Hardware driver wrappers and interfaces
-│   ├── control_modes/   # Control mode implementations
-│   └── utils/           # Shared utilities and helpers
-├── docs/                # Documentation
-│   ├── architecture/    # System architecture and design docs
-│   ├── hardware/        # Hardware setup and configuration guides
-│   ├── setup/           # Setup and installation documentation
-│   └── api/             # API documentation
-├── config/              # Configuration files
-│   ├── system/          # System-wide configurations
-│   ├── hardware/        # Hardware-specific configs
-│   └── control/         # Control mode configurations
-├── hardware/            # Hardware setup and documentation
-│   ├── realsense/       # Realsense camera setup and configs
-│   ├── motor_controllers/ # Motor controller setup and configs
-│   └── raspberry_pi_modules/ # Raspberry Pi sub-module configs
-├── monitoring/          # Monitoring infrastructure
-│   ├── system/          # System resource monitoring
-│   ├── hardware/        # Hardware health monitoring
-│   └── performance/     # Performance metrics and analysis
-├── logging/             # Logging infrastructure
-│   ├── config/          # Logging configuration files
-│   └── scripts/         # Log rotation and management scripts
-└── control/             # Control system
-    ├── modes/           # Control mode definitions
-    └── switching/       # Mode switching logic and safety checks
+┌─────────────────────────────────────┐
+│ Host (Minimal)                      │
+│ - JetPack + NVIDIA drivers          │
+│ - Docker + NVIDIA runtime           │
+│ - Device permissions (udev)         │
+│ - Network (mDNS, WiFi)              │
+└─────────────────┬───────────────────┘
+                  │
+        ┌─────────┴──────────┐
+        │                    │
+┌───────▼────────┐  ┌────────▼────────┐
+│   Perception   │  │    Control      │
+│   Container    │  │   Container     │
+│                │  │                 │
+│ - ROS2 Humble  │  │ - ROS2 Humble   │
+│ - RealSense SDK│  │ - PyTorch       │
+│ - nvblox TSDF  │  │ - VLA model     │
+│ - Cameras      │  │ - Servo control │
+└────────────────┘  └─────────────────┘
 ```
 
-## 🚀 Quick Start
+**Integration**: Uses [robotics_sdk](../robotics/common/robotics_sdk) base classes to implement `PerceptionBase` and `ControlBase`.
 
-### Simple Setup Workflow
+## Quick Start
 
-1. **Clone and setup**:
-   ```bash
-   git clone <repository-url>
-   cd jetson-orin-nano
-   ./setup.sh
-   ```
-
-   Or for non-interactive setup with auto-reboot:
-   ```bash
-   NON_INTERACTIVE=true sudo ./setup.sh
-   ```
-
-2. **Activate environment**:
-   ```bash
-   source scripts/utils/env_setup.sh
-   ```
-
-3. **Run code**:
-   ```bash
-   ros2 launch system_monitor system_monitor.launch.py
-   ```
-
-The setup script works identically on:
-- **Native Jetson hardware**
-- **Docker containers**
-- **Ubuntu development machines**
-
-See [Development Workflow](docs/development/WORKFLOW.md) for detailed workflow documentation.
-
-### First-Time Jetson Setup
-
-For initial Jetson system setup (after flashing):
+### 1. Host Setup (One-Time)
 
 ```bash
-cd ~/src/jetson-orin-nano
-sudo ./scripts/system/setup_isaac.sh
+git clone <repository-url>
+cd jetson-orin-nano
+
+# Run minimal host setup
+./setup.sh
+
+# Reboot for group membership
 sudo reboot
 ```
 
-Then run the main setup:
-```bash
-./setup.sh
-```
-
-### Post-Setup Verification
+### 2. Configure Robot
 
 ```bash
-# Verify hostname
-hostname  # Should show "isaac"
+# Create environment file
+cp .env.example .env
+nano .env
 
-# Verify ROS 2
-source /opt/ros/humble/setup.bash
-ros2 --help
+# Set:
+# - ROBOT_ID=jetson-01
+# - ZENOH_ROUTER=tcp/192.168.1.100:7447 (server IP)
+# - Camera serials from: rs-enumerate-devices
 
-# Check system status
-./scripts/monitoring/system_health_check.sh
+# Edit robot config
+nano config/robot_config.yaml
 ```
 
-## 🔧 System Requirements
+### 3. Build and Start
 
-- **Hardware**: Jetson Orin Nano Developer Kit
-- **OS**: Ubuntu 22.04 (JetPack 5.x)
-- **ROS**: ROS 2 Humble
-- **Storage**: Currently microSD (SSD support planned)
-- **Network**: Dynamic IP (DHCP) with mDNS hostname resolution
-
-## 📚 Documentation
-
-- **[Quick Start](docs/QUICK_START.md)** - Quick reference for common tasks
-- **[Setup Guide](docs/setup/SETUP.md)** - Comprehensive system setup instructions
-- **[Development Workflow](docs/development/WORKFLOW.md)** - Development workflow and practices
-- **[Architecture](docs/architecture/ARCHITECTURE.md)** - System architecture and design
-- **[Hardware Setup](docs/hardware/HARDWARE.md)** - Hardware integration guides
-- **[Deployment](docs/deployment/DEPLOYMENT.md)** - Deployment and CI/CD guides
-- **[API Documentation](docs/api/API.md)** - Code API reference
-
-## 🔌 Hardware Support
-
-### Final Hardware Setup (Electronics Complete)
-
-The Isaac robot system uses the following hardware configuration:
-
-- **Main Computer**: Jetson Orin Nano
-- **Cameras**: Two Intel RealSense cameras (USB ports)
-  - Hardware frame sync via ground and sync pin connections
-- **Audio Input**: USB microphone (USB port)
-- **Chassis**: iRobot Create (USB port)
-- **Motor Control & IMU**: SparkFun Auto pHAT (40-pin GPIO)
-  - Four servo motors for camera actuation
-  - ICM-20948 9DOF IMU (accelerometer, gyroscope, magnetometer)
-
-### Software Framework
-- ROS 2 Humble
-- Ubuntu 22.04 (JetPack 5.x)
-
-## 🛡️ System Stability Features
-
-This robot system includes several stability and reliability features:
-
-- **Self-Updating**: Automated system and package updates
-- **Self-Cleaning**: Log rotation, temporary file cleanup, disk space management
-- **Self-Restoring**: Recovery scripts for common failure scenarios
-- **Health Monitoring**: Continuous system and hardware health checks
-- **Safe Mode Switching**: Graceful transitions between control modes
-
-## 📝 Development Workflow
-
-1. **System Setup**: Run `scripts/system/setup_isaac.sh` on first boot
-2. **Hardware Setup**: Follow hardware-specific guides in `docs/hardware/`
-3. **Development**: Work in `src/` directory with ROS 2 workspace
-4. **Testing**: Use monitoring scripts to verify system health
-5. **Deployment**: Configuration files in `config/` directory
-
-## 🌐 Network Configuration
-
-- **Hostname**: `isaac`
-- **Network**: Dynamic IP (DHCP) via NetworkManager
-- **Hostname Resolution**: mDNS (Avahi) - accessible as `isaac.local`
-- **SSH**: Enabled by default
-
-Connect from another computer:
 ```bash
-ssh nano@isaac.local
+# Build containers
+docker compose build
+
+# Start robot
+docker compose up -d
+
+# Monitor logs
+docker compose logs -f perception control
 ```
 
-## 🔐 Security Notes
+### 4. Verify Registration
 
-- Default username: `nano`
-- Change default password after first setup
-- SSH keys recommended for remote access
-- Firewall configuration recommended for production use
+```bash
+# Check robot registered with dispatch service
+curl http://192.168.1.100:5000/api/v1/robots
 
-## 🚀 Deployment
+# Should show jetson-01 with capabilities
+```
 
-The system supports multiple deployment modes:
+### 5. Test Mission
 
-- **Dev Sandbox**: Quick deployment of local changes (`./scripts/deployment/deploy_dev.sh`)
-- **Package Installation**: Install from GitHub releases
-- **Auto-Start**: Systemd services for boot-time launch
-- **Dev Priority**: Dev sandbox takes precedence over installed packages
+```bash
+# Submit test mission
+curl -X POST http://192.168.1.100:5000/api/v1/missions \
+  -H "Content-Type: application/json" \
+  -d '{"command": "Look around", "required_capabilities": ["pan_tilt_camera"]}'
+```
 
-See [Deployment Guide](docs/deployment/DEPLOYMENT.md) for details.
+## Repository Structure
 
-## 📦 Future Enhancements
+```
+jetson-orin-nano/
+├── perception/              # Perception container
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── src/
+│       └── perception_main.py  # Implements PerceptionBase
+├── control/                 # Control container
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── src/
+│       └── control_main.py     # Implements ControlBase
+├── config/
+│   └── robot_config.yaml       # Robot-specific configuration
+├── docs/
+│   ├── setup/
+│   │   └── DOCKER_FIRST_SETUP.md  # Complete bringup guide
+│   ├── hardware/               # Hardware setup guides
+│   └── architecture/           # System design
+├── scripts/
+│   ├── system/                 # Minimal host scripts
+│   │   ├── setup_wifi.sh       # WiFi configuration
+│   │   └── setup_bluetooth.sh  # Bluetooth pairing
+│   └── hardware/
+│       └── setup_hardware.sh   # Hardware verification
+├── setup.sh                    # Minimal host setup (~150 lines)
+├── docker-compose.yml          # Production orchestration
+└── .env.example                # Configuration template
+```
 
-- [ ] NFS mount for shared logging directory
-- [ ] SSD migration scripts
-- [ ] Docker containerization for VLA model
-- [ ] Web-based monitoring dashboard
-- [ ] Automated backup and restore
-- [ ] Over-the-air (OTA) update system
+## Hardware
 
-## 🤝 Contributing
+**Supported**:
+- 2x Intel RealSense D435i cameras (stereo, depth, IMU)
+- Pan-tilt mounts (Dynamixel servos)
+- Mobile base (differential drive)
+- iRobot Create chassis (optional)
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. For questions or issues, contact the maintainer or open an issue.
+**Requirements**:
+- Jetson Orin Nano with JetPack 5.x
+- 256GB+ SSD (boot drive + data)
+- USB 3.0 for cameras
+- Serial/I2C for actuators
 
-## 📄 License
+## Key Features
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Docker-First Benefits
 
-The MIT License is one of the most permissive open-source licenses, allowing you to:
-- Use the software commercially
-- Modify the software
-- Distribute the software
-- Sublicense the software
-- Use privately
+**Before (Host-Based)**:
+- 737-line setup.sh
+- 40+ script files
+- System package conflicts
+- Difficult to update
 
-The only requirement is that you include the original copyright notice and license text.
+**After (Docker-First)**:
+- 150-line setup.sh (host only)
+- Isolated dependencies
+- Easy updates (rebuild container)
+- Reproducible builds
 
-## 👤 Author
+### Integration with Robotics Platform
 
-Mathew Richmond - mathewrichmond@gmail.com
+- **Perception**: Publishes TSDF, ESDF, pose to `/robot/{robot_id}/perception/*`
+- **Control**: Subscribes to missions from dispatch, sends subsystem commands
+- **Capabilities**: Registers with dispatch service for automatic task routing
+- **Logging**: Streams to centralized MCAP logging service
+- **Digital Twin**: Contributes to shared 3D world representation
 
----
+### Continuous Learning
 
-**Note**: This system is designed for robot control. Always ensure safety mechanisms are in place before operating physical hardware.
+- Novel scenario detection triggers active learning
+- MCAP logs uploaded for VLA retraining
+- Model updates deployed via volume mount (`/data/models/`)
+
+## Daily Operation
+
+### Start Robot
+
+```bash
+docker compose up -d
+```
+
+### Stop Robot
+
+```bash
+docker compose down
+```
+
+### View Logs
+
+```bash
+docker compose logs -f perception control
+```
+
+### Update Code
+
+```bash
+git pull
+docker compose build
+docker compose up -d
+```
+
+### Update Model
+
+```bash
+# Copy new VLA model
+scp new_model.pth jetson-01.local:/data/models/vla_latest.pth
+
+# Restart control
+docker compose restart control
+```
+
+### Auto-Start on Boot
+
+```bash
+./scripts/system/install_services.sh
+sudo reboot  # Test auto-start
+```
+
+## Documentation
+
+- **[Docker-First Setup](docs/setup/DOCKER_FIRST_SETUP.md)** - Complete bringup guide
+- **[Hardware Verification](docs/hardware/VERIFICATION.md)** - Test all hardware
+- **[Troubleshooting](docs/setup/DOCKER_FIRST_SETUP.md#troubleshooting)** - Common issues
+- **[Architecture](docs/architecture/)** - System design
+
+## Development
+
+### Local Testing
+
+```bash
+# Build for x86 (on laptop)
+docker buildx build --platform linux/amd64 ./perception
+
+# Test perception logic without hardware
+docker compose run --rm perception python3 -m pytest
+```
+
+### Live Development
+
+```bash
+# Mount robotics framework locally
+# Edit docker-compose.yml:
+# volumes:
+#   - ../robotics:/robotics:ro
+
+# Rebuild
+docker compose build --no-cache
+docker compose up
+```
+
+### Hardware Verification
+
+```bash
+# Test camera access
+docker compose run --rm perception bash
+rs-enumerate-devices
+
+# Test servo access
+docker compose run --rm control bash
+python3 -c "import serial; print(serial.Serial('/dev/ttyUSB0'))"
+
+# Test GPU
+docker run --rm --gpus all nvcr.io/nvidia/l4t-base:r35.2.1 nvidia-smi
+```
+
+## Migration from Host-Based
+
+See [Docker-First Setup Guide](docs/setup/DOCKER_FIRST_SETUP.md#migration-from-host-based-setup) for migration instructions.
+
+**Summary**:
+1. Backup existing ROS2 workspace
+2. Run new setup.sh (installs Docker only)
+3. Move code to `perception/src/` and `control/src/`
+4. Update imports to use `robotics_sdk`
+5. Build and test containers
+
+## Troubleshooting
+
+### Camera Not Found
+
+```bash
+# Check USB
+lsusb | grep Intel
+
+# Check permissions
+groups $USER  # Should include: video, plugdev
+
+# Test in container
+docker compose run --rm perception rs-enumerate-devices
+```
+
+### GPU Not Accessible
+
+```bash
+# Test NVIDIA runtime
+docker run --rm --gpus all nvcr.io/nvidia/l4t-base:r35.2.1 nvidia-smi
+
+# Check daemon config
+cat /etc/docker/daemon.json
+```
+
+### Robot Not Registering
+
+```bash
+# Check Zenoh connection
+docker compose logs control | grep "Registered capabilities"
+
+# Test server connectivity
+nc -zv 192.168.1.100 7447
+
+# Check .env
+cat .env | grep ZENOH_ROUTER
+```
+
+See [full troubleshooting guide](docs/setup/DOCKER_FIRST_SETUP.md#troubleshooting).
+
+## Support
+
+- **Issues**: Open GitHub issue
+- **Docs**: See `docs/` directory
+- **Platform**: See [robotics framework](../robotics)
+- **Hardware**: See `docs/hardware/`
+
+## License
+
+MIT

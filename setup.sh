@@ -1,7 +1,10 @@
 #!/bin/bash
-# Unified Setup Script
-# Single entry point for setting up the Isaac robot system
-# Works for both native Jetson and Docker environments
+# Jetson Orin Nano - Docker-First Setup
+# Minimal host setup for containerized robot system
+# Installs ONLY what containers cannot provide: Docker runtime, device access, network config
+#
+# Architecture: Perception and control run in containers, host provides hardware access layer
+# See: docs/setup/DOCKER_FIRST_SETUP.md
 
 set -e
 
@@ -18,8 +21,6 @@ NC='\033[0m'
 # Configuration
 SETUP_LOG="${SETUP_LOG:-$SCRIPT_DIR/.setup.log}"
 SETUP_STATE="${SETUP_STATE:-$SCRIPT_DIR/.setup_state}"
-DEPLOYMENT="${DEPLOYMENT:-local}"
-SETUP_NETWORK="${SETUP_NETWORK:-auto}"
 
 # Detect environment
 detect_environment() {
@@ -27,14 +28,19 @@ detect_environment() {
         echo "docker"
     elif [ -f /etc/nv_tegra_release ]; then
         echo "jetson"
-    elif [ -f /etc/os-release ] && grep -q "Ubuntu" /etc/os-release; then
-        echo "ubuntu"
     else
-        echo "unknown"
+        echo "ubuntu"
     fi
 }
 
 ENV_TYPE=$(detect_environment)
+
+# Docker-first mode: skip if running in container
+if [ "$ENV_TYPE" = "docker" ]; then
+    echo "Running in container - host setup not needed"
+    echo "See perception/ or control/ Dockerfile for container setup"
+    exit 0
+fi
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$SETUP_LOG"
@@ -83,7 +89,7 @@ step_update_system() {
         return 0
     fi
 
-    log_step "1" "13" "Updating system packages"
+    log_step "1" "7" "Updating system packages"
 
     if ! check_root; then
         sudo apt-get update
@@ -96,274 +102,169 @@ step_update_system() {
     mark_step_complete "update_system"
 }
 
-# Step 2: Install system packages
-step_install_system_packages() {
-    if check_step "install_system_packages"; then
-        log "Skipping: System packages already installed"
+# Step 2: Install Docker and NVIDIA Container Runtime
+step_install_docker() {
+    if check_step "install_docker"; then
+        log "Skipping: Docker already installed"
         return 0
     fi
 
-    log_step "2" "13" "Installing system packages"
+    log_step "2" "7" "Installing Docker and NVIDIA Container Runtime"
 
-    # Check if package manager exists
-    if [ ! -f "$SCRIPT_DIR/scripts/utils/package_manager.py" ]; then
-        log "ERROR: Package manager not found"
-        exit 1
+    # Install Docker
+    if ! command -v docker &> /dev/null; then
+        log "Installing Docker..."
+        curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+        sudo sh /tmp/get-docker.sh
+        sudo usermod -aG docker $USER
+        rm /tmp/get-docker.sh
     fi
 
-    # Install PyYAML if needed
-    if ! python3 -c "import yaml" 2>/dev/null; then
-        log "Installing PyYAML..."
-        pip3 install --user pyyaml || sudo pip3 install pyyaml
+    # Install NVIDIA Container Toolkit
+    if ! dpkg -l | grep -q nvidia-docker2; then
+        log "Installing NVIDIA Container Toolkit..."
+        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+            sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+            sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        sudo apt-get update
+        sudo apt-get install -y nvidia-docker2
     fi
 
-    # Install packages based on environment
-    if [ "$ENV_TYPE" = "docker" ]; then
-        # Docker: Install minimal set
-        python3 "$SCRIPT_DIR/scripts/utils/package_manager.py" install-system --groups dev_minimal
-    elif [ "$ENV_TYPE" = "jetson" ]; then
-        # Jetson: Install robot essentials
-        python3 "$SCRIPT_DIR/scripts/utils/package_manager.py" install-system --groups robot_essentials
+    # Configure Docker daemon
+    log "Configuring Docker daemon..."
+    sudo mkdir -p /etc/docker
+    sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+{
+  "data-root": "/data/docker",
+  "runtimes": {
+    "nvidia": {
+      "path": "nvidia-container-runtime",
+      "runtimeArgs": []
+    }
+  },
+  "default-runtime": "nvidia",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOF
+
+    sudo systemctl restart docker
+
+    # Install docker-compose plugin
+    if ! docker compose version &> /dev/null; then
+        log "Installing Docker Compose plugin..."
+        sudo apt-get install -y docker-compose-plugin
+    fi
+
+    # Test GPU access
+    log "Testing GPU access in Docker..."
+    if docker run --rm --gpus all nvcr.io/nvidia/l4t-base:r35.2.1 nvidia-smi &> /dev/null; then
+        log "GPU access verified!"
     else
-        # Other Ubuntu: Install full dev environment
-        python3 "$SCRIPT_DIR/scripts/utils/package_manager.py" install-system --groups dev_full
+        log "WARNING: GPU test failed - may need reboot"
     fi
 
-    mark_step_complete "install_system_packages"
+    mark_step_complete "install_docker"
 }
 
-# Step 3: Install Python packages
-step_install_python_packages() {
-    if check_step "install_python_packages"; then
-        log "Skipping: Python packages already installed"
+# Step 3: Setup device permissions (udev rules)
+step_setup_device_permissions() {
+    if check_step "setup_device_permissions"; then
+        log "Skipping: Device permissions already configured"
         return 0
     fi
 
-    log_step "3" "13" "Installing Python packages"
+    log_step "3" "7" "Setting up device permissions"
 
-    # Upgrade pip (pin setuptools to <80 for colcon-core compatibility)
-    pip3 install --upgrade pip wheel --user || sudo pip3 install --upgrade pip wheel
-    pip3 install --user "setuptools<80,>=30.3.0" || sudo pip3 install "setuptools<80,>=30.3.0"
+    # RealSense cameras
+    log "Configuring RealSense camera permissions..."
+    sudo tee /etc/udev/rules.d/99-realsense.rules > /dev/null <<'EOF'
+# Intel RealSense cameras
+SUBSYSTEM=="usb", ATTRS{idVendor}=="8086", MODE="0666", GROUP="plugdev"
+KERNEL=="video[0-9]*", ATTRS{idVendor}=="8086", MODE="0666", GROUP="video"
+EOF
 
-    # Install PyYAML if needed
-    if ! python3 -c "import yaml" 2>/dev/null; then
-        pip3 install --user pyyaml || sudo pip3 install pyyaml
-    fi
+    # Add user to required groups
+    sudo usermod -aG docker,video,dialout,i2c,gpio $USER || true
 
-    # Install Python packages
-    if [ "$ENV_TYPE" = "docker" ]; then
-        python3 "$SCRIPT_DIR/scripts/utils/package_manager.py" install-python --groups dev_minimal
-    else
-        python3 "$SCRIPT_DIR/scripts/utils/package_manager.py" install-python --groups dev_all
-    fi
+    # Reload udev rules
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
 
-    # Install project requirements if they exist
-    if [ -f "$SCRIPT_DIR/requirements-dev.txt" ]; then
-        log "Installing project requirements..."
-        pip3 install --user -r "$SCRIPT_DIR/requirements-dev.txt" || true
-    fi
+    log "Device permissions configured. Group membership requires logout/login or reboot."
 
-    mark_step_complete "install_python_packages"
+    mark_step_complete "setup_device_permissions"
 }
 
-# Step 4: Setup ROS 2 workspace
-step_setup_ros2_workspace() {
-    if check_step "setup_ros2_workspace"; then
-        log "Skipping: ROS 2 workspace already set up"
-        return 0
-    fi
-
-    log_step "4" "13" "Setting up ROS 2 workspace"
-
-    # Check if ROS 2 is installed
-    if [ ! -f "/opt/ros/humble/setup.bash" ]; then
-        log "WARNING: ROS 2 Humble not found. Installing..."
-        if ! check_root; then
-            sudo "$SCRIPT_DIR/scripts/system/setup_isaac.sh" || true
-        fi
-    fi
-
-    # Source ROS 2
-    if [ -f "/opt/ros/humble/setup.bash" ]; then
-        source /opt/ros/humble/setup.bash
-
-        # Initialize workspace
-        mkdir -p ~/ros2_ws/src
-        cd ~/ros2_ws
-
-        if [ ! -f .rosinstall ]; then
-            if command -v wstool &> /dev/null; then
-                wstool init src || true
-            fi
-        fi
-
-        # Link packages from src directory and hardware_drivers subdirectory
-        cd ~/ros2_ws/src
-        for pkg_dir in "$SCRIPT_DIR/src"/* "$SCRIPT_DIR/src/hardware_drivers"/* "$SCRIPT_DIR/src/utils"/*; do
-            if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.xml" ]; then
-                pkg_name=$(basename "$pkg_dir")
-                if [ ! -L "$pkg_name" ] && [ ! -d "$pkg_name" ]; then
-                    ln -sf "$pkg_dir" "$pkg_name" 2>/dev/null || true
-                    log "Linked $pkg_name package to workspace"
-                fi
-            fi
-        done
-
-        # Install dependencies
-        if command -v rosdep &> /dev/null; then
-            cd ~/ros2_ws
-            rosdep update || true
-            rosdep install --from-paths src --ignore-src -r -y || true
-        fi
-
-        # Clean problematic symlink directories (fixes ament_cmake_python symlink errors)
-        log "Cleaning problematic build directories..."
-        cd ~/ros2_ws
-        for pkg_dir in src/*/; do
-            if [ -d "$pkg_dir" ]; then
-                pkg_name=$(basename "$pkg_dir")
-                symlink_dir="build/${pkg_name}/ament_cmake_python/${pkg_name}/${pkg_name}"
-                if [ -d "$symlink_dir" ]; then
-                    rm -rf "$symlink_dir" 2>/dev/null || true
-                fi
-            fi
-        done
-
-        # Build workspace
-        log "Building ROS 2 workspace..."
-        colcon build --symlink-install || log "Build completed with warnings"
-    else
-        log "WARNING: ROS 2 not available, skipping workspace setup"
-    fi
-
-    mark_step_complete "setup_ros2_workspace"
-}
-
-# Step 5: Setup Python virtual environment
-step_setup_venv() {
-    if check_step "setup_venv"; then
-        log "Skipping: Virtual environment already set up"
-        return 0
-    fi
-
-    log_step "5" "13" "Setting up Python virtual environment"
-
-    if [ ! -d "$SCRIPT_DIR/.venv" ]; then
-        python3 -m venv "$SCRIPT_DIR/.venv"
-        source "$SCRIPT_DIR/.venv/bin/activate"
-        pip install --upgrade pip setuptools wheel
-
-        # Install requirements
-        if [ -f "$SCRIPT_DIR/requirements-dev.txt" ]; then
-            pip install -r "$SCRIPT_DIR/requirements-dev.txt"
-        fi
-
-        deactivate
-    fi
-
-    mark_step_complete "setup_venv"
-}
-
-# Step 6: Install pre-commit hooks
-step_install_precommit() {
-    if check_step "install_precommit"; then
-        log "Skipping: Pre-commit hooks already installed"
-        return 0
-    fi
-
-    log_step "6" "13" "Installing pre-commit hooks"
-
-    if [ -d "$SCRIPT_DIR/.git" ] && [ -f "$SCRIPT_DIR/.pre-commit-config.yaml" ]; then
-        if command -v pre-commit &> /dev/null; then
-            cd "$SCRIPT_DIR"
-            pre-commit install || log "Pre-commit installation failed (may need to install pre-commit)"
-        else
-            log "Pre-commit not found, skipping hook installation"
-        fi
-    else
-        log "Not a git repository or pre-commit config not found, skipping"
-    fi
-
-    mark_step_complete "install_precommit"
-}
-
-# Step 7: Setup Network Configuration
+# Step 4: Setup network configuration
 step_setup_network() {
     if check_step "setup_network"; then
         log "Skipping: Network already configured"
         return 0
     fi
 
-    log_step "7" "14" "Setting up network configuration"
+    log_step "4" "7" "Setting up network configuration"
 
-    # Check if network setup is needed based on deployment
-    if [ "$SETUP_NETWORK" = "false" ]; then
-        log "Network setup disabled (SETUP_NETWORK=false)"
-        mark_step_complete "setup_network"
-        return 0
+    # Set hostname for mDNS
+    ROBOT_ID=$(grep -E "^ROBOT_ID=" .env 2>/dev/null | cut -d= -f2 || echo "jetson-01")
+    log "Setting hostname to $ROBOT_ID..."
+    sudo hostnamectl set-hostname $ROBOT_ID
+
+    # Install avahi for mDNS (allows jetson-01.local addressing)
+    if ! command -v avahi-daemon &> /dev/null; then
+        log "Installing Avahi for mDNS..."
+        sudo apt-get install -y avahi-daemon avahi-utils
+        sudo systemctl enable avahi-daemon
+        sudo systemctl start avahi-daemon
     fi
 
-    # Auto-detect if network setup is needed
-    if [ "$SETUP_NETWORK" = "auto" ]; then
-        DEPLOYMENT_CONFIG="$SCRIPT_DIR/config/deployment/${DEPLOYMENT}.yaml"
-        
-        if [ -f "$DEPLOYMENT_CONFIG" ]; then
-            # Check if deployment requires sudo for network
-            if grep -q "require_sudo: true" "$DEPLOYMENT_CONFIG" 2>/dev/null; then
-                log "Deployment $DEPLOYMENT requires network configuration"
-                SETUP_NETWORK="true"
-            else
-                log "Deployment $DEPLOYMENT does not require network configuration"
-                SETUP_NETWORK="false"
-            fi
-        else
-            log "No deployment config found, skipping network setup"
-            SETUP_NETWORK="false"
-        fi
-    fi
-
-    if [ "$SETUP_NETWORK" = "true" ]; then
-        log "Running network setup script..."
-        
-        # Check if network setup script exists
-        NETWORK_SCRIPT="$SCRIPT_DIR/scripts/network/setup_network.sh"
-        if [ -f "$NETWORK_SCRIPT" ]; then
-            if check_root; then
-                bash "$NETWORK_SCRIPT" "$DEPLOYMENT"
-            else
-                sudo bash "$NETWORK_SCRIPT" "$DEPLOYMENT"
-            fi
-            log "Network configuration complete"
-        else
-            log "Warning: Network setup script not found: $NETWORK_SCRIPT"
-        fi
-    fi
+    log "Network configuration complete. Robot accessible at ${ROBOT_ID}.local"
 
     mark_step_complete "setup_network"
 }
 
-# Step 8: Setup Bluetooth (optional, only on Jetson)
-step_setup_bluetooth() {
-    if [ "$ENV_TYPE" != "jetson" ]; then
+# Step 5: Setup WiFi (optional, host-level)
+step_setup_wifi() {
+    if check_step "setup_wifi"; then
+        log "Skipping: WiFi setup already completed"
         return 0
     fi
 
+    log_step "5" "7" "Setting up WiFi (optional)"
+
+    echo ""
+    echo "Setup WiFi as fallback when Ethernet is disconnected? (y/N)"
+    read -r response
+
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        if [ -f "$SCRIPT_DIR/scripts/system/setup_wifi.sh" ]; then
+            sudo "$SCRIPT_DIR/scripts/system/setup_wifi.sh"
+            mark_step_complete "setup_wifi"
+        else
+            log "WARNING: WiFi setup script not found"
+        fi
+    else
+        log "Skipping WiFi setup. Run manually: sudo ./scripts/system/setup_wifi.sh"
+    fi
+}
+
+# Step 6: Setup Bluetooth (optional, host-level)
+step_setup_bluetooth() {
     if check_step "setup_bluetooth"; then
         log "Skipping: Bluetooth setup already completed"
         return 0
     fi
 
-    log_step "7" "13" "Setting up Bluetooth (optional)"
+    log_step "6" "7" "Setting up Bluetooth (optional)"
 
-    # Auto-answer if non-interactive
-    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
-        response="y"
-    else
-        echo ""
-        echo "Setup Bluetooth support? (y/N)"
-        echo "This will install Bluetooth packages and enable the Bluetooth service."
-        read -r response
-    fi
+    echo ""
+    echo "Setup Bluetooth support? (y/N)"
+    read -r response
 
     if [[ "$response" =~ ^[Yy]$ ]]; then
         if [ -f "$SCRIPT_DIR/scripts/system/setup_bluetooth.sh" ]; then
@@ -377,275 +278,32 @@ step_setup_bluetooth() {
     fi
 }
 
-# Step 8: Setup WiFi with Ethernet priority (optional, only on Jetson)
-step_setup_wifi() {
-    if [ "$ENV_TYPE" != "jetson" ]; then
-        return 0
-    fi
-
-    if check_step "setup_wifi"; then
-        log "Skipping: WiFi setup already completed"
-        return 0
-    fi
-
-    log_step "8" "13" "Setting up WiFi with Ethernet priority (optional)"
-
-    # Auto-answer if non-interactive
-    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
-        response="y"
-    else
-        echo ""
-        echo "Setup WiFi as fallback when Ethernet is disconnected? (y/N)"
-        echo "Ethernet will be preferred, WiFi will connect automatically when Ethernet is unavailable."
-        read -r response
-    fi
-
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        if [ -f "$SCRIPT_DIR/scripts/system/setup_wifi.sh" ]; then
-            if [ "$EUID" -eq 0 ]; then
-                "$SCRIPT_DIR/scripts/system/setup_wifi.sh"
-            else
-                sudo "$SCRIPT_DIR/scripts/system/setup_wifi.sh"
-            fi
-            mark_step_complete "setup_wifi"
-        else
-            log "WARNING: WiFi setup script not found"
-        fi
-    else
-        log "Skipping WiFi setup. Run manually: sudo ./scripts/system/setup_wifi.sh"
-    fi
-}
-
-# Step 9: Install RealSense cameras (optional, only on Jetson)
-step_install_realsense() {
-    if [ "$ENV_TYPE" != "jetson" ]; then
-        return 0
-    fi
-
-    if check_step "install_realsense"; then
-        log "Skipping: RealSense installation already completed"
-        return 0
-    fi
-
-    log_step "9" "13" "Installing RealSense cameras (optional)"
-
-    # Auto-answer if non-interactive
-    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
-        response="y"
-    else
-        echo ""
-        echo "Install Intel RealSense camera support? (y/N)"
-        echo "This will install the RealSense SDK and ROS 2 wrapper."
-        read -r response
-    fi
-
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        if [ -f "$SCRIPT_DIR/scripts/utils/hardware_manager.py" ]; then
-            if [ "$EUID" -eq 0 ]; then
-                python3 "$SCRIPT_DIR/scripts/utils/hardware_manager.py" install-realsense
-            else
-                sudo python3 "$SCRIPT_DIR/scripts/utils/hardware_manager.py" install-realsense
-            fi
-
-            # Build ROS package if ROS 2 workspace exists
-            if [ -f "/opt/ros/humble/setup.bash" ] && [ -d ~/ros2_ws ]; then
-                log "Building RealSense ROS 2 package..."
-                source /opt/ros/humble/setup.bash
-                python3 "$SCRIPT_DIR/scripts/utils/hardware_manager.py" build-realsense-ros || log "ROS package build failed (may need manual build)"
-            fi
-
-            mark_step_complete "install_realsense"
-        else
-            log "WARNING: Hardware manager not found, using fallback script"
-            if [ -f "$SCRIPT_DIR/scripts/hardware/install_realsense.sh" ]; then
-                if [ "$EUID" -eq 0 ]; then
-                    "$SCRIPT_DIR/scripts/hardware/install_realsense.sh"
-                else
-                    sudo "$SCRIPT_DIR/scripts/hardware/install_realsense.sh"
-                fi
-                mark_step_complete "install_realsense"
-            else
-                log "WARNING: RealSense installation script not found"
-            fi
-        fi
-    else
-        log "Skipping RealSense installation. Run manually: sudo python3 scripts/utils/hardware_manager.py install-realsense"
-    fi
-}
-
-# Step 10: Install systemd services (optional, only on Jetson)
-step_install_services() {
-    if [ "$ENV_TYPE" != "jetson" ]; then
-        return 0
-    fi
-
-    if check_step "install_services"; then
-        log "Skipping: Services already installed"
-        return 0
-    fi
-
-    log_step "10" "13" "Installing systemd services (optional)"
-
-    # Auto-answer if non-interactive
-    if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
-        response="y"
-    else
-        echo ""
-        echo "Install systemd services for auto-start and maintenance? (y/N)"
-        read -r response
-    fi
-
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        if [ "$EUID" -eq 0 ]; then
-            "$SCRIPT_DIR/scripts/system/install_services.sh"
-        else
-            sudo "$SCRIPT_DIR/scripts/system/install_services.sh"
-        fi
-        mark_step_complete "install_services"
-    else
-        log "Skipping service installation. Run manually: sudo ./scripts/system/install_services.sh"
-    fi
-}
-
-# Step 11: Setup visualization tools (rosbridge and Foxglove Bridge)
-step_setup_visualization() {
-    if check_step "setup_visualization"; then
-        log "Skipping: Visualization tools already set up"
-        return 0
-    fi
-
-    log_step "11" "13" "Setting up visualization tools (rosbridge and Foxglove Bridge)"
-
-    # Check if ROS 2 is installed
-    if [ ! -f "/opt/ros/humble/setup.bash" ]; then
-        log "Skipping: ROS 2 not installed"
-        return 0
-    fi
-
-    source /opt/ros/humble/setup.bash
-
-    # Install rosbridge_suite if not already installed
-    if ! ros2 pkg list | grep -q rosbridge_suite; then
-        log "Installing rosbridge_suite..."
-        if ! check_root; then
-            sudo apt install -y ros-humble-rosbridge-suite || log "rosbridge installation failed (may need manual install)"
-        else
-            apt install -y ros-humble-rosbridge-suite || log "rosbridge installation failed (may need manual install)"
-        fi
-    else
-        log "rosbridge_suite already installed"
-    fi
-
-    # Install foxglove_bridge if not already installed
-    if ! ros2 pkg list | grep -q foxglove_bridge; then
-        log "Installing foxglove_bridge..."
-        if ! check_root; then
-            sudo apt install -y ros-humble-foxglove-bridge || log "foxglove_bridge installation failed (may need manual install)"
-        else
-            apt install -y ros-humble-foxglove-bridge || log "foxglove_bridge installation failed (may need manual install)"
-        fi
-    else
-        log "foxglove_bridge already installed"
-    fi
-
-    mark_step_complete "setup_visualization"
-}
-
-# Step 12: Hardware verification
+# Step 7: Hardware verification
 step_verify_hardware() {
     if check_step "verify_hardware"; then
         log "Skipping: Hardware verification already completed"
         return 0
     fi
 
-    log_step "12" "13" "Hardware verification"
+    log_step "7" "7" "Hardware verification"
 
-    if [ "$ENV_TYPE" != "jetson" ]; then
-        log "Skipping hardware verification (not on Jetson)"
-        mark_step_complete "verify_hardware"
-        return 0
-    fi
+    echo ""
+    echo "Run hardware verification? (checks all connected hardware) (y/N)"
+    read -r response
 
-    if ask_yes_no "Run hardware verification? (checks all connected hardware)"; then
-        "${SCRIPT_DIR}/scripts/hardware/setup_hardware.sh" verify || {
-            log "Hardware verification completed with warnings"
-        }
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        if [ -f "$SCRIPT_DIR/scripts/hardware/setup_hardware.sh" ]; then
+            "$SCRIPT_DIR/scripts/hardware/setup_hardware.sh" verify || {
+                log "Hardware verification completed with warnings"
+            }
+        else
+            log "WARNING: Hardware verification script not found"
+        fi
         mark_step_complete "verify_hardware"
     else
-        log "Hardware verification skipped"
+        log "Hardware verification skipped. Run manually: ./scripts/hardware/setup_hardware.sh verify"
         mark_step_complete "verify_hardware"
     fi
-}
-
-# Step 13: Build ROS 2 packages (including RealSense if installed)
-step_build_ros2_packages() {
-    if check_step "build_ros2_packages"; then
-        log "Skipping: ROS 2 packages already built"
-        return 0
-    fi
-
-    log_step "14" "14" "Building ROS 2 packages"
-
-    # Check if ROS 2 is installed
-    if [ ! -f "/opt/ros/humble/setup.bash" ]; then
-        log "Skipping: ROS 2 not installed"
-        return 0
-    fi
-
-    # Check if workspace exists
-    if [ ! -d ~/ros2_ws/src ]; then
-        log "Skipping: ROS 2 workspace not set up"
-        return 0
-    fi
-
-    source /opt/ros/humble/setup.bash
-
-    # Link realsense_camera package if it exists
-    if [ -d "$SCRIPT_DIR/src/hardware_drivers/realsense_camera" ]; then
-        cd ~/ros2_ws/src
-        if [ ! -L realsense_camera ] && [ ! -d realsense_camera ]; then
-            ln -sf "$SCRIPT_DIR/src/hardware_drivers/realsense_camera" realsense_camera
-            log "Linked realsense_camera package to workspace"
-        fi
-    fi
-
-    # Link other packages (including hardware_drivers and utils subdirectories)
-    for pkg_dir in "$SCRIPT_DIR/src"/* "$SCRIPT_DIR/src/hardware_drivers"/* "$SCRIPT_DIR/src/utils"/*; do
-        if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.xml" ]; then
-            pkg_name=$(basename "$pkg_dir")
-            cd ~/ros2_ws/src
-            if [ ! -L "$pkg_name" ] && [ ! -d "$pkg_name" ]; then
-                ln -sf "$pkg_dir" "$pkg_name"
-                log "Linked $pkg_name package to workspace"
-            fi
-        fi
-    done
-
-    # Install dependencies
-    if command -v rosdep &> /dev/null; then
-        cd ~/ros2_ws
-        rosdep update || true
-        rosdep install --from-paths src --ignore-src -r -y || true
-    fi
-
-    # Clean problematic symlink directories (fixes ament_cmake_python symlink errors)
-    log "Cleaning problematic build directories..."
-    cd ~/ros2_ws
-    for pkg_dir in src/*/; do
-        if [ -d "$pkg_dir" ]; then
-            pkg_name=$(basename "$pkg_dir")
-            symlink_dir="build/${pkg_name}/ament_cmake_python/${pkg_name}/${pkg_name}"
-            if [ -d "$symlink_dir" ]; then
-                rm -rf "$symlink_dir" 2>/dev/null || true
-            fi
-        fi
-    done
-
-    # Build workspace
-    log "Building ROS 2 workspace..."
-    colcon build --symlink-install || log "Build completed with warnings"
-
-    mark_step_complete "build_ros2_packages"
 }
 
 # Check if reboot is needed
@@ -680,47 +338,50 @@ check_reboot() {
 
 # Main execution
 main() {
-    log_section "Isaac Robot System Setup"
+    log_section "Jetson Orin Nano - Docker-First Setup"
     log "Environment: $ENV_TYPE"
     log "Script directory: $SCRIPT_DIR"
+    echo ""
+    echo -e "${YELLOW}This setup installs ONLY host-level requirements.${NC}"
+    echo -e "${YELLOW}Perception, control, and ROS2 run in Docker containers.${NC}"
+    echo ""
 
     # Create setup state file if it doesn't exist
     touch "$SETUP_STATE"
 
     # Run setup steps
     step_update_system
-    step_install_system_packages
-    step_install_python_packages
-    step_setup_ros2_workspace
-    step_setup_venv
-    step_install_precommit
+    step_install_docker
+    step_setup_device_permissions
     step_setup_network
-    step_setup_bluetooth
     step_setup_wifi
-    step_install_realsense
-    step_install_services
-    step_setup_visualization
+    step_setup_bluetooth
     step_verify_hardware
-    step_build_ros2_packages
 
-    log_section "Setup Complete!"
+    log_section "Host Setup Complete!"
     echo ""
-    echo "Next steps:"
-    echo "1. Activate virtual environment:"
-    echo "   source .venv/bin/activate"
+    echo -e "${GREEN}=== Next Steps ===${NC}"
     echo ""
-    echo "2. Source ROS 2 (if available):"
-    echo "   source /opt/ros/humble/setup.bash"
-    echo "   source ~/ros2_ws/install/setup.bash"
+    echo "1. ${BLUE}IMPORTANT${NC}: Reboot or logout/login for group membership:"
+    echo "   sudo reboot"
     echo ""
-    echo "3. Run system monitor:"
-    echo "   ros2 launch isaac_robot minimal.launch.py"
+    echo "2. After reboot, configure robot:"
+    echo "   cp .env.example .env"
+    echo "   nano .env  # Set ROBOT_ID, ZENOH_ROUTER, camera serials"
     echo ""
-    echo "4. Or launch robot system (with cameras if installed):"
-    echo "   ros2 launch isaac_robot full.launch.py"
+    echo "3. Build Docker containers:"
+    echo "   docker compose build"
     echo ""
-    echo "5. Or use start script:"
-    echo "   ./scripts/system/start_robot.sh"
+    echo "4. Start robot services:"
+    echo "   docker compose up -d"
+    echo ""
+    echo "5. Monitor logs:"
+    echo "   docker compose logs -f perception control"
+    echo ""
+    echo "6. (Optional) Install systemd service for auto-start:"
+    echo "   ./scripts/system/install_services.sh"
+    echo ""
+    echo -e "${YELLOW}See docs/setup/DOCKER_FIRST_SETUP.md for full guide${NC}"
     echo ""
 
     # Check for reboot requirement

@@ -1,60 +1,98 @@
 version: '3.8'
 
+# Docker-First Production Configuration
+# Perception and control run in containers
+# See docs/setup/DOCKER_FIRST_SETUP.md
+
 services:
-  isaac-dev:
+  perception:
+    build:
+      context: ./perception
+      dockerfile: Dockerfile
+      args:
+        ROBOTICS_SDK_INSTALL: ${ROBOTICS_SDK_INSTALL:-git}
+    image: jetson-orin-nano/perception:latest
+    container_name: jetson-perception
+    privileged: true  # Required for camera access
+    network_mode: host
+    runtime: nvidia
+    environment:
+      - ROBOT_ID=${ROBOT_ID:-jetson-01}
+      - ZENOH_ROUTER=${ZENOH_ROUTER:-tcp/192.168.1.100:7447}
+      - CONFIG_PATH=/app/config/robot_config.yaml
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    devices:
+      # RealSense cameras (USB)
+      - /dev/bus/usb:/dev/bus/usb
+      # Video devices (adjust based on actual devices)
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video2:/dev/video2
+      - /dev/video3:/dev/video3
+    volumes:
+      - ./config:/app/config:ro
+      - /data/mcap:/data/mcap  # Local logging if needed
+      # For development: mount robotics framework locally
+      # - ../robotics:/robotics:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  control:
+    build:
+      context: ./control
+      dockerfile: Dockerfile
+      args:
+        ROBOTICS_SDK_INSTALL: ${ROBOTICS_SDK_INSTALL:-git}
+    image: jetson-orin-nano/control:latest
+    container_name: jetson-control
+    network_mode: host
+    runtime: nvidia
+    environment:
+      - ROBOT_ID=${ROBOT_ID:-jetson-01}
+      - ZENOH_ROUTER=${ZENOH_ROUTER:-tcp/192.168.1.100:7447}
+      - CONFIG_PATH=/app/config/robot_config.yaml
+      - MODEL_PATH=${MODEL_PATH:-/data/models/vla_latest.pth}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    devices:
+      # Serial devices for servos/motors
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyACM0:/dev/ttyACM0
+      # I2C devices
+      - /dev/i2c-1:/dev/i2c-1
+    volumes:
+      - ./config:/app/config:ro
+      - /data/models:/data/models:ro  # VLA model checkpoints
+      # For development: mount robotics framework locally
+      # - ../robotics:/robotics:ro
+    depends_on:
+      - perception
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Legacy development containers (for debugging, not used in production)
+  dev:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: isaac-dev
+    container_name: jetson-dev
     volumes:
-      # Mount source code
       - .:/workspace
-      # Mount ROS 2 workspace (if exists)
-      - ~/ros2_ws:/home/nano/ros2_ws
-      # Persist setup state
-      - .setup_state:/workspace/.setup_state
-      - .setup.log:/workspace/.setup.log
     environment:
       - DISPLAY=${DISPLAY:-:0}
-      - TZ=UTC
-      - SETUP_LOG=/workspace/.setup.log
-      - SETUP_STATE=/workspace/.setup_state
     network_mode: host
     stdin_open: true
     tty: true
     command: /bin/bash
-
-  isaac-ros:
-    build:
-      context: .
-      dockerfile: Dockerfile.ros2
-    container_name: isaac-ros
-    volumes:
-      - .:/workspace
-      - ~/ros2_ws:/home/nano/ros2_ws
-    environment:
-      - DISPLAY=${DISPLAY:-:0}
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    network_mode: host
-    stdin_open: true
-    tty: true
-    command: /bin/bash
-
-  isaac-viz:
-    build:
-      context: .
-      dockerfile: Dockerfile.ros2
-    container_name: isaac-viz
-    volumes:
-      - .:/workspace
-      - ~/ros2_ws:/home/nano/ros2_ws
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - ROSBRIDGE_PORT=${ROSBRIDGE_PORT:-9090}
-    network_mode: host
-    stdin_open: true
-    tty: true
-    command: >
-      /bin/bash -c "source /opt/ros/humble/setup.bash &&
-      source ~/ros2_ws/install/setup.bash 2>/dev/null || true &&
-      ros2 launch isaac_robot rosbridge.launch.py"
+    profiles: ["dev"]  # Only start with --profile dev
