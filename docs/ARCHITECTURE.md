@@ -166,6 +166,42 @@ robot_base → pan_servo → tilt_servo → camera_optical_frame
 
 ---
 
+## Hardware Platform
+
+### SparkFun Auto pHAT (ROB-16328)
+
+The robot control is implemented using the SparkFun Auto pHAT for Raspberry Pi, connected to a Jetson Orin Nano via the 40-pin GPIO header.
+
+**Key Components**:
+- **PCA9685 Servo Controller**: 4-channel PWM for pan-tilt servos (I2C address 0x40)
+- **ICM-20948 IMU**: 9-DoF motion sensing for odometry and SLAM (I2C address 0x69)
+- **PSoC 4245 Motor Driver**: 2-channel H-bridge for chassis motors (I2C address 0x5D)
+- **ATtiny84 Encoder Reader**: Dual quadrature encoder inputs (I2C address 0x73)
+
+**I2C Bus Configuration**:
+- All devices communicate via I2C bus 7 on Jetson Orin Nano (bus 1 on Raspberry Pi)
+- GPIO pins 3 (SDA) and 5 (SCL) on 40-pin header
+- Built-in pull-up resistors (2.2kΩ-10kΩ to 3.3V)
+
+**Documentation**:
+- Complete hardware reference: [hardware/sparkfun-auto-phat/](hardware/sparkfun-auto-phat/)
+- I2C troubleshooting: [I2C_TROUBLESHOOTING.md](hardware/sparkfun-auto-phat/I2C_TROUBLESHOOTING.md)
+- Configuration: `config/hardware/phat_params.yaml`
+
+**Diagnostics**:
+```bash
+# Scan I2C bus
+sudo i2cdetect -y 7
+
+# Test servo controller
+./scripts/hardware/diagnose_pca9685.sh
+
+# General PHAT diagnostics
+./scripts/hardware/diagnose_phat.sh
+```
+
+---
+
 ## Use Cases
 
 ### Use Case 1: Planning with Worldgraph
@@ -339,6 +375,11 @@ See [CALIBRATION.md](CALIBRATION.md) for complete details.
 
 ## See Also
 
-- Calibration: [CALIBRATION.md](CALIBRATION.md)
-- Setup: [SETUP.md](../SETUP.md)
-- Recovery: [RECOVERY.md](RECOVERY.md)
+- **Hardware Documentation**: [hardware/sparkfun-auto-phat/](hardware/sparkfun-auto-phat/) - Complete SparkFun Auto pHAT specifications
+  - [Hardware Overview](hardware/sparkfun-auto-phat/README.md) - Board identification and component layout
+  - [Technical Specifications](hardware/sparkfun-auto-phat/SPECIFICATIONS.md) - Detailed IC specs and addresses
+  - [I2C Troubleshooting](hardware/sparkfun-auto-phat/I2C_TROUBLESHOOTING.md) - Systematic debugging guide
+  - [Jumper Configuration](hardware/sparkfun-auto-phat/JUMPER_CONFIGURATION.md) - Address configuration
+- **Calibration**: [CALIBRATION.md](CALIBRATION.md) - Camera and servo calibration procedures
+- **Setup**: [SETUP.md](../SETUP.md) - Initial system setup
+- **Recovery**: [RECOVERY.md](RECOVERY.md) - System recovery procedures

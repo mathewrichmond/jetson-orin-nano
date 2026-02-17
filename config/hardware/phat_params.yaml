@@ -1,9 +1,43 @@
 /**:
   ros__parameters:
-    # I2C configuration for accelerometer
-    i2c_bus: 7  # I2C bus number (Jetson Orin Nano uses bus 7 for ICM-20948, different from Raspberry Pi's bus 1)
-    accelerometer_address: 0x69  # I2C address (0x69 for ICM-20948/SparkFun Auto pHAT, 0x68 for MPU6050, 0x6A for LSM6DS3)
-    accelerometer_type: 'ICM20948'  # Options: ICM20948 (SparkFun Auto pHAT), MPU6050, LSM6DS3
+    # ============================================================================
+    # SparkFun Auto pHAT Configuration (ROB-16328)
+    # ============================================================================
+    # Hardware Documentation: docs/hardware/sparkfun-auto-phat/
+    # Troubleshooting Guide: docs/hardware/sparkfun-auto-phat/I2C_TROUBLESHOOTING.md
+    # Jumper Configuration: docs/hardware/sparkfun-auto-phat/JUMPER_CONFIGURATION.md
+    #
+    # IMPORTANT I2C NOTES:
+    # - Jetson Orin Nano uses I2C bus 7 for GPIO header (Raspberry Pi uses bus 1)
+    # - All Auto pHAT devices share the same I2C bus (pins 3=SDA, 5=SCL)
+    # - I2C requires pull-up resistors (2.2kΩ-10kΩ to VCC), NOT pull-down
+    # - Built-in pull-ups are present on Auto pHAT board
+    # - SDA/SCL should idle HIGH (~3.3V) when no communication
+    #
+    # Default I2C Addresses (all configurable via jumpers):
+    #   0x40 - PCA9685 Servo Controller (SRV ADD jumpers, range: 0x40-0x47)
+    #   0x69 - ICM-20948 IMU (IMU ADD jumper, can be 0x68 or 0x69)
+    #   0x5D - PSoC 4245 Motor Driver (MTR ADD jumpers, range: 0x58-0x61)
+    #   0x73 - ATtiny84 Encoder Reader (fixed address)
+    #
+    # Diagnostics:
+    #   - Scan I2C bus: sudo i2cdetect -y 7
+    #   - Test PCA9685: ./scripts/hardware/diagnose_pca9685.sh
+    #   - General PHAT: ./scripts/hardware/diagnose_phat.sh
+    # ============================================================================
+
+    # I2C Bus Configuration
+    i2c_bus: 7  # Jetson Orin Nano GPIO I2C bus (bus 1 on Raspberry Pi)
+                # Verify with: ls /dev/i2c-* 
+                # Should show /dev/i2c-7
+
+    # IMU (Accelerometer/Gyroscope/Magnetometer) Configuration
+    accelerometer_address: 0x69  # ICM-20948 I2C address
+                                 # 0x69 = IMU ADD jumper CLOSED (default)
+                                 # 0x68 = IMU ADD jumper OPEN
+                                 # To change: See docs/hardware/sparkfun-auto-phat/JUMPER_CONFIGURATION.md
+    accelerometer_type: 'ICM20948'  # ICM-20948 9-DoF IMU on SparkFun Auto pHAT
+                                    # Alternative types: MPU6050, LSM6DS3 (for different hardware)
     enable_accelerometer: true
 
     # Publishing rate
@@ -16,24 +50,52 @@
     motor_right_dir_pin: 20  # Direction pin for right motor
     pwm_frequency: 1000  # PWM frequency in Hz
 
-    # Servo control (PCA9685 on Auto pHAT)
+    # Servo Control (PCA9685 PWM Controller)
+    # ============================================================================
+    # The PCA9685 is a 16-channel 12-bit PWM controller for servo control.
+    # Auto pHAT exposes 4 channels via servo headers.
+    #
+    # Hardware: NXP PCA9685
+    # Datasheet: docs/hardware/sparkfun-auto-phat/datasheets/PCA9685_NXP_Datasheet.pdf
+    # Specifications: docs/hardware/sparkfun-auto-phat/SPECIFICATIONS.md
+    #
+    # TROUBLESHOOTING PCA9685:
+    # If servos don't respond or PCA9685 not detected on I2C:
+    #   1. Check I2C address: sudo i2cdetect -y 7 (should show 40)
+    #   2. Verify power: PCA9685 requires 5V on VDD (pin 28)
+    #   3. Check /OE pin: Output Enable (pin 23) must be LOW (connected to GND)
+    #   4. Verify jumpers: SRV ADD jumpers on back (all open = 0x40)
+    #   5. Run diagnostics: ./scripts/hardware/diagnose_pca9685.sh
+    #   6. See full guide: docs/hardware/sparkfun-auto-phat/I2C_TROUBLESHOOTING.md
+    #
+    # Pull-up resistor note: I2C requires pull-UPs, not pull-downs!
+    #   - Correct: Resistors pull SDA/SCL HIGH to 3.3V when idle
+    #   - Wrong: Pull-down resistors prevent communication
+    #   - Auto pHAT has built-in pull-ups, no external resistors needed
+    # ============================================================================
     enable_servos: true
-    servo_i2c_bus: 7
-    servo_i2c_address: 0x40
-    servo_pwm_frequency: 50
-    servo_pan_channel: 0
-    servo_tilt_channel: 1
-    servo_pan_inverted: false
+    servo_i2c_bus: 7              # Must match main i2c_bus (Jetson uses bus 7)
+    servo_i2c_address: 0x40       # Default PCA9685 address (all SRV ADD jumpers open)
+                                  # If changed via jumpers, update this to match
+                                  # Range: 0x40-0x47 (see JUMPER_CONFIGURATION.md)
+    servo_pwm_frequency: 50       # 50 Hz for standard analog servos (20ms period)
+                                  # PCA9685 supports 24-1526 Hz
+                                  # Servo standard: 50 Hz with 1000-2000μs pulses
+    servo_pan_channel: 0          # PWM channel for pan servo (channels 0-3 available)
+    servo_tilt_channel: 1         # PWM channel for tilt servo
+    servo_pan_inverted: false     # Invert servo direction if mounted backwards
     servo_tilt_inverted: false
-    servo_min_angle_deg: 0.0
-    servo_max_angle_deg: 180.0
-    servo_min_pulse_us: 1000.0
-    servo_max_pulse_us: 2000.0
-    servo_startup_pan_deg: 90.0
-    servo_startup_tilt_deg: 90.0
-    servo_initialize_on_start: false
-    servo_pan_topic: "/phat/camera_pan"
-    servo_tilt_topic: "/phat/camera_tilt"
+    servo_min_angle_deg: 0.0      # Minimum servo angle (mechanical limit)
+    servo_max_angle_deg: 180.0    # Maximum servo angle (mechanical limit)
+    servo_min_pulse_us: 1000.0    # Minimum PWM pulse width (μs) for 0° position
+    servo_max_pulse_us: 2000.0    # Maximum PWM pulse width (μs) for 180° position
+                                  # Standard servo range: 1000-2000μs (1-2ms)
+                                  # Some servos use 500-2500μs - check servo specs
+    servo_startup_pan_deg: 90.0   # Initial position for pan servo on startup
+    servo_startup_tilt_deg: 90.0  # Initial position for tilt servo on startup
+    servo_initialize_on_start: false  # Set to true to move servos to startup position on node start
+    servo_pan_topic: "/phat/camera_pan"    # ROS topic for pan control
+    servo_tilt_topic: "/phat/camera_tilt"  # ROS topic for tilt control
 
     # Servo safety parameters
     servo_max_speed_deg_per_sec: 30.0  # Maximum angular velocity (deg/s) - conservative default
