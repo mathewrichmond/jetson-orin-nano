@@ -176,3 +176,20 @@ Now boots to SD by default. NVMe data remains intact.
 ---
 
 **IMPORTANT FOR HEADLESS**: Always have a serial console adapter available for emergency recovery. It's the ultimate fallback when network access fails.
+
+---
+
+## Complete Hardware Documentation
+
+For detailed hardware procedures and recovery methods, see:
+
+### Jetson Orin Nano Hardware
+- **[Hardware Overview](hardware/jetson-orin-nano/)** - Board specifications and connectors
+- **[Storage Setup](hardware/jetson-orin-nano/STORAGE_SETUP.md)** - NVMe SSD and SD card installation
+- **[Flashing Guide](hardware/jetson-orin-nano/FLASHING.md)** - Recovery mode and SDK Manager procedure
+- **[Serial Console](hardware/jetson-orin-nano/SERIAL_CONSOLE.md)** - J14 UART setup for headless debugging
+- **[Button Header](hardware/jetson-orin-nano/BUTTON_HEADER.md)** - Recovery pins, reset, and power control
+- **[GPIO Reference](hardware/jetson-orin-nano/GPIO_REFERENCE.md)** - 40-pin header pinout and I2C mapping
+
+### SparkFun Auto pHAT
+- **[Hardware Overview](hardware/sparkfun-auto-phat/)** - Robotics control board documentation

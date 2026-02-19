@@ -168,9 +168,27 @@ robot_base → pan_servo → tilt_servo → camera_optical_frame
 
 ## Hardware Platform
 
+### NVIDIA Jetson Orin Nano Developer Kit
+
+The robot runs on the NVIDIA Jetson Orin Nano Developer Kit, providing AI compute, GPIO interfaces, and real-time sensor processing.
+
+**Key Features**:
+- ARM Cortex-A78AE CPU (6-core @ 2.0 GHz) + NVIDIA Ampere GPU (1024 CUDA cores)
+- 8GB LPDDR5 RAM, M.2 NVMe storage support
+- 40-pin GPIO header (Raspberry Pi-compatible, 3.3V logic)
+- I2C bus 7 on GPIO pins 3 (SDA) and 5 (SCL) for peripheral communication
+- J14 serial console for headless debugging
+
+**Documentation**:
+- Complete hardware reference: [hardware/jetson-orin-nano/](hardware/jetson-orin-nano/)
+- Storage setup: [STORAGE_SETUP.md](hardware/jetson-orin-nano/STORAGE_SETUP.md)
+- Flashing guide: [FLASHING.md](hardware/jetson-orin-nano/FLASHING.md)
+- Serial console: [SERIAL_CONSOLE.md](hardware/jetson-orin-nano/SERIAL_CONSOLE.md)
+- GPIO reference: [GPIO_REFERENCE.md](hardware/jetson-orin-nano/GPIO_REFERENCE.md)
+
 ### SparkFun Auto pHAT (ROB-16328)
 
-The robot control is implemented using the SparkFun Auto pHAT for Raspberry Pi, connected to a Jetson Orin Nano via the 40-pin GPIO header.
+The robot control is implemented using the SparkFun Auto pHAT for Raspberry Pi, connected to the Jetson Orin Nano via the 40-pin GPIO header.
 
 **Key Components**:
 - **PCA9685 Servo Controller**: 4-channel PWM for pan-tilt servos (I2C address 0x40)
@@ -375,11 +393,19 @@ See [CALIBRATION.md](CALIBRATION.md) for complete details.
 
 ## See Also
 
-- **Hardware Documentation**: [hardware/sparkfun-auto-phat/](hardware/sparkfun-auto-phat/) - Complete SparkFun Auto pHAT specifications
-  - [Hardware Overview](hardware/sparkfun-auto-phat/README.md) - Board identification and component layout
-  - [Technical Specifications](hardware/sparkfun-auto-phat/SPECIFICATIONS.md) - Detailed IC specs and addresses
-  - [I2C Troubleshooting](hardware/sparkfun-auto-phat/I2C_TROUBLESHOOTING.md) - Systematic debugging guide
-  - [Jumper Configuration](hardware/sparkfun-auto-phat/JUMPER_CONFIGURATION.md) - Address configuration
+- **Hardware Documentation**:
+  - **Jetson Orin Nano**: [hardware/jetson-orin-nano/](hardware/jetson-orin-nano/)
+    - [Hardware Overview](hardware/jetson-orin-nano/README.md) - Board specs and connectors
+    - [Storage Setup](hardware/jetson-orin-nano/STORAGE_SETUP.md) - NVMe SSD and SD card
+    - [Flashing Guide](hardware/jetson-orin-nano/FLASHING.md) - Recovery mode and SDK Manager
+    - [Serial Console](hardware/jetson-orin-nano/SERIAL_CONSOLE.md) - J14 UART debug access
+    - [GPIO Reference](hardware/jetson-orin-nano/GPIO_REFERENCE.md) - 40-pin header and I2C bus 7
+    - [Button Header](hardware/jetson-orin-nano/BUTTON_HEADER.md) - Recovery pins and reset
+  - **SparkFun Auto pHAT**: [hardware/sparkfun-auto-phat/](hardware/sparkfun-auto-phat/)
+    - [Hardware Overview](hardware/sparkfun-auto-phat/README.md) - Board identification and component layout
+    - [Technical Specifications](hardware/sparkfun-auto-phat/SPECIFICATIONS.md) - Detailed IC specs and addresses
+    - [I2C Troubleshooting](hardware/sparkfun-auto-phat/I2C_TROUBLESHOOTING.md) - Systematic debugging guide
+    - [Jumper Configuration](hardware/sparkfun-auto-phat/JUMPER_CONFIGURATION.md) - Address configuration
 - **Calibration**: [CALIBRATION.md](CALIBRATION.md) - Camera and servo calibration procedures
 - **Setup**: [SETUP.md](../SETUP.md) - Initial system setup
 - **Recovery**: [RECOVERY.md](RECOVERY.md) - System recovery procedures

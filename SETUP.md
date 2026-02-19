@@ -2,9 +2,12 @@
 
 ## Prerequisites
 
-- Jetson Orin Nano with JetPack 5.x
-- NVMe SSD (recommended) or SD card
-- Intel RealSense cameras with pan-tilt servos
+- **Jetson Orin Nano** with JetPack 5.x
+  - For fresh flash: See [docs/hardware/jetson-orin-nano/FLASHING.md](docs/hardware/jetson-orin-nano/FLASHING.md)
+  - For storage setup: See [docs/hardware/jetson-orin-nano/STORAGE_SETUP.md](docs/hardware/jetson-orin-nano/STORAGE_SETUP.md)
+- **NVMe SSD** (256GB+ recommended) or SD card
+- **Intel RealSense cameras** with pan-tilt servos
+- **SparkFun Auto pHAT** (ROB-16328) for motor/servo control
 
 ## Installation
 
