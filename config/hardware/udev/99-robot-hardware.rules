@@ -1,0 +1,90 @@
+# 99-robot-hardware.rules
+# Consolidated udev rules for robot hardware access.
+#
+# PURPOSE:
+#   Grants non-root access to robot hardware devices, and makes them
+#   accessible inside Docker containers without requiring privileged: true.
+#
+# INSTALL:
+#   sudo cp config/hardware/udev/99-robot-hardware.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+#
+# Done automatically by: ./scripts/hardware/setup_hardware.sh full-setup
+#
+# GROUPS REQUIRED (configured by full-setup):
+#   i2c, gpio, dialout, audio, video
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# I2C — SparkFun Auto pHAT (PCA9685, ICM-20948, motor driver, encoder)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# All I2C buses: accessible by i2c group
+KERNEL=="i2c-[0-9]*", GROUP="i2c", MODE="0660"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GPIO — Jetson GPIO header
+# ─────────────────────────────────────────────────────────────────────────────
+
+# gpiochip devices: accessible by gpio group
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"
+
+# GPIO memory/export interface
+SUBSYSTEM=="gpio", GROUP="gpio", MODE="0660"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Serial — ODrive motor controller, iRobot Create
+# ─────────────────────────────────────────────────────────────────────────────
+
+# USB serial adapters (dialout group is already default on Ubuntu, but explicit here)
+KERNEL=="ttyUSB[0-9]*", GROUP="dialout", MODE="0660"
+KERNEL=="ttyACM[0-9]*", GROUP="dialout", MODE="0660"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# USB Video — Intel RealSense cameras
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Intel RealSense D4xx cameras (USB 3.x)
+# D435: 8086:0b07 / 8086:0b5c  |  D455: 8086:0b64
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b07", GROUP="video", MODE="0660", TAG+="uaccess"
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b5c", GROUP="video", MODE="0660", TAG+="uaccess"
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b64", GROUP="video", MODE="0660", TAG+="uaccess"
+
+# RealSense DFU / recovery mode
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0adb", GROUP="video", MODE="0660", TAG+="uaccess"
+ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0adc", GROUP="video", MODE="0660", TAG+="uaccess"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Audio — USB microphone
+# ─────────────────────────────────────────────────────────────────────────────
+
+# USB audio class devices
+SUBSYSTEM=="sound", GROUP="audio", MODE="0660"
+KERNEL=="controlC[0-9]*", SUBSYSTEM=="sound", GROUP="audio", MODE="0660"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Notes for Docker integration
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Once these rules are in place, replace the broad docker-compose.yml config:
+#
+#   privileged: true        ← REMOVE (security footgun)
+#   volumes:
+#     - /dev:/dev           ← REPLACE with specific devices
+#
+# With:
+#   group_add:
+#     - i2c
+#     - gpio
+#     - video
+#     - dialout
+#     - audio
+#   devices:
+#     - /dev/i2c-7          # Auto pHAT I2C bus
+#     - /dev/gpiochip0      # Jetson GPIO
+#     - /dev/video0         # RealSense front camera
+#     - /dev/video1         # RealSense rear camera (if present)
+#     - /dev/ttyUSB0        # ODrive / iRobot (check actual device)
+#
+# Note: Keep privileged: true until all hardware is confirmed working,
+# then switch to explicit device grants.

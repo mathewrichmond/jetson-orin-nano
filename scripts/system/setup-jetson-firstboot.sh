@@ -180,13 +180,134 @@ DAEMON
 EOF
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. Deploy initial container
+# 7. MAXN performance mode + persistent jetson_clocks
+# ─────────────────────────────────────────────────────────────────────────────
+step "Configuring MAXN performance mode"
+
+${SSH_KEY} << 'EOF'
+    set -e
+
+    # Set MAXN (mode 0) — all cores, max GPU/memory bandwidth
+    sudo nvpmodel -m 0
+    echo "nvpmodel set to MAXN (mode 0)"
+
+    # Install jetson_clocks as a systemd service so it persists across reboots
+    sudo tee /etc/systemd/system/jetson-clocks.service > /dev/null << 'SERVICE'
+[Unit]
+Description=Maximize Jetson clocks (jetson_clocks)
+After=nvpmodel.service
+Wants=nvpmodel.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/jetson_clocks
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable jetson-clocks.service
+    sudo systemctl start jetson-clocks.service
+
+    echo "jetson_clocks enabled at boot"
+    sudo nvpmodel -q
+EOF
+ok "MAXN mode set, jetson_clocks enabled at boot"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Sync repo to Jetson (needed for hardware setup scripts + pre-built .dtbo)
+# ─────────────────────────────────────────────────────────────────────────────
+step "Syncing repo to Jetson"
+
+# Determine repo root (works whether running from repo or scripts/system/)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+${SSH_KEY} "mkdir -p ~/src/jetson-orin-nano"
+
+rsync -az --delete \
+    --exclude='.git' \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    --exclude='install/' \
+    --exclude='build/' \
+    --exclude='log/' \
+    -e "ssh -i ${DEPLOY_KEY} -o ConnectTimeout=15" \
+    "${REPO_ROOT}/" \
+    "${JETSON_USER}@${JETSON_HOST}:~/src/jetson-orin-nano/"
+
+ok "Repo synced to ~/src/jetson-orin-nano on Jetson"
+info "(includes pre-compiled i2c7-100khz.dtbo — no compiler needed on target)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Hardware setup — Pass 1 (groups, udev, I2C overlay → reboot)
+# ─────────────────────────────────────────────────────────────────────────────
+step "Running hardware setup Pass 1 (groups + I2C overlay)"
+
+${SSH_KEY} << 'EOF'
+    set -e
+    cd ~/src/jetson-orin-nano
+    chmod +x scripts/hardware/setup_hardware.sh
+    chmod +x scripts/hardware/setup_i2c.sh
+    chmod +x scripts/hardware/setup_gpio.sh
+    # Pass 1: configures groups, udev rules, installs DT overlay, patches extlinux.conf
+    # Exits cleanly with a reboot notice (does NOT call reboot itself)
+    bash scripts/hardware/setup_hardware.sh full-setup
+EOF
+
+ok "Hardware setup Pass 1 complete — reboot required"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. Reboot Jetson
+# ─────────────────────────────────────────────────────────────────────────────
+step "Rebooting Jetson for I2C overlay to take effect"
+
+${SSH_KEY} "sudo reboot" || true   # SSH will drop — that's expected
+info "Waiting 45 seconds for Jetson to come back up..."
+sleep 45
+
+# Wait for SSH to become available (up to 2 minutes)
+WAIT=0
+until ssh -i "${DEPLOY_KEY}" -o ConnectTimeout=5 -o BatchMode=yes \
+         "${JETSON_USER}@${JETSON_HOST}" "echo ok" &>/dev/null 2>&1; do
+    WAIT=$((WAIT + 5))
+    if [ "$WAIT" -gt 120 ]; then
+        warn "Jetson not reachable after 2 minutes — continue manually:"
+        warn "  ssh -i ${DEPLOY_KEY} ${JETSON_USER}@${JETSON_HOST}"
+        warn "  cd ~/src/jetson-orin-nano"
+        warn "  bash scripts/hardware/setup_hardware.sh full-setup"
+        break
+    fi
+    info "  Still waiting... (${WAIT}s)"
+    sleep 5
+done
+
+if [ "$WAIT" -le 120 ]; then
+    ok "Jetson is back online after ${WAIT}s"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11. Hardware setup — Pass 2 (verify I2C, install drivers, full verify)
+# ─────────────────────────────────────────────────────────────────────────────
+step "Running hardware setup Pass 2 (driver install + verification)"
+
+${SSH_KEY} << 'EOF'
+    set -e
+    cd ~/src/jetson-orin-nano
+    # Pass 2: detects overlay is active, installs camera/GPIO/audio drivers, verifies
+    bash scripts/hardware/setup_hardware.sh full-setup
+EOF
+
+ok "Hardware setup complete"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. Deploy initial container
 # ─────────────────────────────────────────────────────────────────────────────
 step "Setting up initial deployment"
 
 ${SSH_KEY} << 'EOF'
     set -e
-    mkdir -p ~/src/jetson-orin-nano
     echo "Ready for deployment via CI/CD."
     echo "Run the GitHub Actions 'Deploy to Robot' workflow targeting this host."
 EOF

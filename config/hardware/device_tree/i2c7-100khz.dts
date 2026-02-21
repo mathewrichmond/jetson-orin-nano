@@ -1,0 +1,50 @@
+/dts-v1/;
+/plugin/;
+
+/*
+ * Device Tree Overlay: I2C7 100kHz (GPIO Header)
+ * Target: Jetson Orin Nano Developer Kit (p3767-0005 on p3509-a02 carrier)
+ * JetPack: 6.x (Tegra234 / L4T 36.x)
+ *
+ * PURPOSE:
+ *   Reduces the I2C7 bus (GPIO header pins 3/5) clock from the default 400kHz
+ *   (Fast Mode) to 100kHz (Standard Mode) so that the PCA9685 servo controller
+ *   on the SparkFun Auto pHAT is reliably detected and communicates correctly.
+ *
+ * SAFE MODIFICATION METHOD:
+ *   This is a device tree OVERLAY (.dtbo), not a modification of the main DTB.
+ *   Applied via FDT_OVERLAYS in /boot/extlinux/extlinux.conf.
+ *   Reversible: remove the FDT_OVERLAYS line from extlinux.conf to revert.
+ *   The main kernel DTB is never touched.
+ *
+ * I2C7 NODE:
+ *   On Tegra234, I2C7 is at /i2c@31e0000. This maps to the 40-pin GPIO header:
+ *     Pin 3  = SDA (I2C7_SDA)
+ *     Pin 5  = SCL (I2C7_SCL)
+ *   Verify on target: xxd -e -g4 /proc/device-tree/aliases/i2c7
+ *   Should resolve to: /i2c@31e0000
+ *
+ * REBUILD (if .dts is changed):
+ *   Run on WSL2 / Linux x86 dev machine — dtc is architecture-independent:
+ *     dtc -O dtb -o config/hardware/device_tree/i2c7-100khz.dtbo \
+ *         -b 0 -@ config/hardware/device_tree/i2c7-100khz.dts
+ *   Commit both .dts and .dtbo together.
+ *
+ * HARDWARE CONTEXT:
+ *   SparkFun Auto pHAT (ROB-16328) devices on I2C7:
+ *     0x40 - PCA9685 (servo controller)    ← requires 100kHz
+ *     0x69 - ICM-20948 (IMU)
+ *     0x5D - PSoC 4245 (motor driver)
+ *     0x73 - ATtiny84 (encoder reader)
+ */
+
+/ {
+    compatible = "nvidia,p3767-0005";
+
+    fragment@0 {
+        target-path = "/i2c@31e0000";
+        __overlay__ {
+            clock-frequency = <100000>;
+        };
+    };
+};
