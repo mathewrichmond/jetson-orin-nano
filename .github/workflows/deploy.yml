@@ -1,7 +1,7 @@
 name: Deploy to Robot
 
 on:
-  # Only manual deployment (auto-deploy disabled until secrets configured)
+  # Manual deploy with environment + target selection
   workflow_dispatch:
     inputs:
       environment:
@@ -10,185 +10,132 @@ on:
         type: choice
         options:
           - dev
-          - staging
           - production
-      hosts:
-        description: 'Target hosts (comma-separated, e.g., jetson,pi)'
+      jetson_host:
+        description: 'Jetson hostname or IP (e.g. isaac.local)'
         required: true
-        default: 'jetson'
+        default: 'isaac.local'
 
 env:
   DEPLOY_USER: nano
-  ROS_DISTRO: humble
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/isaac-robot-control
 
 jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build ARM64 image on the self-hosted GPU machine and push to ghcr.io
+  # ──────────────────────────────────────────────────────────────────────────
+  build-arm64:
+    name: Build ARM64 Image
+    runs-on: [self-hosted, linux, gpu]
+
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker buildx
+        run: |
+          docker buildx use robotics-builder 2>/dev/null || \
+            docker buildx create --name robotics-builder --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+      - name: Build and push ARM64 image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.robot-control
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Deploy: SSH to Jetson, pull image, restart services
+  # ──────────────────────────────────────────────────────────────────────────
   deploy-jetson:
     name: Deploy to Jetson
-    runs-on: ubuntu-latest
-    if: contains(github.event.inputs.hosts, 'jetson')
-    
+    runs-on: [self-hosted, linux, gpu]
+    needs: build-arm64
+
+    environment: ${{ github.event.inputs.environment }}
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set environment variables
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "DEPLOY_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "DEPLOY_ENV=production" >> $GITHUB_ENV
-          else
-            echo "DEPLOY_ENV=dev" >> $GITHUB_ENV
-          fi
-      
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        run: echo "tag=sha-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.JETSON_SSH_KEY }}" > ~/.ssh/jetson_key
           chmod 600 ~/.ssh/jetson_key
-          
-          # Add host to known_hosts
-          ssh-keyscan -H ${{ secrets.JETSON_HOST }} >> ~/.ssh/known_hosts
-      
+          ssh-keyscan -H ${{ github.event.inputs.jetson_host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
       - name: Test SSH connection
         run: |
-          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} "echo 'SSH connection successful'"
-      
-      - name: Deploy code to Jetson
+          ssh -i ~/.ssh/jetson_key -o ConnectTimeout=10 \
+            ${{ env.DEPLOY_USER }}@${{ github.event.inputs.jetson_host }} \
+            "echo 'SSH OK: $(hostname)'"
+
+      - name: Sync compose file and config
         run: |
-          # Rsync code to Jetson
-          rsync -avz --delete \
+          rsync -avz \
             -e "ssh -i ~/.ssh/jetson_key" \
-            --exclude '.git' \
-            --exclude 'build' \
-            --exclude 'install' \
-            --exclude 'log' \
-            --exclude '.venv' \
-            --exclude '__pycache__' \
-            ./ ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }}:~/src/jetson-orin-nano/
-      
-      - name: Build on Jetson
+            --include='docker-compose.yml' \
+            --include='config/***' \
+            --exclude='*' \
+            ./ ${{ env.DEPLOY_USER }}@${{ github.event.inputs.jetson_host }}:~/src/jetson-orin-nano/
+
+      - name: Pull image and restart
         run: |
-          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} << 'EOF'
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}"
+          ssh -i ~/.ssh/jetson_key \
+            ${{ env.DEPLOY_USER }}@${{ github.event.inputs.jetson_host }} << EOF
+            set -e
+            echo "Pulling $IMAGE ..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | \
+              docker login ghcr.io -u ${{ github.actor }} --password-stdin 2>/dev/null
+
+            docker pull "$IMAGE"
+
             cd ~/src/jetson-orin-nano
-            
-            # Source ROS 2
-            source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
-            
-            # Build packages
-            colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-            
-            echo "Build completed successfully"
-          EOF
-      
-      - name: Restart services (if production)
-        if: env.DEPLOY_ENV == 'production'
-        run: |
-          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} << 'EOF'
-            # Restart systemd service
-            systemctl --user restart isaac-robot.service || true
-            
-            # Wait for service to start
+            IMAGE="$IMAGE" docker compose up -d --remove-orphans
+
+            echo "Waiting for health check..."
             sleep 5
-            
-            # Check status
-            systemctl --user status isaac-robot.service
-          EOF
-      
-      - name: Health check
-        run: |
-          ssh -i ~/.ssh/jetson_key ${{ env.DEPLOY_USER }}@${{ secrets.JETSON_HOST }} << 'EOF'
-            cd ~/src/jetson-orin-nano
-            source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
-            source install/setup.bash
-            
-            # Check ROS 2 nodes
-            timeout 10 ros2 node list || echo "No nodes running (may be expected)"
-          EOF
-      
-      - name: Send deployment notification
-        if: always()
-        run: |
-          echo "Deployment to Jetson (${{ env.DEPLOY_ENV }}) completed with status: ${{ job.status }}"
-  
-  deploy-pi:
-    name: Deploy to Raspberry Pi
-    runs-on: ubuntu-latest
-    if: contains(github.event.inputs.hosts, 'pi')
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set environment variables
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "DEPLOY_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-          else
-            echo "DEPLOY_ENV=dev" >> $GITHUB_ENV
-          fi
-      
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_key
-          chmod 600 ~/.ssh/pi_key
-          
-          ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts
-      
-      - name: Deploy code to Pi
-        run: |
-          rsync -avz --delete \
-            -e "ssh -i ~/.ssh/pi_key" \
-            --exclude '.git' \
-            --exclude 'build' \
-            --exclude 'install' \
-            --exclude 'log' \
-            --exclude '.venv' \
-            --exclude '__pycache__' \
-            ./ pi@${{ secrets.PI_HOST }}:~/src/jetson-orin-nano/
-      
-      - name: Build on Pi
-        run: |
-          ssh -i ~/.ssh/pi_key pi@${{ secrets.PI_HOST }} << 'EOF'
-            cd ~/src/jetson-orin-nano
-            
-            source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
-            
-            # Build only Pi-specific packages
-            colcon build \
-              --packages-select custom_msgs chassis_control power_management \
-              --symlink-install \
-              --cmake-args -DCMAKE_BUILD_TYPE=Release
-            
-            echo "Build completed successfully"
-          EOF
-      
-      - name: Restart services (if production)
-        if: env.DEPLOY_ENV == 'production'
-        run: |
-          ssh -i ~/.ssh/pi_key pi@${{ secrets.PI_HOST }} << 'EOF'
-            systemctl --user restart isaac-robot.service || true
-            sleep 5
-            systemctl --user status isaac-robot.service
+            docker compose ps
           EOF
 
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [deploy-jetson]
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/jetson_key \
+            ${{ env.DEPLOY_USER }}@${{ github.event.inputs.jetson_host }} \
+            "docker inspect --format='{{.State.Health.Status}}' isaac-robot-control"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/jetson_key
