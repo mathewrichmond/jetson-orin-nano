@@ -77,23 +77,31 @@ echo ""
 echo "[4/5] Verifying device tree node path for I2C7..."
 
 DT_ALIAS_FILE="/proc/device-tree/aliases/i2c7"
-EXPECTED_NODE="i2c@31e0000"
+# JetPack 6.x: /bus@0/i2c@c250000; older: /i2c@31e0000
+EXPECTED_NODES="i2c@c250000 i2c@31e0000"
 DTBO_SRC="${PROJECT_ROOT}/config/hardware/device_tree/i2c7-100khz.dtbo"
 DTBO_DST="/boot/dtb/i2c7-100khz.dtbo"
 EXTLINUX="/boot/extlinux/extlinux.conf"
 
 if [ -f "$DT_ALIAS_FILE" ]; then
-    # The alias value is a null-terminated string like "/i2c@31e0000"
+    # The alias value is a null-terminated string like "/bus@0/i2c@c250000"
     ACTUAL_NODE=$(cat "$DT_ALIAS_FILE" | tr -d '\0')
     info "I2C7 alias resolves to: $ACTUAL_NODE"
 
-    if echo "$ACTUAL_NODE" | grep -q "$EXPECTED_NODE"; then
+    MATCHED=false
+    for node in $EXPECTED_NODES; do
+        if echo "$ACTUAL_NODE" | grep -q "$node"; then
+            MATCHED=true
+            break
+        fi
+    done
+    if $MATCHED; then
         ok "DT node path confirmed: $ACTUAL_NODE"
     else
         echo ""
-        fail "Unexpected I2C7 node path: $ACTUAL_NODE (expected /$EXPECTED_NODE)"
+        fail "Unexpected I2C7 node path: $ACTUAL_NODE (expected one of: $EXPECTED_NODES)"
         echo "  The overlay in config/hardware/device_tree/i2c7-100khz.dts"
-        echo "  targets /i2c@31e0000 which does not match this JetPack version."
+        echo "  targets a known path which does not match this JetPack version."
         echo ""
         echo "  To fix:"
         echo "    1. Edit config/hardware/device_tree/i2c7-100khz.dts"
@@ -166,6 +174,6 @@ echo -e "${YELLOW}  *** REBOOT REQUIRED for I2C frequency change to take effect 
 echo ""
 info "After reboot, verify with:"
 info "  sudo i2cdetect -y 7          # should show 40 (PCA9685)"
-info "  xxd -e -g4 /proc/device-tree/i2c@31e0000/clock-frequency"
+info "  xxd -e -g4 /proc/device-tree/bus@0/i2c@c250000/clock-frequency"
 info "  # should output: 000186a0 (100000 decimal)"
 echo ""

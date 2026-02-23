@@ -18,11 +18,10 @@
  *   The main kernel DTB is never touched.
  *
  * I2C7 NODE:
- *   On Tegra234, I2C7 is at /i2c@31e0000. This maps to the 40-pin GPIO header:
- *     Pin 3  = SDA (I2C7_SDA)
- *     Pin 5  = SCL (I2C7_SCL)
- *   Verify on target: xxd -e -g4 /proc/device-tree/aliases/i2c7
- *   Should resolve to: /i2c@31e0000
+ *   JetPack 6.x (L4T 36.x): /bus@0/i2c@c250000
+ *   Older JetPack (Tegra234): /i2c@31e0000
+ *   Maps to 40-pin GPIO header: Pin 3 = SDA, Pin 5 = SCL
+ *   Verify on target: cat /proc/device-tree/aliases/i2c7 | tr -d '\0'
  *
  * REBUILD (if .dts is changed):
  *   Run on WSL2 / Linux x86 dev machine — dtc is architecture-independent:
@@ -42,7 +41,7 @@
     compatible = "nvidia,p3767-0005";
 
     fragment@0 {
-        target-path = "/i2c@31e0000";
+        target-path = "/bus@0/i2c@c250000";
         __overlay__ {
             clock-frequency = <100000>;
         };

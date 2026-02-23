@@ -298,9 +298,9 @@ full_setup() {
 
     # After reboot with overlay active, the reported clock-frequency in
     # /proc/device-tree will be 0x000186a0 (100000 in big-endian hex).
-    if [ -f /proc/device-tree/i2c@31e0000/clock-frequency ]; then
+    if [ -f /proc/device-tree/bus@0/i2c@c250000/clock-frequency ]; then
         local freq
-        freq=$(xxd -e -g4 /proc/device-tree/i2c@31e0000/clock-frequency 2>/dev/null | awk '{print $2}' | head -1)
+        freq=$(xxd -e -g4 /proc/device-tree/bus@0/i2c@c250000/clock-frequency 2>/dev/null | awk '{print $2}' | head -1)
         if [ "$freq" = "000186a0" ]; then
             i2c_overlay_active=true
         fi
